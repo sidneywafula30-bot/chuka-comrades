@@ -18,6 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,6 +37,29 @@ jobs:
         env:
           VITE_BASE: /chuka-comrades/
 
+          VITE_CPL_API_URL: ${{ secrets.VITE_CPL_API_URL }}
+          VITE_CYBER_API_URL: ${{ secrets.VITE_CYBER_API_URL }}
+          VITE_EFOOTBALL_API_URL: ${{ secrets.VITE_EFOOTBALL_API_URL }}
+
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+
+          VITE_GIGS_API_URL: ${{ secrets.VITE_GIGS_API_URL }}
+          VITE_HOSTEL_API_URL: ${{ secrets.VITE_HOSTEL_API_URL }}
+          VITE_LABS_API_URL: ${{ secrets.VITE_LABS_API_URL }}
+          VITE_MAPS_URL: ${{ secrets.VITE_MAPS_URL }}
+          VITE_MEDIA_API_URL: ${{ secrets.VITE_MEDIA_API_URL }}
+          VITE_OZONE_API_URL: ${{ secrets.VITE_OZONE_API_URL }}
+          VITE_SKILLS_API_URL: ${{ secrets.VITE_SKILLS_API_URL }}
+          VITE_SOKO_API_URL: ${{ secrets.VITE_SOKO_API_URL }}
+
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -48,8 +72,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
     needs: build
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
