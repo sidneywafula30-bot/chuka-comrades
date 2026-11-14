@@ -1,151 +1,550 @@
+
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle, MapPin } from 'lucide-react'
-import { labsApi, type CalEvent, type EventKind, type EventsResult } from '../lib/labs'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  LoaderCircle,
+  MapPin,
+} from 'lucide-react'
 
-/* ---------- date helpers (all on plain 'YYYY-MM-DD' strings so time zones can never shift a day) ---------- */
-const pad = (n: number) => String(n).padStart(2, '0')
-const addDays = (k: string, n: number) => { const d = new Date(`${k}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
-const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' })
-const fmtDay = (k: string, long = false) =>
-  new Date(`${k}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: long ? 'long' : undefined, day: 'numeric', month: 'short', timeZone: 'UTC' })
-const monthTitle = (y: number, m: number) => new Date(Date.UTC(y, m, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+import {
+  labsApi,
+  type CalEvent,
+  type EventKind,
+  type EventsResult,
+} from '../lib/labs'
 
-const KIND_LABEL: Record<EventKind, string> = { exam: 'Exam', cat: 'CAT', important: 'Important', event: 'Event' }
-const FILTERS: { key: 'all' | EventKind; label: string }[] = [
-  { key: 'all', label: 'All' }, { key: 'exam', label: 'Exams' }, { key: 'cat', label: 'CATs' }, { key: 'important', label: 'Important dates' },
+/* ---------- Date helpers ---------- */
+
+// Use plain YYYY-MM-DD strings to avoid timezone date shifts.
+const pad = (n: number): string => String(n).padStart(2, '0')
+
+const addDays = (key: string, amount: number): string => {
+  const date = new Date(`${key}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + amount)
+  return date.toISOString().slice(0, 10)
+}
+
+const todayKey = (): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Nairobi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+
+const fmtDay = (key: string, long = false): string =>
+  new Date(`${key}T00:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: long ? 'long' : undefined,
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+
+const monthTitle = (year: number, month: number): string =>
+  new Date(Date.UTC(year, month, 1)).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+
+const WEEK: string[] = [
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun',
 ]
 
-function whenLabel(e: CalEvent) {
-  const s = e.start.slice(0, 10), en = e.end.slice(0, 10)
-  if (e.allDay) return s === en ? `${fmtDay(s, true)} · all day` : `${fmtDay(s)} – ${fmtDay(en)}`
-  const t1 = e.start.slice(11, 16), t2 = e.end.slice(11, 16)
-  if (s === en) return `${fmtDay(s, true)} · ${t1}${t2 && t2 !== t1 ? ` – ${t2}` : ''}`
-  return `${fmtDay(s)} ${t1} – ${fmtDay(en)} ${t2}`
+/* ---------- Event labels ---------- */
+
+const KIND_LABEL: Record<EventKind, string> = {
+  exam: 'Exam',
+  cat: 'CAT',
+  important: 'Important',
+  event: 'Event',
 }
 
-/** A "add to my Google Calendar" link built from the event itself (the calendar's own link would open the owner's calendar). */
-function addLink(e: CalEvent) {
-  const compact = (v: string) => v.replace(/[-:]/g, '').slice(0, e.allDay ? 8 : 15)
-  const dates = e.allDay ? `${compact(e.start)}/${compact(addDays(e.end.slice(0, 10), 1))}` : `${compact(e.start)}/${compact(e.end)}`
-  const q = new URLSearchParams({ action: 'TEMPLATE', text: e.title, dates, ctz: 'Africa/Nairobi' })
-  if (e.location) q.set('location', e.location)
-  if (e.description) q.set('details', e.description)
-  return `https://calendar.google.com/calendar/render?${q.toString()}`
+const FILTERS: { key: 'all' | EventKind; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'exam', label: 'Exams' },
+  { key: 'cat', label: 'CATs' },
+  { key: 'important', label: 'Important dates' },
+]
+
+/* ---------- Event formatting ---------- */
+
+function whenLabel(event: CalEvent): string {
+  const startDate = event.start.slice(0, 10)
+  const endDate = event.end.slice(0, 10)
+
+  if (event.allDay) {
+    return startDate === endDate
+      ? `${fmtDay(startDate, true)} · all day`
+      : `${fmtDay(startDate)} – ${fmtDay(endDate)}`
+  }
+
+  const startTime = event.start.slice(11, 16)
+  const endTime = event.end.slice(11, 16)
+
+  if (startDate === endDate) {
+    return `${fmtDay(startDate, true)} · ${startTime}${
+      endTime && endTime !== startTime ? ` – ${endTime}` : ''
+    }`
+  }
+
+  return `${fmtDay(startDate)} ${startTime} – ${fmtDay(endDate)} ${endTime}`
 }
+
+/**
+ * Builds a Google Calendar event link.
+ * This adds the individual event to the user's calendar,
+ * rather than opening the owner's calendar.
+ */
+function addLink(event: CalEvent): string {
+  const compact = (value: string): string =>
+    value.replace(/[-:]/g, '').slice(0, event.allDay ? 8 : 15)
+
+  const dates = event.allDay
+    ? `${compact(event.start)}/${compact(
+        addDays(event.end.slice(0, 10), 1),
+      )}`
+    : `${compact(event.start)}/${compact(event.end)}`
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates,
+    ctz: 'Africa/Nairobi',
+  })
+
+  if (event.location) {
+    params.set('location', event.location)
+  }
+
+  if (event.description) {
+    params.set('details', event.description)
+  }
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
+/* ---------- Calendar component ---------- */
 
 export default function LabsCalendar() {
   const now = todayKey()
-  const [ym, setYm] = useState({ y: Number(now.slice(0, 4)), m: Number(now.slice(5, 7)) - 1 })
+
+  const [ym, setYm] = useState<{ y: number; m: number }>({
+    y: Number(now.slice(0, 4)),
+    m: Number(now.slice(5, 7)) - 1,
+  })
+
   const [res, setRes] = useState<EventsResult | null>(null)
-  const [err, setErr] = useState('')
+  const [err, setErr] = useState<string>('')
   const [filter, setFilter] = useState<'all' | EventKind>('all')
   const [selected, setSelected] = useState<string | null>(null)
-  const cache = useRef(new Map<string, EventsResult>())
 
-  // The grid always shows 6 weeks starting on Monday, so fetch exactly that window.
+  const cache = useRef<Map<string, EventsResult>>(new Map())
+
+  /* ---------- Calculate calendar grid ---------- */
+
+  // Always display six weeks beginning on Monday.
   const { cells, from, to, monthStart, monthEnd } = useMemo(() => {
     const first = `${ym.y}-${pad(ym.m + 1)}-01`
-    const dow = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7
-    const gridStart = addDays(first, -dow)
-    const last = new Date(Date.UTC(ym.y, ym.m + 1, 0)).toISOString().slice(0, 10)
-    return { cells: Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), from: gridStart, to: addDays(gridStart, 41), monthStart: first, monthEnd: last }
+
+    const dayOfWeek =
+      (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7
+
+    const gridStart = addDays(first, -dayOfWeek)
+
+    const last = new Date(
+      Date.UTC(ym.y, ym.m + 1, 0),
+    )
+      .toISOString()
+      .slice(0, 10)
+
+    return {
+      cells: Array.from(
+        { length: 42 },
+        (_, index): string => addDays(gridStart, index),
+      ),
+      from: gridStart,
+      to: addDays(gridStart, 41),
+      monthStart: first,
+      monthEnd: last,
+    }
   }, [ym])
+
+  /* ---------- Fetch calendar events ---------- */
 
   useEffect(() => {
     let live = true
-    const ck = `${from}_${to}`
-    const hit = cache.current.get(ck)
-    if (hit) { setRes(hit); setErr(''); return }
-    setRes(null); setErr('')
-    labsApi.events(from, to)
-      .then((r) => { cache.current.set(ck, r); if (live) setRes(r) })
-      .catch((e) => { if (live) setErr(e instanceof Error ? e.message : 'Could not load the calendar.') })
-    return () => { live = false }
+
+    const cacheKey = `${from}_${to}`
+    const cached = cache.current.get(cacheKey)
+
+    if (cached) {
+      setRes(cached)
+      setErr('')
+      return
+    }
+
+    setRes(null)
+    setErr('')
+
+    labsApi
+      .events(from, to)
+      .then((result: EventsResult) => {
+        cache.current.set(cacheKey, result)
+
+        if (live) {
+          setRes(result)
+        }
+      })
+      .catch((error: unknown) => {
+        if (live) {
+          setErr(
+            error instanceof Error
+              ? error.message
+              : 'Could not load the calendar.',
+          )
+        }
+      })
+
+    return () => {
+      live = false
+    }
   }, [from, to])
 
-  const events = useMemo(() => (res?.events ?? []).filter((e) => filter === 'all' || e.kind === filter), [res, filter])
+  /* ---------- Filter events ---------- */
+
+  const events = useMemo(
+    (): CalEvent[] =>
+      (res?.events ?? []).filter(
+        (event: CalEvent) =>
+          filter === 'all' || event.kind === filter,
+      ),
+    [res, filter],
+  )
+
+  /* ---------- Group events by date ---------- */
 
   const byDay = useMemo(() => {
-    const m = new Map<string, CalEvent[]>()
-    for (const e of events) {
-      let k = e.start.slice(0, 10) < from ? from : e.start.slice(0, 10)
-      const stop = e.end.slice(0, 10) > to ? to : e.end.slice(0, 10)
-      for (let i = 0; i < 45 && k <= stop; i++, k = addDays(k, 1)) m.set(k, [...(m.get(k) ?? []), e])
+    const grouped = new Map<string, CalEvent[]>()
+
+    for (const event of events) {
+      let currentDate =
+        event.start.slice(0, 10) < from
+          ? from
+          : event.start.slice(0, 10)
+
+      const stopDate =
+        event.end.slice(0, 10) > to
+          ? to
+          : event.end.slice(0, 10)
+
+      for (
+        let index = 0;
+        index < 45 && currentDate <= stopDate;
+        index++, currentDate = addDays(currentDate, 1)
+      ) {
+        const existing = grouped.get(currentDate) ?? []
+        grouped.set(currentDate, [...existing, event])
+      }
     }
-    return m
+
+    return grouped
   }, [events, from, to])
 
-  const isThisMonth = ym.y === Number(now.slice(0, 4)) && ym.m === Number(now.slice(5, 7)) - 1
-  const listed = useMemo(() => {
-    if (selected) return byDay.get(selected) ?? []
-    return events.filter((e) => e.end.slice(0, 10) >= (isThisMonth ? now : monthStart) && e.start.slice(0, 10) <= monthEnd)
-  }, [selected, byDay, events, isThisMonth, now, monthStart, monthEnd])
+  /* ---------- Current month and event list ---------- */
 
-  function go(delta: number) {
+  const isThisMonth =
+    ym.y === Number(now.slice(0, 4)) &&
+    ym.m === Number(now.slice(5, 7)) - 1
+
+  const listed = useMemo((): CalEvent[] => {
+    if (selected) {
+      return byDay.get(selected) ?? []
+    }
+
+    return events.filter(
+      (event: CalEvent) =>
+        event.end.slice(0, 10) >=
+          (isThisMonth ? now : monthStart) &&
+        event.start.slice(0, 10) <= monthEnd,
+    )
+  }, [
+    selected,
+    byDay,
+    events,
+    isThisMonth,
+    now,
+    monthStart,
+    monthEnd,
+  ])
+
+  /* ---------- Month navigation ---------- */
+
+  function go(delta: number): void {
     setSelected(null)
-    setYm(({ y, m }) => { const d = new Date(Date.UTC(y, m + delta, 1)); return { y: d.getUTCFullYear(), m: d.getUTCMonth() } })
+
+    setYm(({ y, m }) => {
+      const date = new Date(Date.UTC(y, m + delta, 1))
+
+      return {
+        y: date.getUTCFullYear(),
+        m: date.getUTCMonth(),
+      }
+    })
   }
+
+  function goToday(): void {
+    setSelected(null)
+
+    setYm({
+      y: Number(now.slice(0, 4)),
+      m: Number(now.slice(5, 7)) - 1,
+    })
+  }
+
+  /* ---------- Calendar not configured ---------- */
 
   if (res && !res.configured) {
     return (
       <section className="sl-cal sl-card">
-        <div className="sl-cal-head"><h2><CalendarDays size={18} /> Important dates &amp; exams</h2></div>
-        <p className="sl-sub">The calendar is not connected yet. An admin needs to add the calendar ID in the Apps Script settings.</p>
+        <div className="sl-cal-head">
+          <h2>
+            <CalendarDays size={18} />
+            Important dates &amp; exams
+          </h2>
+        </div>
+
+        <p className="sl-sub">
+          The calendar is not connected yet. An admin needs
+          to add the calendar ID in the Apps Script settings.
+        </p>
       </section>
     )
   }
 
+  /* ---------- Main calendar ---------- */
+
   return (
-    <section className="sl-cal sl-card" aria-label="Important dates and exams calendar">
+    <section
+      className="sl-cal sl-card"
+      aria-label="Important dates and exams calendar"
+    >
       <div className="sl-cal-head">
-        <h2><CalendarDays size={18} /> Important dates &amp; exams</h2>
+        <h2>
+          <CalendarDays size={18} />
+          Important dates &amp; exams
+        </h2>
+
         <div className="sl-cal-nav">
-          <button className="sl-icon-btn" onClick={() => go(-1)} aria-label="Previous month"><ChevronLeft size={18} /></button>
+          <button
+            type="button"
+            className="sl-icon-btn"
+            onClick={() => go(-1)}
+            aria-label="Previous month"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
           <strong>{monthTitle(ym.y, ym.m)}</strong>
-          <button className="sl-icon-btn" onClick={() => go(1)} aria-label="Next month"><ChevronRight size={18} /></button>
-          {!isThisMonth && <button className="sl-mini ghost" onClick={() => { setSelected(null); setYm({ y: Number(now.slice(0, 4)), m: Number(now.slice(5, 7)) - 1 }) }}>Today</button>}
+
+          <button
+            type="button"
+            className="sl-icon-btn"
+            onClick={() => go(1)}
+            aria-label="Next month"
+          >
+            <ChevronRight size={18} />
+          </button>
+
+          {!isThisMonth && (
+            <button
+              type="button"
+              className="sl-mini ghost"
+              onClick={goToday}
+            >
+              Today
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Event filters */}
+
       <div className="sl-cal-filters">
-        {FILTERS.map((f) => <button key={f.key} className={`sl-chipbtn ${filter === f.key ? 'on' : ''} k-${f.key}`} onClick={() => setFilter(f.key)}>{f.label}</button>)}
+        {FILTERS.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`sl-chipbtn ${
+              filter === item.key ? 'on' : ''
+            } k-${item.key}`}
+            onClick={() => setFilter(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <div className="sl-cal-body">
+        {/* Calendar grid */}
+
         <div className="sl-cal-grid-wrap">
           <div className="sl-cal-grid" role="grid">
-            {WEEK.map((w) => <span key={w} className="sl-cal-dow" role="columnheader">{w}</span>)}
-            {cells.map((k) => {
-              const list = byDay.get(k) ?? []
-              const kinds = Array.from(new Set(list.map((e) => e.kind)))
+            {WEEK.map((day) => (
+              <span
+                key={day}
+                className="sl-cal-dow"
+                role="columnheader"
+              >
+                {day}
+              </span>
+            ))}
+
+            {cells.map((key) => {
+              const dayEvents: CalEvent[] =
+                byDay.get(key) ?? []
+
+              const kinds: EventKind[] = Array.from(
+                new Set(
+                  dayEvents.map(
+                    (event: CalEvent) => event.kind,
+                  ),
+                ),
+              )
+
               return (
-                <button key={k} role="gridcell" aria-label={`${fmtDay(k, true)}${list.length ? `, ${list.length} event${list.length > 1 ? 's' : ''}` : ''}`}
-                  className={`sl-cal-day${k.slice(0, 7) !== monthStart.slice(0, 7) ? ' out' : ''}${k === now ? ' today' : ''}${k === selected ? ' sel' : ''}${list.length ? ' has' : ''}`}
-                  onClick={() => setSelected(k === selected ? null : k)}>
-                  <span>{Number(k.slice(8))}</span>
-                  {kinds.length > 0 && <i className="sl-cal-dots">{kinds.map((kd) => <b key={kd} className={`d-${kd}`} />)}</i>}
+                <button
+                  key={key}
+                  type="button"
+                  role="gridcell"
+                  aria-label={`${fmtDay(key, true)}${
+                    dayEvents.length
+                      ? `, ${dayEvents.length} event${
+                          dayEvents.length > 1 ? 's' : ''
+                        }`
+                      : ''
+                  }`}
+                  aria-pressed={key === selected}
+                  className={[
+                    'sl-cal-day',
+                    key.slice(0, 7) !==
+                    monthStart.slice(0, 7)
+                      ? 'out'
+                      : '',
+                    key === now ? 'today' : '',
+                    key === selected ? 'sel' : '',
+                    dayEvents.length ? 'has' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() =>
+                    setSelected(
+                      key === selected ? null : key,
+                    )
+                  }
+                >
+                  <span>{Number(key.slice(8))}</span>
+
+                  {kinds.length > 0 && (
+                    <i className="sl-cal-dots">
+                      {kinds.map((kind) => (
+                        <b
+                          key={kind}
+                          className={`d-${kind}`}
+                        />
+                      ))}
+                    </i>
+                  )}
                 </button>
               )
             })}
           </div>
-          {!res && !err && <div className="sl-cal-loading"><LoaderCircle className="sl-spin" size={20} /></div>}
+
+          {!res && !err && (
+            <div className="sl-cal-loading">
+              <LoaderCircle
+                className="sl-spin"
+                size={20}
+              />
+            </div>
+          )}
         </div>
 
+        {/* Event list */}
+
         <div className="sl-cal-list">
-          <h3>{selected ? fmtDay(selected, true) : isThisMonth ? 'Coming up this month' : `Events in ${monthTitle(ym.y, ym.m)}`}
-            {selected && <button className="sl-mini ghost" onClick={() => setSelected(null)}>Show month</button>}</h3>
-          {err && <p className="sl-reject">{err}</p>}
-          {!err && res && listed.length === 0 && <p className="sl-sub">{selected ? 'Nothing on this day.' : 'No events to show.'}</p>}
+          <h3>
+            {selected
+              ? fmtDay(selected, true)
+              : isThisMonth
+                ? 'Coming up this month'
+                : `Events in ${monthTitle(ym.y, ym.m)}`}
+
+            {selected && (
+              <button
+                type="button"
+                className="sl-mini ghost"
+                onClick={() => setSelected(null)}
+              >
+                Show month
+              </button>
+            )}
+          </h3>
+
+          {err && (
+            <p className="sl-reject">{err}</p>
+          )}
+
+          {!err && res && listed.length === 0 && (
+            <p className="sl-sub">
+              {selected
+                ? 'Nothing on this day.'
+                : 'No events to show.'}
+            </p>
+          )}
+
           <ul>
-            {listed.map((e) => (
-              <li key={`${e.id}${e.start}`} className={`ev k-${e.kind}`}>
-                <span className="ev-kind">{KIND_LABEL[e.kind]}</span>
-                <strong>{e.title}</strong>
-                <small>{whenLabel(e)}</small>
-                {e.location && <small className="ev-loc"><MapPin size={11} /> {e.location}</small>}
-                {e.description && <p>{e.description}</p>}
-                <a href={addLink(e)} target="_blank" rel="noreferrer noopener"><ExternalLink size={11} /> Add to my calendar</a>
+            {listed.map((event: CalEvent) => (
+              <li
+                key={`${event.id}${event.start}`}
+                className={`ev k-${event.kind}`}
+              >
+                <span className="ev-kind">
+                  {KIND_LABEL[event.kind]}
+                </span>
+
+                <strong>{event.title}</strong>
+
+                <small>{whenLabel(event)}</small>
+
+                {event.location && (
+                  <small className="ev-loc">
+                    <MapPin size={11} />
+                    {event.location}
+                  </small>
+                )}
+
+                {event.description && (
+                  <p>{event.description}</p>
+                )}
+
+                <a
+                  href={addLink(event)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <ExternalLink size={11} />
+                  Add to my calendar
+                </a>
               </li>
             ))}
           </ul>
