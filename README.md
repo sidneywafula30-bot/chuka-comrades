@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Chuka Comrades (fresh start)
 
 Step 1: Preloader + Landing page. React 19 + Vite + TypeScript, with Firebase (Google sign-in) and Supabase wired but empty.
@@ -107,3 +108,7 @@ Server files are in `appscripts/skills/` (follow `SETUP.txt` there, in order).
 - **WhatsApp groups on the landing page**: run `supabase/migrations/202611150001_whatsapp_groups.sql` once. The admin (verified email in `app_admins`) sees **Manage groups** under the groups on the landing page to add, hide or delete invite links.
 - Run `npm install` (adds `simple-icons`).
 - Note: `src/App.tsx` imports `./pages/Media` and `./pages/Ozone`, which are not in this zip; add them from your other copy before `npm run build`.
+=======
+# chuka-comrades
+app for chuka students
+>>>>>>> ae516e21efc4a392c4273f640ff245eb69353a06
