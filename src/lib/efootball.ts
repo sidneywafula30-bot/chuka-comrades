@@ -12,7 +12,7 @@ export type Video = { videoId: string; title: string; description: string; chann
 export type VideoResult = { videos: Video[]; warning?: string }
 export type VideoCategory = 'highlights' | 'goals' | 'skills' | 'tips' | 'formations' | 'updates'
 
-export type PublicPlayer = { uid: string; username: string; name: string; course: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean }
+export type PublicPlayer = { uid: string; username: string; name: string; course: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean; whatsapp?: string }
 export type Profile = PublicPlayer & { fullName: string; whatsapp: string; freeTimes: string[]; status: string; email: string }
 export type ProfileInput = {
   username: string; fullName: string; course: string; year: number; platform: string; strength: number

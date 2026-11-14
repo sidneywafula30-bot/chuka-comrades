@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Gamepad2, Search } from 'lucide-react'
-import { PLATFORMS, driveImg, ef, type PublicPlayer } from '../lib/efootball'
+import { WhatsAppLogo } from '../components/BrandLogos'
+import { PLATFORMS, driveImg, ef, waLink, type PublicPlayer } from '../lib/efootball'
 
 const PAGE = 24
 
@@ -52,6 +53,11 @@ export default function EfPlayers() {
               <small>{p.course}{p.year ? `, year ${p.year}` : ''}</small>
               <small>{p.platform} · strength {p.strength}</small>
               {p.canHost && <span className="ef-pill">Can host</span>}
+              {p.whatsapp && (
+                <a className="ef-wa" href={waLink(p.whatsapp, `Hi ${p.username}, I found you on the Chuka eFootball players list. Up for a match?`)} target="_blank" rel="noopener noreferrer" aria-label={`Chat with ${p.username} on WhatsApp`}>
+                  <WhatsAppLogo size={18} /> Chat on WhatsApp
+                </a>
+              )}
             </div>
           </article>
         ))}
