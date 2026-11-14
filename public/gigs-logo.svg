@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Chuka Earning and Gigs">
+  <circle cx="100" cy="100" r="96" fill="#155c39"/>
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#e8b923" stroke-width="4"/>
+  <rect x="58" y="66" width="84" height="56" rx="10" fill="#fff"/>
+  <path d="M82 66v-8a8 8 0 0 1 8-8h20a8 8 0 0 1 8 8v8" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M58 90h84" stroke="#155c39" stroke-width="4" opacity=".35"/>
+  <circle cx="100" cy="94" r="14" fill="#e8b923"/>
+  <text x="100" y="100" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-weight="800" font-size="17" fill="#155c39">KSh</text>
+  <text x="100" y="152" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-weight="800" font-size="25" fill="#fff">GIGS</text>
+</svg>

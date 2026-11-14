@@ -1,0 +1,13 @@
+.gsi-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  height: 40px; padding: 0 14px; border-radius: 20px;
+  background: #fff; color: #3c4043; border: 1px solid #dadce0;
+  font: 500 14px/1 'Roboto', 'DM Sans', Arial, sans-serif; letter-spacing: .25px;
+  cursor: pointer; white-space: nowrap;
+  transition: background .15s, box-shadow .15s, border-color .15s;
+}
+.gsi-button:hover:not(:disabled) { background: #f8faff; border-color: #d2e3fc; box-shadow: 0 1px 2px #3c40434d, 0 1px 3px 1px #3c404326; }
+.gsi-button:active:not(:disabled) { background: #eef3fe; }
+.gsi-button:focus-visible { outline: 2px solid #4285f4; outline-offset: 2px; }
+.gsi-button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 400px) { .gsi-button { padding: 0 11px; font-size: 13px; } }

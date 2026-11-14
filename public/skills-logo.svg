@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Chuka Skills">
+  <circle cx="100" cy="100" r="96" fill="#155c39"/>
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#e8b923" stroke-width="4"/>
+  <path d="M100 52 46 78l54 26 54-26z" fill="#fff"/>
+  <path d="M70 94v22c0 8 14 16 30 16s30-8 30-16V94l-30 14z" fill="#fff" opacity=".9"/>
+  <path d="M148 82v32" stroke="#e8b923" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="148" cy="118" r="6" fill="#e8b923"/>
+  <text x="100" y="164" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-weight="800" font-size="25" fill="#fff">SKILLS</text>
+</svg>

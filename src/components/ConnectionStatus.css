@@ -1,0 +1,6 @@
+.conn-status { position: fixed; left: 12px; bottom: 12px; z-index: 50; width: 250px; padding: 10px 12px; border-radius: 12px; background: #12301fee; color: #e8f3ec; font-size: 12px; box-shadow: 0 8px 24px #0004; }
+.conn-status strong { display: block; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; opacity: .7; }
+.conn-row { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 2px 0; }
+.conn-row em { font-style: normal; opacity: .8; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #888; }
+.conn-dot.ok { background: #3ddc84; } .conn-dot.bad { background: #ff6b5e; } .conn-dot.wait { background: #f4b400; }

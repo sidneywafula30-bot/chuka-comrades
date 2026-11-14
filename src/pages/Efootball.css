@@ -1,0 +1,55 @@
+.ef-mark { width: 120px; aspect-ratio: 1; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: #0f1d16; box-shadow: 0 18px 40px #173d2526; }
+.ef-mark img { width: 100%; height: 100%; object-fit: cover; }
+.ef-banner { display: flex; align-items: center; gap: 14px; width: min(100%, 560px); margin: 0 0 18px; padding: 14px 18px; border-radius: 16px; background: #0f1d16; color: #fff; text-decoration: none; text-align: left; }
+.ef-banner svg { color: #e8b923; flex-shrink: 0; }
+.ef-banner span { display: grid; gap: 2px; }
+.ef-banner small { color: #bfe3cc; font-size: 12px; }
+.ef .cpl-page { text-align: left; }
+.ef-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.ef-head img, .ef-logo-ph { width: 84px; height: 84px; border-radius: 18px; object-fit: cover; border: 1px solid var(--line); background: var(--green-soft); display: grid; place-items: center; color: var(--green); }
+.ef-head h2 { margin: 0; }
+.ef-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.ef-bar { height: 8px; border-radius: 99px; background: var(--green-soft); overflow: hidden; margin: 10px 0 4px; }
+.ef-bar i { display: block; height: 100%; background: var(--green); }
+.ef-rules { white-space: pre-wrap; font-size: 14px; line-height: 1.55; color: #33423a; }
+.ef-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ef-steps li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 12px; background: #f3f8f4; font-size: 14px; }
+.ef-steps li.now { background: #0f1d16; color: #fff; }
+.ef-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
+.ef-member { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: #fff; font-size: 13px; }
+.ef-member.win { border-color: #e8b923; background: #fff9e3; }
+.ef-member img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--green-soft); flex-shrink: 0; }
+.ef-member div { display: grid; min-width: 0; }
+.ef-member strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ef-member small { color: var(--muted); }
+.ef-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--green-soft); color: var(--green); width: fit-content; }
+.ef-pill.gold { background: #fff3cc; color: #7a5a00; }
+.ef-pill.red { background: #fdeceb; color: #b3261e; }
+.ef-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.ef-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ef-table th, .ef-table td { padding: 9px 8px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
+.ef-table th { font-weight: 700; color: var(--muted); border-top: 0; }
+.ef-table th:nth-child(-n+2), .ef-table td:nth-child(-n+2) { text-align: left; }
+.ef-table td:nth-child(2) { white-space: normal; }
+.ef-table td:nth-child(2) small { display: block; color: var(--muted); }
+.ef-scroll { overflow-x: auto; }
+.ef-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+.ef-tabs button { border: 1px solid var(--line); background: #fff; color: #536158; border-radius: 99px; padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.ef-tabs button.on { background: var(--green); border-color: var(--green); color: #fff; }
+.ef-slots { display: grid; grid-template-columns: 70px repeat(4, 1fr); gap: 6px; align-items: center; font-size: 12px; }
+.ef-slots button { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 0; cursor: pointer; font-size: 12px; color: #536158; }
+.ef-slots button.on { background: var(--green); border-color: var(--green); color: #fff; }
+.ef-slots b { color: var(--muted); font-weight: 600; text-align: center; }
+.ef-score { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ef-score input[type=number] { width: 64px; border: 1px solid var(--line); border-radius: 10px; padding: 9px; font-size: 15px; text-align: center; }
+.ef-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.ef-pcard { border: 1px solid var(--line); border-radius: 16px; background: #fff; overflow: hidden; display: grid; }
+.ef-pcard img, .ef-pcard .ph { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--green-soft); display: grid; place-items: center; color: var(--green); }
+.ef-pcard div { padding: 12px 14px; display: grid; gap: 3px; font-size: 13px; }
+.ef-pcard small { color: var(--muted); }
+.ef-pcard button { border: 0; padding: 0; cursor: zoom-in; background: none; }
+.ef-copy { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: 12px; background: #f3f8f4; font-size: 13px; word-break: break-all; }
+.ef-zoom { position: fixed; inset: 0; background: #000b; display: grid; place-items: center; z-index: 60; padding: 20px; }
+.ef-zoom img { max-width: min(100%, 900px); max-height: 90vh; border-radius: 12px; }
+@media (max-width: 520px) { .ef-slots { grid-template-columns: 52px repeat(4, 1fr); } }
+.ef-sel { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font: inherit; font-size: 14px; background: #fff; }

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Chuka Study Labs">
+  <circle cx="100" cy="100" r="96" fill="#155c39"/>
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#e8b923" stroke-width="4"/>
+  <!-- open book -->
+  <path d="M100 66c-10-9-26-12-44-10v58c18-2 34 1 44 10z" fill="#fff"/>
+  <path d="M100 66c10-9 26-12 44-10v58c-18-2-34 1-44 10z" fill="#fff" opacity=".88"/>
+  <g stroke="#155c39" stroke-width="4" stroke-linecap="round" opacity=".45">
+    <path d="M68 76c8-1 16 0 24 3M68 88c8-1 16 0 24 3M68 100c8-1 16 0 24 3"/>
+    <path d="M132 76c-8-1-16 0-24 3M132 88c-8-1-16 0-24 3"/>
+  </g>
+  <!-- flask -->
+  <path d="M120 92h16v10l11 19a6 6 0 0 1-5 9h-28a6 6 0 0 1-5-9l11-19z" fill="#e8b923"/>
+  <rect x="117" y="88" width="22" height="6" rx="3" fill="#e8b923"/>
+  <circle cx="128" cy="123" r="3.5" fill="#fff"/>
+  <text x="100" y="158" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-weight="800" font-size="24" fill="#fff">STUDY LABS</text>
+</svg>

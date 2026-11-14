@@ -1,0 +1,38 @@
+.preloader {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center; padding: 24px;
+  background:
+    radial-gradient(600px 400px at 15% 0%, #dcebd5aa, transparent 70%),
+    radial-gradient(520px 380px at 90% 100%, #e7ead3aa, transparent 70%),
+    #fbfcfa;
+  transition: opacity .5s ease, visibility .5s ease;
+}
+.preloader.leaving { opacity: 0; visibility: hidden; }
+.preloader-inner { display: flex; flex-direction: column; align-items: center; text-align: center; width: min(100%, 380px); }
+
+.pl-crest { width: 128px; height: auto; filter: drop-shadow(0 10px 14px #183a2122); animation: pl-pop .8s cubic-bezier(.2,.9,.3,1.2) both; }
+.pl-name { margin: 20px 0 4px; font: 800 34px/1.1 'Manrope', sans-serif; letter-spacing: -1px; color: var(--green); animation: pl-rise .7s .15s both; }
+.pl-tagline { margin: 0; color: var(--muted); font-size: 14px; animation: pl-rise .7s .25s both; }
+
+.pl-row { margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; max-width: 340px; }
+.pl-chip {
+  width: 64px; height: 64px; border-radius: 18px; background: #fff;
+  border: 1px solid var(--line); box-shadow: 0 6px 18px #173d2512;
+  display: grid; place-items: center; padding: 9px;
+  animation: pl-rise .6s both;
+}
+.pl-chip svg, .pl-chip img { max-width: 100%; max-height: 100%; height: auto; display: block; }
+.pl-chip img { width: 100%; object-fit: contain; }
+
+.pl-solved { margin: 22px 0 0; font: 800 17px/1.3 'Manrope', sans-serif; letter-spacing: -.2px; color: var(--green); animation: pl-rise .6s 1s both; }
+.pl-bar { margin-top: 22px; width: 100%; height: 5px; border-radius: 99px; background: var(--green-soft); overflow: hidden; }
+.pl-bar-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #237348, #48a56f); animation: pl-fill linear forwards; }
+.pl-welcome { margin: 12px 0 0; font-size: 12px; letter-spacing: .6px; color: #7b877e; }
+
+@keyframes pl-pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+@keyframes pl-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pl-fill { from { width: 0; } to { width: 92%; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader *, .preloader { animation-duration: .01ms !important; animation-delay: 0s !important; }
+}

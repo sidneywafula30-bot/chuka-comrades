@@ -1,0 +1,46 @@
+/* Extras for Gigs and Skills (the rest comes from StudyLabs.css) */
+.hub-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}
+.hub-chips button{border:1px solid #d6e4db;background:#fff;color:#365b49;border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.hub-chips button.on{background:#1e754a;border-color:#1e754a;color:#fff}
+.hub-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 16px}
+.hub-bar .sl-search{flex:1;min-width:240px;margin:0}
+.hub-pay{display:inline-block;background:#fff6dc;color:#7a5a00;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800}
+.hub-meta{display:flex;gap:6px 14px;flex-wrap:wrap;color:#63756a;font-size:13px;margin:4px 0 8px}
+.hub-warn{background:#fff6e5;border:1px solid #f0d9a8;color:#7a5a00;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5;margin:0 0 16px}
+.hub-flag{background:#fdeceb;border:1px solid #f2c4c0;color:#9b2c25;border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0}
+.hub-contact{background:#eaf5ed;border-radius:12px;padding:10px 12px;margin:10px 0;font-weight:700;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hub-contact a{color:#187448}
+.hub-decide{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.hub-decide input{flex:1;min-width:160px;border:1px solid #d6e4db;border-radius:10px;padding:8px 10px;font:inherit}
+.hub-video{aspect-ratio:16/9;width:100%;border:0;border-radius:12px;margin:8px 0;background:#000}
+.hub-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin:0 0 8px;display:block;cursor:pointer}
+.hub-vote{border:1px solid #d6e4db;background:#fff;border-radius:10px;padding:5px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;gap:6px;align-items:center;color:#365b49}
+.hub-vote.on{background:#1e754a;color:#fff;border-color:#1e754a}
+.hub-post{border-top:1px solid #e5ece7;padding:12px 0}
+.hub-post:first-child{border-top:0}
+.hub-post p{margin:4px 0;white-space:pre-wrap}
+.hub-sec{margin:26px 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.hub-sec h2{margin:0;font-size:19px}
+.hub-prov{display:block;border:1px solid #e1ebe4;background:#fff;border-radius:14px;padding:14px;text-decoration:none;color:inherit}
+.hub-prov strong{display:block;color:#173b2c}.hub-prov small{color:#63756a;line-height:1.5;display:block;margin-top:4px}
+.sl-brand>span.has-logo{background:#fff;padding:0;overflow:hidden;border-radius:50%}
+.sl-brand>span.has-logo img{width:100%;height:100%;object-fit:contain;display:block}
+
+/* ---- free course finder, sessions, admin class form ---- */
+.cf-card{display:flex;flex-direction:column;gap:8px;border:1px solid #e1ebe4;background:#fff;border-radius:16px;padding:16px;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s}
+.cf-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px #173b2c14}
+.cf-head{display:flex;align-items:center;gap:12px}.cf-head strong{display:block;color:#173b2c;margin-bottom:4px}
+.cf-card p{margin:0;color:#44594d;font-size:13.5px;line-height:1.5}
+.cf-access{color:#63756a;line-height:1.45}
+.cf-go{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#1c7a4c}
+.cf-logo{flex:0 0 auto;display:grid;place-items:center;background:#fff;border:1px solid #e1ebe4;border-radius:12px;overflow:hidden}
+.cf-logo img{width:78%;height:78%;object-fit:contain}
+.cf-initials{color:#fff;font-weight:800;border:0;letter-spacing:.02em}
+.cf-sessions{display:grid;gap:8px}
+.cf-sess{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;border:1px solid #e1ebe4;background:#fff;border-radius:12px;padding:10px 14px}
+.cf-sess b{color:#173b2c;min-width:150px}.cf-sess>span:nth-child(2){flex:1;min-width:160px}
+.cf-sess.past{opacity:.55}
+.cf-sess-actions{display:inline-flex;gap:6px;flex-wrap:wrap}
+.cf-box{display:grid;gap:10px;border:1px dashed #cfe0d5;background:#f7fbf8;border-radius:14px;padding:14px;margin:14px 0}
+.cf-box strong{display:flex;align-items:center;gap:6px;color:#173b2c}.cf-box small{color:#63756a}
+.cf-linkrow{display:flex;gap:8px;align-items:center}.cf-linkrow input{flex:1;min-width:0}

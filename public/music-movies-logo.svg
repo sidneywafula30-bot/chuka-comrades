@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Chuka Music &amp; Movies">
+  <circle cx="60" cy="60" r="58" fill="#155c39"/>
+  <circle cx="60" cy="60" r="53" fill="none" stroke="#e8b53a" stroke-width="3"/>
+  <!-- film screen with sprocket holes -->
+  <rect x="20" y="40" width="62" height="46" rx="9" fill="#fff"/>
+  <g fill="#155c39" opacity=".28">
+    <rect x="25" y="44" width="5" height="4" rx="1"/><rect x="36" y="44" width="5" height="4" rx="1"/><rect x="47" y="44" width="5" height="4" rx="1"/><rect x="58" y="44" width="5" height="4" rx="1"/><rect x="69" y="44" width="5" height="4" rx="1"/>
+    <rect x="25" y="78" width="5" height="4" rx="1"/><rect x="36" y="78" width="5" height="4" rx="1"/><rect x="47" y="78" width="5" height="4" rx="1"/><rect x="58" y="78" width="5" height="4" rx="1"/><rect x="69" y="78" width="5" height="4" rx="1"/>
+  </g>
+  <path d="M43 54v22l20-11z" fill="#155c39"/>
+  <!-- music note -->
+  <g stroke="#155c39" stroke-width="2.5" stroke-linejoin="round" fill="#e8b53a">
+    <path d="M94 30v46h-4V36z"/>
+    <path d="M92 30c4 9 17 8 16 26-3-9-9-12-16-13z"/>
+    <ellipse cx="84" cy="78" rx="10" ry="7.5" transform="rotate(-20 84 78)"/>
+  </g>
+</svg>

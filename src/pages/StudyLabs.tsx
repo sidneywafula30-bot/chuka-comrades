@@ -1,0 +1,694 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import type { User } from 'firebase/auth'
+import {
+  ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
+  LoaderCircle, Plus, Search, ShieldCheck, Trash2, Upload, X,
+} from 'lucide-react'
+import {
+  labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
+  type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
+} from '../lib/labs'
+import { fileToB64, shrinkImage } from '../lib/files'
+import './StudyLabs.css'
+
+type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
+type View =
+  | { name: 'home' }
+  | { name: 'programme'; programme: Programme }
+  | { name: 'unit'; unit: Unit; programme?: Programme }
+  | { name: 'mine' }
+  | { name: 'admin' }
+type Note = { type: 'ok' | 'err'; text: string } | null
+
+const TYPES = Object.keys(TYPE_LABELS) as ResourceType[]
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+
+function Msg({ msg }: { msg: Note }) {
+  if (!msg) return null
+  return <p className={`sl-alert ${msg.type === 'ok' ? 'ok' : 'err'}`}>{msg.type === 'ok' && <CheckCircle2 size={16} />}{msg.text}</p>
+}
+function Loading({ text = 'Loading…' }: { text?: string }) {
+  return <div className="sl-empty"><LoaderCircle className="sl-spin" size={22} /><span>{text}</span></div>
+}
+function Empty({ icon, title, text }: { icon?: ReactNode; title: string; text?: string }) {
+  return <div className="sl-empty">{icon ?? <FolderOpen size={26} />}<h3>{title}</h3>{text && <p>{text}</p>}</div>
+}
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="sl-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="sl-modal" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="sl-modal-head"><h2>{title}</h2><button className="sl-icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Opens a private (pending / own) file. The window is opened first so popup blockers allow it. */
+async function openPreview(fileId: string) {
+  const w = window.open('', '_blank')
+  try {
+    const r = await labsApi.preview(fileId)
+    if (w) { w.location.href = r.url } else { const a = document.createElement('a'); a.href = r.url; a.download = r.name; a.click() }
+    setTimeout(() => URL.revokeObjectURL(r.url), 120000)
+  } catch (e) { w?.close(); throw e }
+}
+
+function StatusBadge({ s }: { s: Resource['status'] }) {
+  return <span className={`sl-badge ${s}`}>{s === 'pending' ? 'Pending review' : s === 'approved' ? 'Approved' : 'Rejected'}</span>
+}
+
+/* ------------------------------------------------------------------ */
+/* Resource card                                                       */
+/* ------------------------------------------------------------------ */
+function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, admin, children }: {
+  r: Resource; showUnit?: boolean; canReport?: boolean; onReport?: (r: Resource) => void; onDelete?: (r: Resource) => void
+  onError: (m: string) => void; admin?: boolean; children?: ReactNode
+}) {
+  const [busyFile, setBusyFile] = useState('')
+  const preview = async (id: string) => {
+    setBusyFile(id)
+    try { await openPreview(id) } catch (e) { onError(errMsg(e)) } finally { setBusyFile('') }
+  }
+  return (
+    <article className="sl-resource">
+      <div className="sl-resource-top">
+        <span className={`sl-type t-${r.type}`}>{TYPE_LABELS[r.type]}</span>
+        {r.examType && <span className="sl-chip">{r.examType}</span>}
+        {r.academicYear && <span className="sl-chip">{r.academicYear}</span>}
+        {r.status !== 'approved' && <StatusBadge s={r.status} />}
+      </div>
+      <h3>{r.title}</h3>
+      {showUnit && <small className="sl-unitline">{r.unitCode} · {r.unitName} · {r.programmeName}</small>}
+      {r.description && <p>{r.description}</p>}
+      {r.status === 'rejected' && r.rejectReason && <p className="sl-reject">Reason: {r.rejectReason}</p>}
+      {r.link && <a className="sl-link" href={r.link} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> Open link</a>}
+      {r.files.length > 0 && (
+        <ul className="sl-files">
+          {r.files.map((f) => (
+            <li key={f.id}>
+              {f.isImage && f.thumb ? <img src={f.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="sl-file-ico"><FileText size={18} /></span>}
+              <span className="sl-file-name"><strong>{f.name}</strong><small>{f.sizeKB >= 1024 ? `${(f.sizeKB / 1024).toFixed(1)} MB` : `${f.sizeKB} KB`}</small></span>
+              {f.view || f.download ? (
+                <span className="sl-file-actions">
+                  {f.view && <a href={f.view} target="_blank" rel="noreferrer noopener" title="View"><Eye size={15} /></a>}
+                  {f.download && <a href={f.download} target="_blank" rel="noreferrer noopener" title="Download"><Download size={15} /></a>}
+                </span>
+              ) : (
+                <button className="sl-mini" disabled={busyFile === f.id} onClick={() => preview(f.id)}>{busyFile === f.id ? '…' : 'Preview'}</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="sl-resource-foot">
+        <small>{r.uploaderName ? `By ${r.uploaderName}` : 'Anonymous'}{r.createdAt ? ` · ${new Date(r.createdAt).toLocaleDateString('en-KE')}` : ''}{admin && r.uploaderEmail ? ` · ${r.uploaderEmail}` : ''}</small>
+        <span className="sl-foot-actions">
+          {canReport && onReport && <button className="sl-mini ghost" onClick={() => onReport(r)}><Flag size={13} /> Report</button>}
+          {onDelete && <button className="sl-mini danger" onClick={() => onDelete(r)}><Trash2 size={13} /> Delete</button>}
+        </span>
+      </div>
+      {children}
+    </article>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Modals: upload, suggest unit, report                                */
+/* ------------------------------------------------------------------ */
+function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: LabsConfig | null; onClose: () => void; onDone: () => void }) {
+  const [type, setType] = useState<ResourceType>('note')
+  const [title, setTitle] = useState('')
+  const [examType, setExamType] = useState<ExamType>('CAT')
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear())
+  const [description, setDescription] = useState('')
+  const [link, setLink] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<Note>(null)
+  const [done, setDone] = useState(false)
+  const needsExam = type === 'cat' || type === 'paper'
+  const maxFiles = config?.maxFiles ?? 5
+  const maxFileMB = config?.maxFileMB ?? 10
+  const maxTotalMB = config?.maxTotalMB ?? 25
+  const allowed = useMemo(() => (config?.extensions ?? []).map((x) => x.replace('.', '').toLowerCase()), [config])
+
+  function pick(list: FileList | null) {
+    if (!list) return
+    const next = [...files, ...Array.from(list)]
+    if (next.length > maxFiles) return setMsg({ type: 'err', text: `You can attach up to ${maxFiles} files.` })
+    for (const f of Array.from(list)) {
+      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+      if (allowed.length && !allowed.includes(ext)) return setMsg({ type: 'err', text: `.${ext || '?'} files are not allowed. Allowed: ${allowed.join(', ')}.` })
+      if (f.size > maxFileMB * 1024 * 1024 && !f.type.startsWith('image/')) return setMsg({ type: 'err', text: `${f.name} is over ${maxFileMB} MB.` })
+    }
+    setMsg(null); setFiles(next)
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (title.trim().length < 3) return setMsg({ type: 'err', text: 'Give your upload a clear title.' })
+    if (!files.length && !link.trim()) return setMsg({ type: 'err', text: 'Attach at least one file or paste a link.' })
+    setBusy(true); setMsg(null)
+    try {
+      const out: { name: string; data: string }[] = []
+      let total = 0
+      for (const f of files) {
+        if (f.type.startsWith('image/')) {
+          const url = await shrinkImage(f, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY)
+          const data = url.split(',')[1] ?? ''
+          total += data.length * 0.75
+          out.push({ name: f.name.replace(/\.[^.]+$/, '') + '.jpg', data })
+        } else {
+          const data = await fileToB64(f)
+          total += data.length * 0.75
+          out.push({ name: f.name, data })
+        }
+      }
+      if (total > maxTotalMB * 1024 * 1024) throw new Error(`Files are over ${maxTotalMB} MB in total. Remove some and try again.`)
+      await labsApi.submit({
+        unitId: unit.id, type, title: title.trim(), description: description.trim(), link: link.trim(),
+        ...(needsExam ? { examType, academicYear: academicYear.trim() } : {}), files: out,
+      })
+      setDone(true); onDone()
+    } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+  }
+
+  if (done) {
+    return (
+      <Modal title="Thank you!" onClose={onClose}>
+        <div className="sl-done"><CheckCircle2 size={34} /><p>Your upload was sent for review. It will appear for everyone once an admin approves it. You can track it under <strong>My uploads</strong>.</p><button className="sl-primary" onClick={onClose}>Done</button></div>
+      </Modal>
+    )
+  }
+  return (
+    <Modal title={`Upload to ${unit.code}`} onClose={onClose}>
+      <form className="sl-form" onSubmit={submit}>
+        <p className="sl-sub">{unit.name} · {yearLabel(unit.year)}, {semesterLabel(unit.semester)}</p>
+        <label>What are you sharing?
+          <select value={type} onChange={(e) => setType(e.target.value as ResourceType)}>{TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</select>
+        </label>
+        <label>Title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture 3 notes, Main exam 2024" maxLength={120} /></label>
+        {needsExam && (
+          <div className="sl-two">
+            <label>Exam type<select value={examType} onChange={(e) => setExamType(e.target.value as ExamType)}>{EXAM_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Academic year<input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} placeholder="2025/2026" /></label>
+          </div>
+        )}
+        <label>Description (optional)<textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} /></label>
+        <label>Link (optional, e.g. a YouTube video)<input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://" /></label>
+        <label className="sl-drop"><Upload size={18} /> Choose files
+          <input type="file" multiple onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
+          <small>Up to {maxFiles} files, {maxFileMB} MB each. Photos are shrunk automatically.</small>
+        </label>
+        {files.length > 0 && (
+          <ul className="sl-picked">{files.map((f, i) => (
+            <li key={`${f.name}${i}`}><FileText size={14} /><span>{f.name}</span><button type="button" className="sl-icon-btn" onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label="Remove"><X size={14} /></button></li>
+          ))}</ul>
+        )}
+        <Msg msg={msg} />
+        <button className="sl-primary" disabled={busy}>{busy ? 'Uploading…' : 'Submit for review'}</button>
+      </form>
+    </Modal>
+  )
+}
+
+function SuggestModal({ programme, onClose }: { programme: Programme; onClose: () => void }) {
+  const [year, setYear] = useState(1)
+  const [semester, setSemester] = useState(1)
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<Note>(null)
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!code.trim() || !name.trim()) return setMsg({ type: 'err', text: 'Enter the unit code and name.' })
+    setBusy(true); setMsg(null)
+    try {
+      await labsApi.suggestUnit({ programmeId: programme.id, year, semester, code: code.trim(), name: name.trim() })
+      setMsg({ type: 'ok', text: 'Thanks! An admin will review your suggestion.' }); setCode(''); setName('')
+    } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+  }
+  return (
+    <Modal title="Suggest a missing unit" onClose={onClose}>
+      <form className="sl-form" onSubmit={submit}>
+        <p className="sl-sub">{programme.name}</p>
+        <div className="sl-two">
+          <label>Year<select value={year} onChange={(e) => setYear(Number(e.target.value))}>{Array.from({ length: programme.years || 4 }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}</select></label>
+          <label>Semester<select value={semester} onChange={(e) => setSemester(Number(e.target.value))}>{[1, 2, 3].map((s) => <option key={s} value={s}>{semesterLabel(s)}</option>)}</select></label>
+        </div>
+        <label>Unit code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. COSC 101" /></label>
+        <label>Unit name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Introduction to Computer Science" /></label>
+        <Msg msg={msg} />
+        <button className="sl-primary" disabled={busy}>{busy ? 'Sending…' : 'Send suggestion'}</button>
+      </form>
+    </Modal>
+  )
+}
+
+function ReportModal({ resource, onClose }: { resource: Resource; onClose: () => void }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<Note>(null)
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (reason.trim().length < 5) return setMsg({ type: 'err', text: 'Tell us briefly what is wrong.' })
+    setBusy(true); setMsg(null)
+    try { await labsApi.report(resource.id, reason.trim()); setMsg({ type: 'ok', text: 'Report sent. Thank you for keeping Study Labs clean.' }) }
+    catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+  }
+  return (
+    <Modal title="Report this upload" onClose={onClose}>
+      <form className="sl-form" onSubmit={submit}>
+        <p className="sl-sub">{resource.title}</p>
+        <label>What is wrong?<textarea rows={4} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Wrong unit, unreadable, inappropriate, copied…" maxLength={400} /></label>
+        <Msg msg={msg} />
+        <button className="sl-primary" disabled={busy}>{busy ? 'Sending…' : 'Send report'}</button>
+      </form>
+    </Modal>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Pages                                                               */
+/* ------------------------------------------------------------------ */
+function UnitRow({ u, onOpen }: { u: Unit; onOpen: (u: Unit) => void }) {
+  const total = TYPES.reduce((n, t) => n + (u.counts?.[t] ?? 0), 0)
+  return (
+    <button className="sl-unit" onClick={() => onOpen(u)}>
+      <span className="sl-unit-code">{u.code}</span>
+      <span className="sl-unit-name"><strong>{u.name}</strong>{u.programmeName && <small>{u.programmeName}</small>}</span>
+      <span className="sl-unit-counts">{total > 0 ? TYPES.filter((t) => u.counts?.[t]).map((t) => `${u.counts[t]} ${TYPE_LABELS[t].toLowerCase()}`).join(' · ') : 'No uploads yet'}</span>
+      <ChevronRight size={16} />
+    </button>
+  )
+}
+
+function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport }: {
+  programmes: Programme[]; loading: boolean; onProgramme: (p: Programme) => void; onUnit: (u: Unit) => void
+  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void
+}) {
+  const [q, setQ] = useState('')
+  const [level, setLevel] = useState('All')
+  const [results, setResults] = useState<{ units: Unit[]; resources: Resource[] } | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [err, setErr] = useState<Note>(null)
+  const levels = useMemo(() => ['All', ...Array.from(new Set(programmes.map((p) => p.level).filter(Boolean)))], [programmes])
+  const filtered = programmes.filter((p) => p.active && (level === 'All' || p.level === level))
+
+  async function search(e: FormEvent) {
+    e.preventDefault()
+    if (q.trim().length < 2) { setResults(null); return }
+    setSearching(true); setErr(null)
+    try { setResults(await labsApi.search(q.trim())) } catch (ex) { setErr({ type: 'err', text: errMsg(ex) }) } finally { setSearching(false) }
+  }
+
+  return (
+    <>
+      <section className="sl-hero">
+        <div>
+          <span className="sl-kicker">CHUKA STUDY LABS</span>
+          <h1>Notes, CATs &amp; past papers <em>by comrades, for comrades</em></h1>
+          <p>Find your programme, open your unit and download what other students have shared. Add your own to help the next class.</p>
+        </div>
+        <div className="sl-hero-art"><BookOpen size={46} /><span>Study together</span></div>
+      </section>
+
+      <form className="sl-search" onSubmit={search}>
+        <Search size={18} />
+        <input value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) setResults(null) }} placeholder="Search a unit code, unit name or resource…" />
+        <button className="sl-primary small" disabled={searching}>{searching ? '…' : 'Search'}</button>
+      </form>
+      <Msg msg={err} />
+
+      {results ? (
+        <>
+          <div className="sl-section-head"><h2>Results for “{q.trim()}”</h2><button className="sl-mini ghost" onClick={() => { setResults(null); setQ('') }}>Clear</button></div>
+          {results.units.length === 0 && results.resources.length === 0 && <Empty title="Nothing found" text="Try a unit code like COSC 101, or browse by programme below." />}
+          {results.units.length > 0 && <div className="sl-unit-list">{results.units.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div>}
+          {results.resources.length > 0 && (
+            <div className="sl-grid">{results.resources.map((r) => <ResourceCard key={r.id} r={r} showUnit canReport={Boolean(user)} onReport={onReport} onError={onResourceError} />)}</div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="sl-section-head"><h2>Choose your programme</h2></div>
+          {levels.length > 2 && <div className="sl-tabs">{levels.map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l}</button>)}</div>}
+          {loading ? <Loading /> : filtered.length === 0 ? <Empty title="No programmes yet" text="An admin still needs to add programmes. Check back soon." /> : (
+            <div className="sl-prog-grid">
+              {filtered.map((p) => (
+                <button key={p.id} className="sl-prog" onClick={() => onProgramme(p)}>
+                  <span className="sl-prog-ico"><BookOpen size={18} /></span>
+                  <span><strong>{p.name}</strong><small>{[p.level, p.department].filter(Boolean).join(' · ')}</small></span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
+function ProgrammePage({ programme, user, onUnit, onSuggest, onSignIn }: { programme: Programme; user: User | null; onUnit: (u: Unit) => void; onSuggest: () => void; onSignIn: () => void }) {
+  const [units, setUnits] = useState<Unit[] | null>(null)
+  const [err, setErr] = useState<Note>(null)
+  useEffect(() => {
+    let live = true
+    labsApi.units(programme.id).then((u) => { if (live) setUnits(u) }).catch((e) => { if (live) { setErr({ type: 'err', text: errMsg(e) }); setUnits([]) } })
+    return () => { live = false }
+  }, [programme.id])
+  const groups = useMemo(() => {
+    const m = new Map<string, Unit[]>()
+    for (const u of [...(units ?? [])].sort((a, b) => a.year - b.year || a.semester - b.semester || a.code.localeCompare(b.code))) {
+      const k = `${yearLabel(u.year)} · ${semesterLabel(u.semester)}`
+      m.set(k, [...(m.get(k) ?? []), u])
+    }
+    return [...m.entries()]
+  }, [units])
+  return (
+    <>
+      <div className="sl-page-head"><div><span className="sl-kicker">PROGRAMME</span><h1>{programme.name}</h1><small>{[programme.level, programme.department].filter(Boolean).join(' · ')}</small></div>
+        <button className="sl-ghost" onClick={user ? onSuggest : onSignIn}><Plus size={15} /> Suggest a missing unit</button></div>
+      <Msg msg={err} />
+      {units === null ? <Loading /> : groups.length === 0 ? <Empty title="No units yet" text="Know a unit that belongs here? Suggest it and an admin will add it." /> : groups.map(([label, list]) => (
+        <section key={label} className="sl-group"><h2>{label}</h2><div className="sl-unit-list">{list.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div></section>
+      ))}
+    </>
+  )
+}
+
+function UnitPage({ unit, user, config, onSignIn, onReport }: { unit: Unit; user: User | null; config: LabsConfig | null; onSignIn: () => void; onReport: (r: Resource) => void }) {
+  const [type, setType] = useState<ResourceType | 'all'>('all')
+  const [list, setList] = useState<Resource[] | null>(null)
+  const [msg, setMsg] = useState<Note>(null)
+  const [uploading, setUploading] = useState(false)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let live = true
+    setList(null)
+    labsApi.resources(unit.id).then((r) => { if (live) setList(r) }).catch((e) => { if (live) { setMsg({ type: 'err', text: errMsg(e) }); setList([]) } })
+    return () => { live = false }
+  }, [unit.id, tick])
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: list?.length ?? 0 }
+    for (const r of list ?? []) c[r.type] = (c[r.type] ?? 0) + 1
+    return c
+  }, [list])
+  const shown = (list ?? []).filter((r) => type === 'all' || r.type === type)
+  return (
+    <>
+      <div className="sl-page-head"><div><span className="sl-kicker">{unit.code}</span><h1>{unit.name}</h1><small>{unit.programmeName ? `${unit.programmeName} · ` : ''}{yearLabel(unit.year)}, {semesterLabel(unit.semester)}</small></div>
+        <button className="sl-primary inline" onClick={user ? () => setUploading(true) : onSignIn}><Upload size={15} /> {user ? 'Upload' : 'Sign in to upload'}</button></div>
+      <div className="sl-tabs">
+        {(['all', ...TYPES] as const).map((t) => <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t === 'all' ? 'All' : TYPE_LABELS[t]} <b>{counts[t] ?? 0}</b></button>)}
+      </div>
+      <Msg msg={msg} />
+      {list === null ? <Loading /> : shown.length === 0 ? <Empty icon={<Inbox size={26} />} title="Nothing here yet" text="Be the first to share something for this unit." /> : (
+        <div className="sl-grid">{shown.map((r) => <ResourceCard key={r.id} r={r} canReport={Boolean(user)} onReport={onReport} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
+      )}
+      {uploading && <UploadModal unit={unit} config={config} onClose={() => setUploading(false)} onDone={() => setTick((n) => n + 1)} />}
+    </>
+  )
+}
+
+function MinePage() {
+  const [data, setData] = useState<{ resources: Resource[]; suggestions: Suggestion[] } | null>(null)
+  const [msg, setMsg] = useState<Note>(null)
+  const load = useCallback(() => labsApi.myUploads().then(setData).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setData({ resources: [], suggestions: [] }) }), [])
+  useEffect(() => { void load() }, [load])
+  async function del(r: Resource) {
+    if (!window.confirm(`Delete “${r.title}”?`)) return
+    try { await labsApi.deleteMine(r.id); await load() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  return (
+    <>
+      <div className="sl-page-head"><div><span className="sl-kicker">YOUR ACCOUNT</span><h1>My uploads</h1></div></div>
+      <Msg msg={msg} />
+      {!data ? <Loading /> : (
+        <>
+          {data.resources.length === 0 ? <Empty icon={<Inbox size={26} />} title="No uploads yet" text="Open a unit and tap Upload to share notes or past papers." /> : (
+            <div className="sl-grid">{data.resources.map((r) => <ResourceCard key={r.id} r={r} showUnit onDelete={del} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
+          )}
+          {data.suggestions.length > 0 && (
+            <section className="sl-group"><h2>My unit suggestions</h2>
+              <div className="sl-unit-list">{data.suggestions.map((s) => (
+                <div key={s.id} className="sl-unit static"><span className="sl-unit-code">{s.code}</span><span className="sl-unit-name"><strong>{s.name}</strong><small>{s.programmeName} · {yearLabel(s.year)}, {semesterLabel(s.semester)}</small></span><span className={`sl-badge ${s.status}`}>{s.status}</span></div>
+              ))}</div>
+            </section>
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin                                                               */
+/* ------------------------------------------------------------------ */
+function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
+  const [tab, setTab] = useState<'queue' | 'reports' | 'suggestions' | 'catalogue'>('queue')
+  const [queue, setQueue] = useState<AdminQueue | null>(null)
+  const [msg, setMsg] = useState<Note>(null)
+  const loadQueue = useCallback(() => labsApi.admin.queue().then(setQueue).catch((e) => setMsg({ type: 'err', text: errMsg(e) })), [])
+  useEffect(() => { void loadQueue() }, [loadQueue])
+  return (
+    <>
+      <div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Study Labs admin</h1></div></div>
+      <div className="sl-tabs">
+        <button className={tab === 'queue' ? 'on' : ''} onClick={() => setTab('queue')}>Review queue <b>{queue?.pending.length ?? 0}</b></button>
+        <button className={tab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>Reports <b>{queue?.openReports ?? 0}</b></button>
+        <button className={tab === 'suggestions' ? 'on' : ''} onClick={() => setTab('suggestions')}>Suggestions <b>{queue?.pendingSuggestions ?? 0}</b></button>
+        <button className={tab === 'catalogue' ? 'on' : ''} onClick={() => setTab('catalogue')}>Programmes &amp; units</button>
+      </div>
+      <Msg msg={msg} />
+      {tab === 'queue' && <QueueTab queue={queue} reload={loadQueue} setMsg={setMsg} />}
+      {tab === 'reports' && <ReportsTab reload={loadQueue} setMsg={setMsg} />}
+      {tab === 'suggestions' && <SuggestionsTab expected={queue?.pendingSuggestions ?? 0} reload={loadQueue} setMsg={setMsg} onChanged={onCatalogueChanged} />}
+      {tab === 'catalogue' && <CatalogueTab setMsg={setMsg} onChanged={onCatalogueChanged} />}
+    </>
+  )
+}
+
+function QueueTab({ queue, reload, setMsg }: { queue: AdminQueue | null; reload: () => Promise<unknown>; setMsg: (n: Note) => void }) {
+  const [busy, setBusy] = useState('')
+  const [reasons, setReasons] = useState<Record<string, string>>({})
+  if (!queue) return <Loading />
+  async function decide(r: Resource, decision: 'approve' | 'reject') {
+    if (decision === 'reject' && !(reasons[r.id] ?? '').trim()) return setMsg({ type: 'err', text: 'Add a short rejection reason first.' })
+    setBusy(r.id); setMsg(null)
+    try { await labsApi.admin.review(r.id, decision, { reason: reasons[r.id]?.trim() }); setMsg({ type: 'ok', text: decision === 'approve' ? 'Approved and published.' : 'Rejected.' }); await reload() }
+    catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy('') }
+  }
+  if (queue.pending.length === 0) return <Empty icon={<CheckCircle2 size={26} />} title="All caught up" text="No uploads are waiting for review." />
+  return (
+    <div className="sl-grid">
+      {queue.pending.map((r) => (
+        <ResourceCard key={r.id} r={r} showUnit admin onError={(m) => setMsg({ type: 'err', text: m })}>
+          {r.duplicates && r.duplicates.length > 0 && <p className="sl-reject">Possible duplicate of: {r.duplicates.map((d) => d.title).join(', ')}</p>}
+          <input className="sl-reason" placeholder="Rejection reason (only needed to reject)" value={reasons[r.id] ?? ''} onChange={(e) => setReasons({ ...reasons, [r.id]: e.target.value })} />
+          <div className="sl-decide">
+            <button className="sl-primary small" disabled={busy === r.id} onClick={() => decide(r, 'approve')}>Approve</button>
+            <button className="sl-mini danger big" disabled={busy === r.id} onClick={() => decide(r, 'reject')}>Reject</button>
+          </div>
+        </ResourceCard>
+      ))}
+    </div>
+  )
+}
+
+function ReportsTab({ reload, setMsg }: { reload: () => Promise<unknown>; setMsg: (n: Note) => void }) {
+  const [items, setItems] = useState<ReportItem[] | null>(null)
+  const load = useCallback(() => labsApi.admin.reports().then(setItems).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) }), [setMsg])
+  useEffect(() => { void load() }, [load])
+  async function resolve(id: string, resolution: 'dismiss' | 'unpublish' | 'delete') {
+    if (resolution === 'delete' && !window.confirm('Delete this upload for good?')) return
+    try { await labsApi.admin.resolveReport(id, resolution); await load(); await reload() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  if (!items) return <Loading />
+  if (items.length === 0) return <Empty icon={<CheckCircle2 size={26} />} title="No open reports" />
+  return (
+    <div className="sl-grid">
+      {items.map((it) => (
+        <div key={it.id} className="sl-resource">
+          <p className="sl-reject"><Flag size={13} /> {it.reason}</p>
+          {it.resource ? <ResourceCard r={it.resource} showUnit admin onError={(m) => setMsg({ type: 'err', text: m })} /> : <p className="sl-sub">The upload no longer exists.</p>}
+          <div className="sl-decide">
+            <button className="sl-mini ghost big" onClick={() => resolve(it.id, 'dismiss')}>Dismiss</button>
+            <button className="sl-mini big" onClick={() => resolve(it.id, 'unpublish')}>Unpublish</button>
+            <button className="sl-mini danger big" onClick={() => resolve(it.id, 'delete')}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SuggestionsTab({ expected, reload, setMsg, onChanged }: { expected: number; reload: () => Promise<unknown>; setMsg: (n: Note) => void; onChanged: () => void }) {
+  const [items, setItems] = useState<Suggestion[] | null>(null)
+  const load = useCallback(() => labsApi.admin.suggestions().then(setItems).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) }), [setMsg])
+  useEffect(() => { void load() }, [load])
+  async function decide(s: Suggestion, decision: 'approve' | 'reject') {
+    try {
+      await labsApi.admin.decideSuggestion(s.id, decision, decision === 'reject' ? { reason: 'Not needed' } : {})
+      await load(); await reload(); if (decision === 'approve') onChanged()
+    } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  if (!items) return <Loading />
+  // Be forgiving about how the sheet spells the status ("Pending", " pending ", or blank = still waiting).
+  const pending = items.filter((s) => { const st = String(s.status ?? '').trim().toLowerCase(); return st === '' || st === 'pending' })
+  if (pending.length === 0) {
+    return (
+      <>
+        <Empty icon={<CheckCircle2 size={26} />} title="No pending suggestions" />
+        {items.length > 0 && <p className="sl-sub" style={{ textAlign: 'center' }}>The server returned {items.length} suggestion(s), none of them pending.</p>}
+      </>
+    )
+  }
+  return (
+    <div className="sl-unit-list">
+      {expected > pending.length && <p className="sl-sub">The server counts {expected} pending but sent only {pending.length}. In Apps Script use Deploy &gt; Manage deployments &gt; Edit &gt; New version, then reload.</p>}
+      {pending.map((s) => (
+        <div key={s.id} className="sl-unit static">
+          <span className="sl-unit-code">{s.code}</span>
+          <span className="sl-unit-name"><strong>{s.name}</strong><small>{s.programmeName} · {yearLabel(s.year)}, {semesterLabel(s.semester)}{s.userEmail ? ` · ${s.userEmail}` : ''}</small></span>
+          <span className="sl-foot-actions"><button className="sl-mini" onClick={() => decide(s, 'approve')}>Approve</button><button className="sl-mini danger" onClick={() => decide(s, 'reject')}>Reject</button></span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CatalogueTab({ setMsg, onChanged }: { setMsg: (n: Note) => void; onChanged: () => void }) {
+  const [progs, setProgs] = useState<Programme[] | null>(null)
+  const [sel, setSel] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [np, setNp] = useState({ name: '', level: 'Undergraduate', department: '', years: 4 })
+  const [uf, setUf] = useState({ year: 1, semester: 1, code: '', name: '' })
+  const [bulk, setBulk] = useState('')
+  const load = useCallback(() => labsApi.admin.programmes().then(setProgs).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setProgs([]) }), [setMsg])
+  useEffect(() => { void load() }, [load])
+
+  async function run(fn: () => Promise<string>) {
+    setBusy(true); setMsg(null)
+    try { setMsg({ type: 'ok', text: await fn() }); await load(); onChanged() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  if (!progs) return <Loading />
+  return (
+    <>
+      <section className="sl-card">
+        <h2>Programmes</h2>
+        <div className="sl-row-actions">
+          <button className="sl-ghost" disabled={busy} onClick={() => run(async () => { const s = await labsApi.admin.importProgrammes(); return `Read ${s.pagesRead} pages. Added ${s.added}, already had ${s.alreadyHad}, skipped ${s.otherCampusSkipped} from other campuses.` })}>Import from Chuka website</button>
+        </div>
+        <div className="sl-unit-list">
+          {progs.map((p) => (
+            <div key={p.id} className={`sl-unit static${sel === p.id ? ' sel' : ''}`}>
+              <span className="sl-unit-name"><strong>{p.name}</strong><small>{[p.level, p.department, `${p.years} yrs`].filter(Boolean).join(' · ')}</small></span>
+              <span className="sl-foot-actions">
+                <button className="sl-mini" onClick={() => setSel(sel === p.id ? '' : p.id)}>{sel === p.id ? 'Close' : 'Add units'}</button>
+                <button className={`sl-mini ${p.active ? '' : 'ghost'}`} disabled={busy} onClick={() => run(async () => { await labsApi.admin.updateProgramme(p.id, { active: !p.active }); return p.active ? 'Programme hidden.' : 'Programme is live.' })}>{p.active ? 'Hide' : 'Show'}</button>
+              </span>
+            </div>
+          ))}
+        </div>
+        <form className="sl-form inline" onSubmit={(e) => { e.preventDefault(); if (!np.name.trim()) return setMsg({ type: 'err', text: 'Enter a programme name.' }); void run(async () => { await labsApi.admin.addProgramme({ ...np, name: np.name.trim() }); setNp({ ...np, name: '' }); return 'Programme added.' }) }}>
+          <label>New programme<input value={np.name} onChange={(e) => setNp({ ...np, name: e.target.value })} placeholder="e.g. BSc Computer Science" /></label>
+          <label>Level<input value={np.level} onChange={(e) => setNp({ ...np, level: e.target.value })} /></label>
+          <label>Department<input value={np.department} onChange={(e) => setNp({ ...np, department: e.target.value })} /></label>
+          <label>Years<input type="number" min={1} max={8} value={np.years} onChange={(e) => setNp({ ...np, years: Number(e.target.value) || 4 })} /></label>
+          <button className="sl-primary small" disabled={busy}>Add</button>
+        </form>
+      </section>
+
+      {sel && (
+        <section className="sl-card">
+          <h2>Add units to {progs.find((p) => p.id === sel)?.name}</h2>
+          <form className="sl-form inline" onSubmit={(e) => { e.preventDefault(); if (!uf.code.trim() || !uf.name.trim()) return setMsg({ type: 'err', text: 'Enter the unit code and name.' }); void run(async () => { const r = await labsApi.admin.addUnit({ programmeId: sel, ...uf, code: uf.code.trim(), name: uf.name.trim() }); setUf({ ...uf, code: '', name: '' }); return r.created ? 'Unit added.' : 'That unit already exists.' }) }}>
+            <label>Year<input type="number" min={1} max={8} value={uf.year} onChange={(e) => setUf({ ...uf, year: Number(e.target.value) || 1 })} /></label>
+            <label>Semester<input type="number" min={1} max={3} value={uf.semester} onChange={(e) => setUf({ ...uf, semester: Number(e.target.value) || 1 })} /></label>
+            <label>Code<input value={uf.code} onChange={(e) => setUf({ ...uf, code: e.target.value })} /></label>
+            <label>Name<input value={uf.name} onChange={(e) => setUf({ ...uf, name: e.target.value })} /></label>
+            <button className="sl-primary small" disabled={busy}>Add unit</button>
+          </form>
+          <div className="sl-form">
+            <label>Bulk add: one unit per line as “year, semester, code, name”
+              <textarea rows={6} value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={'1, 1, COSC 101, Introduction to Computer Science\n1, 2, MATH 102, Calculus I'} />
+            </label>
+            <button className="sl-primary small" disabled={busy || !bulk.trim()} onClick={() => run(async () => { const r = await labsApi.admin.bulkUnits(sel, bulk); setBulk(r.errors.length ? r.errors.join('\n') : ''); return `Added ${r.added}, skipped ${r.skipped}.${r.errors.length ? ' Lines with problems were left in the box.' : ''}` })}>Add all</button>
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Shell                                                               */
+/* ------------------------------------------------------------------ */
+export default function StudyLabs({ user, onSignIn, onBack }: Props) {
+  const [view, setView] = useState<View>({ name: 'home' })
+  const [config, setConfig] = useState<LabsConfig | null>(null)
+  const [programmes, setProgrammes] = useState<Programme[]>([])
+  const [loading, setLoading] = useState(labsReady)
+  const [fatal, setFatal] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [reporting, setReporting] = useState<Resource | null>(null)
+  const [suggesting, setSuggesting] = useState<Programme | null>(null)
+  const [toast, setToast] = useState<Note>(null)
+
+  const loadProgrammes = useCallback(() => labsApi.programmes().then(setProgrammes), [])
+  const refreshProgrammes = useCallback(() => { loadProgrammes().catch(() => {}) }, [loadProgrammes])
+  useEffect(() => {
+    if (!labsReady) return
+    Promise.all([labsApi.config().then(setConfig), loadProgrammes()])
+      .catch((e) => setFatal(errMsg(e))).finally(() => setLoading(false))
+  }, [loadProgrammes])
+
+  useEffect(() => {
+    setIsAdmin(false)
+    if (!labsReady || !user) return
+    labsApi.adminCheck().then((r) => setIsAdmin(r.isAdmin)).catch(() => {})
+  }, [user])
+
+  useEffect(() => { window.scrollTo(0, 0) }, [view])
+
+  const back = () => {
+    if (view.name === 'unit') setView(view.programme ? { name: 'programme', programme: view.programme } : { name: 'home' })
+    else if (view.name === 'programme' || view.name === 'mine' || view.name === 'admin') setView({ name: 'home' })
+    else onBack()
+  }
+  const openUnit = (unit: Unit, programme?: Programme) => setView({ name: 'unit', unit, programme: programme ?? programmes.find((p) => p.id === unit.programmeId) })
+  const gated = (v: View) => (user ? setView(v) : onSignIn())
+
+  return (
+    <div className="sl-shell">
+      <div className="sl-topbar">
+        <button className="sl-back" onClick={back}><ArrowLeft size={18} /> {view.name === 'home' ? 'Back to services' : 'Back'}</button>
+        <div className="sl-brand"><span className="has-logo"><img src={`${import.meta.env.BASE_URL}study-labs-logo.svg`} alt="Study Labs logo" /></span><div><strong>Study Labs</strong><small>Chuka Comrades</small></div></div>
+        <nav className="sl-nav">
+          <button className={view.name === 'home' ? 'on' : ''} onClick={() => setView({ name: 'home' })}>Browse</button>
+          <button className={view.name === 'mine' ? 'on' : ''} onClick={() => gated({ name: 'mine' })}>My uploads</button>
+          {isAdmin && <button className={view.name === 'admin' ? 'on' : ''} onClick={() => setView({ name: 'admin' })}><ShieldCheck size={14} /> Admin</button>}
+        </nav>
+      </div>
+
+      {!labsReady && <Msg msg={{ type: 'err', text: 'Study Labs server not connected yet. Add VITE_LABS_API_URL to .env and restart npm run dev.' }} />}
+      {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
+      <Msg msg={toast} />
+
+      {view.name === 'home' && (
+        <Home programmes={programmes} loading={loading} user={user} onProgramme={(p) => setView({ name: 'programme', programme: p })}
+          onUnit={(u) => openUnit(u)} onReport={setReporting} onResourceError={(m) => setToast({ type: 'err', text: m })} />
+      )}
+      {view.name === 'programme' && <ProgrammePage programme={view.programme} user={user} onSignIn={onSignIn} onUnit={(u) => openUnit(u, view.programme)} onSuggest={() => setSuggesting(view.programme)} />}
+      {view.name === 'unit' && <UnitPage unit={view.unit} user={user} config={config} onSignIn={onSignIn} onReport={setReporting} />}
+      {view.name === 'mine' && user && <MinePage />}
+      {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
+
+      {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
+      {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}
+    </div>
+  )
+}
