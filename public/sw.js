@@ -1,12 +1,14 @@
 /* Chuka Comrades service worker: offline app shell.
    Only same-origin files are cached. API calls (Supabase, Firebase, etc.) always go to the network. */
-const VERSION = 'v2'
+const VERSION = 'v3'
 const CACHE = `comrades-${VERSION}`
 const SCOPE = self.registration.scope
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll([SCOPE, SCOPE + 'index.html', SCOPE + 'manifest.webmanifest', SCOPE + 'icon-192.png', SCOPE + 'icon-512.png'])).then(() => self.skipWaiting()),
+    caches.open(CACHE)
+      .then((c) => Promise.all([SCOPE, SCOPE + 'manifest.webmanifest', SCOPE + 'icon-192.png', SCOPE + 'icon-512.png'].map((u) => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting()),
   )
 })
 
@@ -29,6 +31,12 @@ self.addEventListener('fetch', (e) => {
         .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(SCOPE, copy)); return res })
         .catch(() => caches.match(SCOPE).then((r) => r || caches.match(SCOPE + 'index.html'))),
     )
+    return
+  }
+
+  // Manifest and app icons: always try the network first so updates show up.
+  if (/manifest\.webmanifest$|\/(icon|apple-touch-icon)[^/]*\.png$/.test(url.pathname)) {
+    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return res }).catch(() => caches.match(req)))
     return
   }
 

@@ -17,6 +17,9 @@ export const SHARE_TEXT = 'Join Chuka Comrades, your campus hub for hostels, sok
 export function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 }
+export function isMobile() {
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent)
+}
 export function isIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
@@ -43,5 +46,7 @@ export function useInstall() {
     return outcome === 'accepted'
   }, [])
   const installed = typeof window !== 'undefined' && isStandalone()
-  return { installed, canInstall: !!deferred && !installed, iosHelp: !installed && isIos(), install }
+  const ios = !installed && isIos()
+  // Everyone else who hasn't installed: real prompt if the browser gave us one, otherwise manual steps.
+  return { installed, canInstall: !!deferred && !installed, iosHelp: ios, manualHelp: !installed && !ios && !deferred, install }
 }

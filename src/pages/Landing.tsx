@@ -89,7 +89,7 @@ const SERVICES = [
 export default function Landing({ user }: { user: User | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const { installed, canInstall, iosHelp, install } = useInstall()
+  const { installed, canInstall, install } = useInstall()
 
   async function handleSignIn() {
     if (!auth) {
@@ -156,8 +156,8 @@ export default function Landing({ user }: { user: User | null }) {
             )}
 
             <div className="lp-actions">
-              {!installed && (canInstall || iosHelp) && (
-                <button className="lp-btn lp-btn-soft" onClick={() => (canInstall ? void install() : alert('On iPhone: tap the Share icon, then "Add to Home Screen".'))}>
+              {!installed && (
+                <button className="lp-btn lp-btn-soft" onClick={() => (canInstall ? void install() : alert('To install: open your browser menu (⋮ or the Share icon on iPhone) and choose "Install app" or "Add to Home Screen".'))}>
                   <Download size={16} /> Install app
                 </button>
               )}
