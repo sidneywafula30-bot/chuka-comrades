@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
 import {
   ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
-  LoaderCircle, Plus, Search, ShieldCheck, Trash2, Upload, X,
+  LoaderCircle, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
 } from 'lucide-react'
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
+  shareUrl, resourceIdFromHash, youtubeId, youtubeThumb,
   type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
 } from '../lib/labs'
 import { fileToB64, shrinkImage } from '../lib/files'
+import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
+import YouTubePanel from './StudyLabsYoutube'
 import './StudyLabs.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
@@ -18,6 +21,7 @@ type View =
   | { name: 'unit'; unit: Unit; programme?: Programme }
   | { name: 'mine' }
   | { name: 'admin' }
+  | { name: 'resource'; id: string }
 type Note = { type: 'ok' | 'err'; text: string } | null
 
 const TYPES = Object.keys(TYPE_LABELS) as ResourceType[]
@@ -44,6 +48,34 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
+/** Direct link to one note, past paper or video: copy, WhatsApp or the phone's share sheet. */
+function ShareModal({ resource, onClose }: { resource: Resource; onClose: () => void }) {
+  const url = shareUrl(resource.id)
+  const [copied, setCopied] = useState(false)
+  const text = `${resource.title} · ${resource.unitCode} ${TYPE_LABELS[resource.type]} on Chuka Study Labs`
+  const canNative = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  async function copy() {
+    try { await navigator.clipboard.writeText(url) } catch { window.prompt('Copy this link', url) }
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <Modal title="Share this" onClose={onClose}>
+      <div className="sl-form">
+        <p className="sl-sub"><strong>{resource.title}</strong><br />{resource.unitCode} · {resource.unitName}</p>
+        <div className="sl-share-box">
+          <input readOnly value={url} aria-label="Share link" onFocus={(e) => e.currentTarget.select()} />
+          <button className="sl-primary small" onClick={copy}>{copied ? 'Copied!' : 'Copy link'}</button>
+        </div>
+        <div className="sl-decide">
+          <a className="sl-mini big" href={`https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`} target="_blank" rel="noreferrer noopener">Share on WhatsApp</a>
+          {canNative && <button className="sl-mini ghost big" onClick={() => { void navigator.share({ title: resource.title, text, url }).catch(() => {}) }}>More options…</button>}
+        </div>
+        <small className="sl-sub">Anyone with this link can open it. It always points to the latest approved version, and stops working if the item is removed.</small>
+      </div>
+    </Modal>
+  )
+}
+
 /** Opens a private (pending / own) file. The window is opened first so popup blockers allow it. */
 async function openPreview(fileId: string) {
   const w = window.open('', '_blank')
@@ -66,6 +98,8 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
   onError: (m: string) => void; admin?: boolean; children?: ReactNode
 }) {
   const [busyFile, setBusyFile] = useState('')
+  const [sharing, setSharing] = useState(false)
+  const yt = youtubeId(r.link)
   const preview = async (id: string) => {
     setBusyFile(id)
     try { await openPreview(id) } catch (e) { onError(errMsg(e)) } finally { setBusyFile('') }
@@ -82,6 +116,11 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
       {showUnit && <small className="sl-unitline">{r.unitCode} · {r.unitName} · {r.programmeName}</small>}
       {r.description && <p>{r.description}</p>}
       {r.status === 'rejected' && r.rejectReason && <p className="sl-reject">Reason: {r.rejectReason}</p>}
+      {yt && (
+        <a className="sl-yt-link" href={r.link} target="_blank" rel="noreferrer noopener" aria-label="Watch on YouTube">
+          <img src={youtubeThumb(yt)} alt="" loading="lazy" referrerPolicy="no-referrer" /><i><Play size={18} fill="currentColor" /></i>
+        </a>
+      )}
       {r.link && <a className="sl-link" href={r.link} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> Open link</a>}
       {r.files.length > 0 && (
         <ul className="sl-files">
@@ -104,11 +143,13 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
       <div className="sl-resource-foot">
         <small>{r.uploaderName ? `By ${r.uploaderName}` : 'Anonymous'}{r.createdAt ? ` · ${new Date(r.createdAt).toLocaleDateString('en-KE')}` : ''}{admin && r.uploaderEmail ? ` · ${r.uploaderEmail}` : ''}</small>
         <span className="sl-foot-actions">
+          {r.status === 'approved' && <button className="sl-mini" onClick={() => setSharing(true)}><Share2 size={13} /> Share</button>}
           {canReport && onReport && <button className="sl-mini ghost" onClick={() => onReport(r)}><Flag size={13} /> Report</button>}
           {onDelete && <button className="sl-mini danger" onClick={() => onDelete(r)}><Trash2 size={13} /> Delete</button>}
         </span>
       </div>
       {children}
+      {sharing && <ShareModal resource={r} onClose={() => setSharing(false)} />}
     </article>
   )
 }
@@ -116,7 +157,7 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
 /* ------------------------------------------------------------------ */
 /* Modals: upload, suggest unit, report                                */
 /* ------------------------------------------------------------------ */
-function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: LabsConfig | null; onClose: () => void; onDone: () => void }) {
+function UploadModal({ unit, config, user, onSignIn, onClose, onDone }: { unit: Unit; config: LabsConfig | null; user: User | null; onSignIn: () => void; onClose: () => void; onDone: () => void }) {
   const [type, setType] = useState<ResourceType>('note')
   const [title, setTitle] = useState('')
   const [examType, setExamType] = useState<ExamType>('CAT')
@@ -127,6 +168,7 @@ function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: La
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<Note>(null)
   const [done, setDone] = useState(false)
+  const [findYt, setFindYt] = useState(false)
   const needsExam = type === 'cat' || type === 'paper'
   const maxFiles = config?.maxFiles ?? 5
   const maxFileMB = config?.maxFileMB ?? 10
@@ -148,7 +190,8 @@ function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: La
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (title.trim().length < 3) return setMsg({ type: 'err', text: 'Give your upload a clear title.' })
-    if (!files.length && !link.trim()) return setMsg({ type: 'err', text: 'Attach at least one file or paste a link.' })
+    if (type === 'video' && !link.trim()) return setMsg({ type: 'err', text: 'Paste the video link, or find one on YouTube.' })
+    if (type !== 'video' && !files.length && !link.trim()) return setMsg({ type: 'err', text: 'Attach at least one file or paste a link.' })
     setBusy(true); setMsg(null)
     try {
       const out: { name: string; data: string }[] = []
@@ -168,7 +211,7 @@ function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: La
       if (total > maxTotalMB * 1024 * 1024) throw new Error(`Files are over ${maxTotalMB} MB in total. Remove some and try again.`)
       await labsApi.submit({
         unitId: unit.id, type, title: title.trim(), description: description.trim(), link: link.trim(),
-        ...(needsExam ? { examType, academicYear: academicYear.trim() } : {}), files: out,
+        ...(needsExam ? { examType, academicYear: academicYear.trim() } : {}), files: type === 'video' ? [] : out,
       })
       setDone(true); onDone()
     } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
@@ -186,7 +229,7 @@ function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: La
       <form className="sl-form" onSubmit={submit}>
         <p className="sl-sub">{unit.name} · {yearLabel(unit.year)}, {semesterLabel(unit.semester)}</p>
         <label>What are you sharing?
-          <select value={type} onChange={(e) => setType(e.target.value as ResourceType)}>{TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</select>
+          <select value={type} onChange={(e) => { const t = e.target.value as ResourceType; setType(t); if (t === 'video') setFiles([]) }}>{TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</select>
         </label>
         <label>Title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lecture 3 notes, Main exam 2024" maxLength={120} /></label>
         {needsExam && (
@@ -196,11 +239,23 @@ function UploadModal({ unit, config, onClose, onDone }: { unit: Unit; config: La
           </div>
         )}
         <label>Description (optional)<textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} /></label>
-        <label>Link (optional, e.g. a YouTube video)<input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://" /></label>
-        <label className="sl-drop"><Upload size={18} /> Choose files
-          <input type="file" multiple onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
-          <small>Up to {maxFiles} files, {maxFileMB} MB each. Photos are shrunk automatically.</small>
-        </label>
+        <label>{type === 'video' ? 'Video link' : 'Link (optional, e.g. a YouTube video)'}<input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://" /></label>
+        {type === 'video' && (
+          <>
+            <button type="button" className="sl-ghost" onClick={() => setFindYt(!findYt)}><Play size={14} /> {findYt ? 'Hide YouTube search' : 'Find a video on YouTube'}</button>
+            {findYt && (
+              <YouTubePanel user={user} onSignIn={onSignIn} defaultQuery={unit.name} pickLabel="Use this video"
+                chips={[`${unit.name} lecture`, `${unit.name} tutorial`]}
+                onPick={(v) => { setLink(`https://www.youtube.com/watch?v=${v.videoId}`); if (!title.trim()) setTitle(v.title.slice(0, 120)); setFindYt(false) }} />
+            )}
+          </>
+        )}
+        {type !== 'video' && (
+          <label className="sl-drop"><Upload size={18} /> Choose files
+            <input type="file" multiple onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
+            <small>Up to {maxFiles} files, {maxFileMB} MB each. Photos are shrunk automatically.</small>
+          </label>
+        )}
         {files.length > 0 && (
           <ul className="sl-picked">{files.map((f, i) => (
             <li key={`${f.name}${i}`}><FileText size={14} /><span>{f.name}</span><button type="button" className="sl-icon-btn" onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label="Remove"><X size={14} /></button></li>
@@ -284,9 +339,9 @@ function UnitRow({ u, onOpen }: { u: Unit; onOpen: (u: Unit) => void }) {
   )
 }
 
-function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport }: {
+function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport, isAdmin }: {
   programmes: Programme[]; loading: boolean; onProgramme: (p: Programme) => void; onUnit: (u: Unit) => void
-  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void
+  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void; isAdmin: boolean
 }) {
   const [q, setQ] = useState('')
   const [level, setLevel] = useState('All')
@@ -295,13 +350,39 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
   const [err, setErr] = useState<Note>(null)
   const levels = useMemo(() => ['All', ...Array.from(new Set(programmes.map((p) => p.level).filter(Boolean)))], [programmes])
   const filtered = programmes.filter((p) => p.active && (level === 'All' || p.level === level))
+  const term = q.trim().toLowerCase()
 
-  async function search(e: FormEvent) {
-    e.preventDefault()
-    if (q.trim().length < 2) { setResults(null); return }
-    setSearching(true); setErr(null)
-    try { setResults(await labsApi.search(q.trim())) } catch (ex) { setErr({ type: 'err', text: errMsg(ex) }) } finally { setSearching(false) }
+  // Courses are matched instantly in the browser: every word typed must appear somewhere in the name, level or department.
+  const matchedProgrammes = useMemo(() => {
+    if (!term) return []
+    const words = term.split(/\s+/).filter(Boolean)
+    return programmes.filter((p) => p.active && words.every((w) => `${p.name} ${p.level} ${p.department}`.toLowerCase().includes(w))).slice(0, 12)
+  }, [programmes, term])
+
+  // Units and uploads are searched on the server shortly after typing stops. Any single letter works.
+  useEffect(() => {
+    if (!term) { setResults(null); setSearching(false); setErr(null); return }
+    let live = true
+    setSearching(true)
+    const t = setTimeout(() => {
+      labsApi.search(term)
+        .then((r) => { if (live) { setResults(r); setErr(null) } })
+        .catch((ex) => { if (live) setErr({ type: 'err', text: errMsg(ex) }) })
+        .finally(() => { if (live) setSearching(false) })
+    }, 250)
+    return () => { live = false; clearTimeout(t) }
+  }, [term])
+
+  async function removeResource(r: Resource) {
+    if (!window.confirm(`Delete “${r.title}” for everyone? This cannot be undone.`)) return
+    try {
+      await labsApi.admin.deleteResource(r.id)
+      setResults((cur) => (cur ? { ...cur, resources: cur.resources.filter((x) => x.id !== r.id) } : cur))
+    } catch (ex) { onResourceError(errMsg(ex)) }
   }
+
+  const searchingNow = Boolean(term)
+  const nothing = results !== null && !searching && matchedProgrammes.length === 0 && results.units.length === 0 && results.resources.length === 0
 
   return (
     <>
@@ -314,24 +395,41 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
         <div className="sl-hero-art"><BookOpen size={46} /><span>Study together</span></div>
       </section>
 
-      <form className="sl-search" onSubmit={search}>
+      <form className="sl-search" onSubmit={(e) => e.preventDefault()}>
         <Search size={18} />
-        <input value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) setResults(null) }} placeholder="Search a unit code, unit name or resource…" />
-        <button className="sl-primary small" disabled={searching}>{searching ? '…' : 'Search'}</button>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any letters: a course, unit code, unit name or resource…" aria-label="Search" autoComplete="off" />
+        {searching ? <LoaderCircle className="sl-spin" size={16} /> : q && <button type="button" className="sl-icon-btn" onClick={() => setQ('')} aria-label="Clear search"><X size={16} /></button>}
       </form>
       <Msg msg={err} />
 
-      {results ? (
+      {searchingNow ? (
         <>
-          <div className="sl-section-head"><h2>Results for “{q.trim()}”</h2><button className="sl-mini ghost" onClick={() => { setResults(null); setQ('') }}>Clear</button></div>
-          {results.units.length === 0 && results.resources.length === 0 && <Empty title="Nothing found" text="Try a unit code like COSC 101, or browse by programme below." />}
-          {results.units.length > 0 && <div className="sl-unit-list">{results.units.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div>}
-          {results.resources.length > 0 && (
-            <div className="sl-grid">{results.resources.map((r) => <ResourceCard key={r.id} r={r} showUnit canReport={Boolean(user)} onReport={onReport} onError={onResourceError} />)}</div>
+          <div className="sl-section-head"><h2>Results for “{q.trim()}”</h2><button className="sl-mini ghost" onClick={() => setQ('')}>Clear</button></div>
+          {matchedProgrammes.length > 0 && (
+            <section className="sl-group"><h2>Courses</h2>
+              <div className="sl-prog-grid">
+                {matchedProgrammes.map((p) => (
+                  <button key={p.id} className="sl-prog" onClick={() => onProgramme(p)}>
+                    <span className="sl-prog-ico"><BookOpen size={18} /></span>
+                    <span><strong>{p.name}</strong><small>{[p.level, p.department].filter(Boolean).join(' · ')}</small></span>
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
+          {results && results.units.length > 0 && <section className="sl-group"><h2>Units</h2><div className="sl-unit-list">{results.units.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div></section>}
+          {results && results.resources.length > 0 && (
+            <section className="sl-group"><h2>Notes, papers &amp; videos</h2>
+              <div className="sl-grid">{results.resources.map((r) => <ResourceCard key={r.id} r={r} showUnit canReport={Boolean(user)} onReport={onReport} onDelete={isAdmin ? removeResource : undefined} onError={onResourceError} admin={isAdmin} />)}</div>
+            </section>
+          )}
+          {nothing && <Empty title="Nothing found" text="Try fewer letters, or browse by programme below." />}
+          {results === null && matchedProgrammes.length === 0 && <Loading text="Searching…" />}
         </>
       ) : (
         <>
+          <CalendarCard isAdmin={isAdmin} />
           <div className="sl-section-head"><h2>Choose your programme</h2></div>
           {levels.length > 2 && <div className="sl-tabs">{levels.map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l}</button>)}</div>}
           {loading ? <Loading /> : filtered.length === 0 ? <Empty title="No programmes yet" text="An admin still needs to add programmes. Check back soon." /> : (
@@ -379,8 +477,8 @@ function ProgrammePage({ programme, user, onUnit, onSuggest, onSignIn }: { progr
   )
 }
 
-function UnitPage({ unit, user, config, onSignIn, onReport }: { unit: Unit; user: User | null; config: LabsConfig | null; onSignIn: () => void; onReport: (r: Resource) => void }) {
-  const [type, setType] = useState<ResourceType | 'all'>('all')
+function UnitPage({ unit, user, config, isAdmin, onSignIn, onReport }: { unit: Unit; user: User | null; config: LabsConfig | null; isAdmin: boolean; onSignIn: () => void; onReport: (r: Resource) => void }) {
+  const [type, setType] = useState<ResourceType | 'all' | 'youtube'>('all')
   const [list, setList] = useState<Resource[] | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const [uploading, setUploading] = useState(false)
@@ -397,18 +495,62 @@ function UnitPage({ unit, user, config, onSignIn, onReport }: { unit: Unit; user
     return c
   }, [list])
   const shown = (list ?? []).filter((r) => type === 'all' || r.type === type)
+  async function removeResource(r: Resource) {
+    if (!window.confirm(`Delete “${r.title}” for everyone? This cannot be undone.`)) return
+    try { await labsApi.admin.deleteResource(r.id); setMsg({ type: 'ok', text: 'Deleted.' }); setTick((n) => n + 1) } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  /** A YouTube pick is sent for review as a video for this unit, like any other upload. */
+  async function suggestVideo(v: { videoId: string; title: string }) {
+    await labsApi.submit({ unitId: unit.id, type: 'video', title: v.title.slice(0, 120), link: `https://www.youtube.com/watch?v=${v.videoId}`, description: 'Found through YouTube search.' })
+    return 'Sent for review. It will show here once an admin approves it. Track it under My uploads.'
+  }
   return (
     <>
       <div className="sl-page-head"><div><span className="sl-kicker">{unit.code}</span><h1>{unit.name}</h1><small>{unit.programmeName ? `${unit.programmeName} · ` : ''}{yearLabel(unit.year)}, {semesterLabel(unit.semester)}</small></div>
         <button className="sl-primary inline" onClick={user ? () => setUploading(true) : onSignIn}><Upload size={15} /> {user ? 'Upload' : 'Sign in to upload'}</button></div>
       <div className="sl-tabs">
         {(['all', ...TYPES] as const).map((t) => <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t === 'all' ? 'All' : TYPE_LABELS[t]} <b>{counts[t] ?? 0}</b></button>)}
+        <button className={`yt${type === 'youtube' ? ' on' : ''}`} onClick={() => setType('youtube')}><Play size={13} /> Find on YouTube</button>
       </div>
       <Msg msg={msg} />
-      {list === null ? <Loading /> : shown.length === 0 ? <Empty icon={<Inbox size={26} />} title="Nothing here yet" text="Be the first to share something for this unit." /> : (
-        <div className="sl-grid">{shown.map((r) => <ResourceCard key={r.id} r={r} canReport={Boolean(user)} onReport={onReport} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
+      {type === 'youtube' ? (
+        <YouTubePanel user={user} onSignIn={onSignIn} defaultQuery={unit.name}
+          chips={[`${unit.name} lecture`, `${unit.name} tutorial`, `${unit.code} ${unit.name} revision`]}
+          onPick={suggestVideo} pickLabel="Share with class" />
+      ) : list === null ? <Loading /> : shown.length === 0 ? <Empty icon={<Inbox size={26} />} title="Nothing here yet" text="Be the first to share something for this unit." /> : (
+        <div className="sl-grid">{shown.map((r) => <ResourceCard key={r.id} r={r} canReport={Boolean(user)} onReport={onReport} onDelete={isAdmin ? removeResource : undefined} admin={isAdmin} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
       )}
-      {uploading && <UploadModal unit={unit} config={config} onClose={() => setUploading(false)} onDone={() => setTick((n) => n + 1)} />}
+      {uploading && <UploadModal unit={unit} config={config} user={user} onSignIn={onSignIn} onClose={() => setUploading(false)} onDone={() => setTick((n) => n + 1)} />}
+    </>
+  )
+}
+
+/** Opened from a share link: #/labs/r/<id>. */
+function ResourcePage({ id, user, isAdmin, onOpenUnit, onSignIn, onReport }: {
+  id: string; user: User | null; isAdmin: boolean; onOpenUnit: (u: Unit) => void; onSignIn: () => void; onReport: (r: Resource) => void
+}) {
+  const [r, setR] = useState<Resource | null>(null)
+  const [msg, setMsg] = useState<Note>(null)
+  const [gone, setGone] = useState(false)
+  useEffect(() => {
+    let live = true
+    setR(null); setMsg(null); setGone(false)
+    labsApi.resource(id).then((x) => { if (live) setR(x) }).catch((e) => { if (live) { setMsg({ type: 'err', text: errMsg(e) }); setGone(true) } })
+    return () => { live = false }
+  }, [id, user?.uid])
+  async function remove(x: Resource) {
+    if (!window.confirm(`Delete “${x.title}” for everyone? This cannot be undone.`)) return
+    try { await labsApi.admin.deleteResource(x.id); setR(null); setGone(true); setMsg({ type: 'ok', text: 'Deleted.' }) } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  const unit: Unit | null = r ? (r.unit ?? { id: r.unitId, programmeId: r.programmeId, year: r.year, semester: r.semester, code: r.unitCode, name: r.unitName, programmeName: r.programmeName, counts: { note: 0, cat: 0, paper: 0, video: 0 } }) : null
+  return (
+    <>
+      <div className="sl-page-head"><div><span className="sl-kicker">SHARED WITH YOU</span><h1>{r ? r.title : 'Shared item'}</h1>{r && <small>{r.unitCode} · {r.unitName}</small>}</div>
+        {unit && <button className="sl-primary inline" onClick={() => onOpenUnit(unit)}><BookOpen size={15} /> Open {unit.code}</button>}</div>
+      <Msg msg={msg} />
+      {!r && !gone && <Loading />}
+      {gone && !user && <p className="sl-sub">If this was your own upload or it is still pending, sign in to see it. <button className="sl-mini" onClick={onSignIn}>Sign in</button></p>}
+      {r && <div className="sl-single"><ResourceCard r={r} showUnit admin={isAdmin} canReport={Boolean(user) && r.status === 'approved'} onReport={onReport} onDelete={isAdmin ? remove : undefined} onError={(m) => setMsg({ type: 'err', text: m })} /></div>}
     </>
   )
 }
@@ -448,7 +590,7 @@ function MinePage() {
 /* Admin                                                               */
 /* ------------------------------------------------------------------ */
 function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
-  const [tab, setTab] = useState<'queue' | 'reports' | 'suggestions' | 'catalogue'>('queue')
+  const [tab, setTab] = useState<'queue' | 'library' | 'calendar' | 'reports' | 'suggestions' | 'catalogue'>('queue')
   const [queue, setQueue] = useState<AdminQueue | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const loadQueue = useCallback(() => labsApi.admin.queue().then(setQueue).catch((e) => setMsg({ type: 'err', text: errMsg(e) })), [])
@@ -458,15 +600,54 @@ function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
       <div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Study Labs admin</h1></div></div>
       <div className="sl-tabs">
         <button className={tab === 'queue' ? 'on' : ''} onClick={() => setTab('queue')}>Review queue <b>{queue?.pending.length ?? 0}</b></button>
+        <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>Library</button>
+        <button className={tab === 'calendar' ? 'on' : ''} onClick={() => setTab('calendar')}>Calendar</button>
         <button className={tab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>Reports <b>{queue?.openReports ?? 0}</b></button>
         <button className={tab === 'suggestions' ? 'on' : ''} onClick={() => setTab('suggestions')}>Suggestions <b>{queue?.pendingSuggestions ?? 0}</b></button>
         <button className={tab === 'catalogue' ? 'on' : ''} onClick={() => setTab('catalogue')}>Programmes &amp; units</button>
       </div>
       <Msg msg={msg} />
       {tab === 'queue' && <QueueTab queue={queue} reload={loadQueue} setMsg={setMsg} />}
+      {tab === 'library' && <LibraryTab setMsg={setMsg} reload={loadQueue} />}
+      {tab === 'calendar' && <AdminCalendarTab setMsg={setMsg} />}
       {tab === 'reports' && <ReportsTab reload={loadQueue} setMsg={setMsg} />}
       {tab === 'suggestions' && <SuggestionsTab expected={queue?.pendingSuggestions ?? 0} reload={loadQueue} setMsg={setMsg} onChanged={onCatalogueChanged} />}
       {tab === 'catalogue' && <CatalogueTab setMsg={setMsg} onChanged={onCatalogueChanged} />}
+    </>
+  )
+}
+
+/** Every upload (approved, pending, rejected). Search by any letters and delete what should not be there. */
+function LibraryTab({ setMsg, reload }: { setMsg: (n: Note) => void; reload: () => Promise<unknown> }) {
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState<'' | 'approved' | 'pending' | 'rejected'>('approved')
+  const [items, setItems] = useState<Resource[] | null>(null)
+  useEffect(() => {
+    let live = true
+    setItems(null)
+    const t = setTimeout(() => {
+      labsApi.admin.resources({ q: q.trim() || undefined, status: status || undefined })
+        .then((r) => { if (live) setItems(r) })
+        .catch((e) => { if (live) { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) } })
+    }, 250)
+    return () => { live = false; clearTimeout(t) }
+  }, [q, status, setMsg])
+  async function remove(r: Resource) {
+    if (!window.confirm(`Delete “${r.title}” for good? Its files are removed from Drive too.`)) return
+    setMsg(null)
+    try { await labsApi.admin.deleteResource(r.id); setItems((cur) => (cur ? cur.filter((x) => x.id !== r.id) : cur)); setMsg({ type: 'ok', text: 'Deleted.' }); void reload() }
+    catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  return (
+    <>
+      <div className="sl-search"><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, unit code or unit name…" aria-label="Search library" />
+        <select className="sl-select" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Status"><option value="approved">Approved</option><option value="pending">Pending</option><option value="rejected">Rejected</option><option value="">All</option></select></div>
+      {items === null ? <Loading /> : items.length === 0 ? <Empty icon={<Inbox size={26} />} title="Nothing found" /> : (
+        <>
+          {items.length >= 200 && <p className="sl-sub">Showing the newest 200. Search to narrow it down.</p>}
+          <div className="sl-grid">{items.map((r) => <ResourceCard key={r.id} r={r} showUnit admin onDelete={remove} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
+        </>
+      )}
     </>
   )
 }
@@ -654,9 +835,23 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
 
   useEffect(() => { window.scrollTo(0, 0) }, [view])
 
+  // Share links: #/labs/r/<id> opens that item directly (also when the hash changes while the page is open).
+  useEffect(() => {
+    const open = () => { const id = resourceIdFromHash(window.location.hash); if (id) setView({ name: 'resource', id }) }
+    open()
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
+  }, [])
+  // Leaving a shared item puts the address back to plain #/labs so a refresh does not reopen it.
+  const prevView = useRef<View['name']>('home')
+  useEffect(() => {
+    if (prevView.current === 'resource' && view.name !== 'resource' && resourceIdFromHash(window.location.hash)) window.history.replaceState(null, '', '#/labs')
+    prevView.current = view.name
+  }, [view])
+
   const back = () => {
     if (view.name === 'unit') setView(view.programme ? { name: 'programme', programme: view.programme } : { name: 'home' })
-    else if (view.name === 'programme' || view.name === 'mine' || view.name === 'admin') setView({ name: 'home' })
+    else if (view.name === 'programme' || view.name === 'mine' || view.name === 'admin' || view.name === 'resource') setView({ name: 'home' })
     else onBack()
   }
   const openUnit = (unit: Unit, programme?: Programme) => setView({ name: 'unit', unit, programme: programme ?? programmes.find((p) => p.id === unit.programmeId) })
@@ -679,11 +874,12 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       <Msg msg={toast} />
 
       {view.name === 'home' && (
-        <Home programmes={programmes} loading={loading} user={user} onProgramme={(p) => setView({ name: 'programme', programme: p })}
+        <Home programmes={programmes} loading={loading} user={user} isAdmin={isAdmin} onProgramme={(p) => setView({ name: 'programme', programme: p })}
           onUnit={(u) => openUnit(u)} onReport={setReporting} onResourceError={(m) => setToast({ type: 'err', text: m })} />
       )}
       {view.name === 'programme' && <ProgrammePage programme={view.programme} user={user} onSignIn={onSignIn} onUnit={(u) => openUnit(u, view.programme)} onSuggest={() => setSuggesting(view.programme)} />}
-      {view.name === 'unit' && <UnitPage unit={view.unit} user={user} config={config} onSignIn={onSignIn} onReport={setReporting} />}
+      {view.name === 'unit' && <UnitPage unit={view.unit} user={user} config={config} isAdmin={isAdmin} onSignIn={onSignIn} onReport={setReporting} />}
+      {view.name === 'resource' && <ResourcePage id={view.id} user={user} isAdmin={isAdmin} onSignIn={onSignIn} onReport={setReporting} onOpenUnit={(u) => openUnit(u)} />}
       {view.name === 'mine' && user && <MinePage />}
       {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
 

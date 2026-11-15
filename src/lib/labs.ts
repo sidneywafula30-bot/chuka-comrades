@@ -30,6 +30,7 @@ export type CalEvent = {
   kind: EventKind
   location?: string
   description?: string
+  link?: string
 }
 
 export type EventsResult = {
@@ -58,6 +59,7 @@ export type LabsConfig = {
   maxFileMB: number
   maxTotalMB: number
   extensions: string[]
+  calendar?: boolean
 }
 
 export type Programme = {
@@ -121,6 +123,20 @@ export type Resource = {
     title: string
     status: ResourceStatus
   }[]
+  /** Only on the single-resource lookup used by share links. */
+  unit?: Unit | null
+}
+
+/** What the admin calendar form sends. date / endDate are YYYY-MM-DD, times are HH:MM. */
+export type EventInput = {
+  title: string
+  date: string
+  endDate?: string
+  allDay: boolean
+  startTime?: string
+  endTime?: string
+  location?: string
+  description?: string
 }
 
 export type Suggestion = {
@@ -266,6 +282,9 @@ export const labsApi = {
 
   resources: (unitId: string, type?: ResourceType) =>
     call<Resource[]>('resources', { unitId, type }),
+
+  /** One resource by id (share links). Needs the "resource" action on the server (v1.2.0+). */
+  resource: (id: string) => call<Resource>('resource', { id }),
 
   // YouTube search
   // Requires the Apps Script backend to implement "yt_search".
@@ -495,6 +514,22 @@ export const labsApi = {
       call<{
         deleted: boolean
       }>('admin_delete_unit', { id }),
+
+    // Calendar (exams, CATs, important dates)
+
+    events: () =>
+      call<EventsResult>('admin_events'),
+
+    addEvent: (e: EventInput) =>
+      call<CalEvent>('admin_add_event', { ...e }),
+
+    updateEvent: (id: string, e: EventInput) =>
+      call<CalEvent>('admin_update_event', { id, ...e }),
+
+    deleteEvent: (id: string) =>
+      call<{
+        deleted: boolean
+      }>('admin_delete_event', { id }),
   },
 }
 
@@ -518,4 +553,51 @@ export function currentAcademicYear(now?: Date) {
       : d.getFullYear() - 1
 
   return `${y}/${y + 1}`
+}
+
+/* ---------- share links & YouTube helpers ---------- */
+
+/** Direct link to one resource, e.g. https://site/#/labs/r/r_abc123 */
+export function shareUrl(resourceId: string) {
+  const base = window.location.href.split('#')[0]
+  return `${base}#/labs/r/${resourceId}`
+}
+
+/** Reads the resource id from a share link hash, or null. */
+export function resourceIdFromHash(hash: string) {
+  const m = /^#\/labs\/r\/(r_[A-Za-z0-9]+)/.exec(hash)
+  return m ? m[1] : null
+}
+
+/** YouTube video id from a youtube.com / youtu.be link, or ''. */
+export function youtubeId(url: string) {
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    const h = u.hostname.replace(/^www\.|^m\./, '')
+    if (h === 'youtu.be') return u.pathname.slice(1).split('/')[0] ?? ''
+    if (h === 'youtube.com' || h === 'youtube-nocookie.com') {
+      if (u.pathname === '/watch') return u.searchParams.get('v') ?? ''
+      const m = /^\/(embed|shorts|live)\/([\w-]{6,20})/.exec(u.pathname)
+      if (m) return m[2]
+    }
+  } catch {
+    /* not a url */
+  }
+  return ''
+}
+
+export const youtubeWatchUrl = (id: string) =>
+  `https://www.youtube.com/watch?v=${id}`
+
+export const youtubeThumb = (id: string) =>
+  `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+
+/** Mirrors the server: the colour of an event comes from words in its title. */
+export function eventKindOf(title: string): EventKind {
+  const s = title.toLowerCase()
+  if (/\b(cats?|continuous assessments?)\b/.test(s)) return 'cat'
+  if (/\b(exams?|examinations?|supplementary|supp|resit|special exam)\b/.test(s)) return 'exam'
+  if (/\b(deadline|registration|reporting|graduation|holiday|closing|opening|fees|orientation|results?|important|notice)\b/.test(s)) return 'important'
+  return 'event'
 }

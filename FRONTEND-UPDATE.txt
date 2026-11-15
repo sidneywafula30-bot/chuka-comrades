@@ -12,3 +12,8 @@ Then restart: npm run dev
 
 UPDATE (Study Labs card): Landing.tsx now lists "Study Labs" in LIVE_LINKS -> #/labs, so the card shows "Open" and links to #/labs.
 Your router must handle #/labs (render the Study Labs page) and .env needs VITE_LABS_API_URL.
+
+
+UPDATE v1.2 (Study Labs): live search, calendar, YouTube search, share links, admin delete.
+New/changed files: src/lib/labs.ts, src/pages/StudyLabs.tsx, StudyLabs.css, StudyLabsCalendar.tsx (new), StudyLabsYoutube.tsx (new).
+Also update the Apps Script (Code.gs, Config.gs, Catalog.gs, Resources.gs) and deploy a NEW VERSION, or share links will not open.
