@@ -150,6 +150,8 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
 
       {t.rules && <section className="cpl-card"><h3>Rules</h3><div className="ef-rules">{t.rules}</div></section>}
 
+      <Entrants tid={t.id} count={t.count} me={me?.uid} />
+
       {t.pools.length > 0 && <Bracket t={t} />}
       <Champions list={champs} />
     </div>
@@ -254,6 +256,42 @@ function Bracket({ t }: { t: Tournament }) {
           </details>
         )
       })}
+    </section>
+  )
+}
+
+type Entrant = { n: number; uid: string; username: string; course: string; platform: string; strength: number; squadId: string }
+
+/** Everyone registered (payment verified) for this tournament, with a search box. */
+function Entrants({ tid, count, me }: { tid: string; count: number; me?: string }) {
+  const [list, setList] = useState<Entrant[] | null>(null)
+  const [err, setErr] = useState('')
+  const [q, setQ] = useState('')
+  const [shown, setShown] = useState(40)
+  useEffect(() => { ef<{ list: Entrant[] }>('entrants', { tid }).then((r) => setList(r.list)).catch((e) => setErr((e as Error).message)) }, [tid, count])
+  const s = q.trim().toLowerCase()
+  const rows = (list ?? []).filter((x) => !s || x.username.toLowerCase().includes(s) || x.course.toLowerCase().includes(s))
+  return (
+    <section className="cpl-card">
+      <h3>Registered players{list ? ` (${list.length})` : ''}</h3>
+      {err && <p className="cpl-err" role="alert">{err}</p>}
+      {!list && !err && <p className="cpl-empty">Loading…</p>}
+      {list && !list.length && <p className="cpl-empty" style={{ margin: 0 }}>No one has registered yet. Entries show here once the admin verifies the payment.</p>}
+      {list && list.length > 0 && (
+        <>
+          <div className="cpl-search" style={{ width: '100%', marginBottom: 10 }}><input value={q} onChange={(e) => { setQ(e.target.value); setShown(40) }} placeholder="Search username or course" aria-label="Search registered players" /></div>
+          <div className="ef-members">
+            {rows.slice(0, shown).map((x) => (
+              <div className={`ef-member${x.uid === me ? ' win' : ''}`} key={x.uid}>
+                {x.squadId ? <img src={driveImg(x.squadId, 120)} alt="" loading="lazy" /> : <img alt="" />}
+                <div><strong>{x.n}. {x.username}{x.uid === me ? ' (you)' : ''}</strong><small>{x.platform} · {x.strength}</small><small>{x.course}</small></div>
+              </div>
+            ))}
+          </div>
+          {!rows.length && <p className="cpl-empty">No match.</p>}
+          {rows.length > shown && <div className="ef-actions"><button className="lp-btn" onClick={() => setShown((n) => n + 40)}>Show more ({rows.length - shown} left)</button></div>}
+        </>
+      )}
     </section>
   )
 }
