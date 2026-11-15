@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
-  shareUrl, resourceIdFromHash, youtubeId, youtubeThumb,
+  shareUrl, resourceIdFromHash, youtubeId, youtubeThumb, PAYWALL_EVENT,
+  type AccessInfo, type AccessUser, type PaymentInfo,
   type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
 } from '../lib/labs'
 import { fileToB64, shrinkImage } from '../lib/files'
@@ -590,7 +591,7 @@ function MinePage() {
 /* Admin                                                               */
 /* ------------------------------------------------------------------ */
 function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
-  const [tab, setTab] = useState<'queue' | 'library' | 'calendar' | 'reports' | 'suggestions' | 'catalogue'>('queue')
+  const [tab, setTab] = useState<'queue' | 'library' | 'calendar' | 'reports' | 'suggestions' | 'catalogue' | 'access'>('queue')
   const [queue, setQueue] = useState<AdminQueue | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const loadQueue = useCallback(() => labsApi.admin.queue().then(setQueue).catch((e) => setMsg({ type: 'err', text: errMsg(e) })), [])
@@ -605,6 +606,7 @@ function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
         <button className={tab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>Reports <b>{queue?.openReports ?? 0}</b></button>
         <button className={tab === 'suggestions' ? 'on' : ''} onClick={() => setTab('suggestions')}>Suggestions <b>{queue?.pendingSuggestions ?? 0}</b></button>
         <button className={tab === 'catalogue' ? 'on' : ''} onClick={() => setTab('catalogue')}>Programmes &amp; units</button>
+        <button className={tab === 'access' ? 'on' : ''} onClick={() => setTab('access')}>Access &amp; payments</button>
       </div>
       <Msg msg={msg} />
       {tab === 'queue' && <QueueTab queue={queue} reload={loadQueue} setMsg={setMsg} />}
@@ -613,7 +615,85 @@ function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
       {tab === 'reports' && <ReportsTab reload={loadQueue} setMsg={setMsg} />}
       {tab === 'suggestions' && <SuggestionsTab expected={queue?.pendingSuggestions ?? 0} reload={loadQueue} setMsg={setMsg} onChanged={onCatalogueChanged} />}
       {tab === 'catalogue' && <CatalogueTab setMsg={setMsg} onChanged={onCatalogueChanged} />}
+      {tab === 'access' && <AccessTab setMsg={setMsg} />}
     </>
+  )
+}
+
+
+/* ---------- free trial + support payment ---------- */
+
+const FALLBACK_PAY: PaymentInfo = {
+  priceKes: 50, trialDays: 14, whatsapp: '254184198432',
+  whatsappLink: 'https://wa.me/254184198432?text=' + encodeURIComponent('Hello, I would like to activate my Chuka Study Labs access. I have sent KSh 50.'),
+  note: 'Send KSh 50 to the admin, then WhatsApp the admin with your M-Pesa confirmation message and the email you sign in with. You will be activated shortly. Thank you for supporting Study Labs!',
+}
+
+function PaywallModal({ payment, email, onClose }: { payment: PaymentInfo | null; email?: string | null; onClose: () => void }) {
+  const p = payment ?? FALLBACK_PAY
+  const link = email ? `${p.whatsappLink}${encodeURIComponent(' (' + email + ')')}` : p.whatsappLink
+  return (
+    <Modal title="Your free trial has ended" onClose={onClose}>
+      <p>You enjoyed {p.trialDays} days of Study Labs free. To keep going, support the database with <b>KSh {p.priceKes}</b>.</p>
+      <ol>
+        <li>Send <b>KSh {p.priceKes}</b> as the admin directs.</li>
+        <li>Chat the admin on WhatsApp <b>+{p.whatsapp}</b> with your payment message{email ? <> and your email <b>{email}</b></> : null}.</li>
+        <li>You will be activated, and you can keep studying.</li>
+      </ol>
+      <p>{p.note}</p>
+      <a className="sl-primary inline" href={link} target="_blank" rel="noopener noreferrer">Chat admin on WhatsApp</a>
+      <p><b>Thank you for the support!</b></p>
+    </Modal>
+  )
+}
+
+function TrialBanner({ access, onPay }: { access: AccessInfo | null; onPay: () => void }) {
+  if (!access || access.status === 'admin') return null
+  if (access.status === 'paid') {
+    return access.daysLeft <= 7 ? <p className="sl-alert ok">Your access runs for {access.daysLeft} more day{access.daysLeft === 1 ? '' : 's'}. Thank you for the support!</p> : null
+  }
+  if (access.status === 'trial') {
+    return <p className="sl-alert ok">Free trial: {access.daysLeft} day{access.daysLeft === 1 ? '' : 's'} left. After that, support Study Labs with KSh {access.payment.priceKes}. <button className="sl-mini" onClick={onPay}>How to pay</button></p>
+  }
+  return <p className="sl-alert err">Your free trial has ended. <button className="sl-mini" onClick={onPay}>Activate with KSh {access.payment.priceKes}</button></p>
+}
+
+/** Admin: activate a student after they pay, see who is on trial, paid or expired. */
+function AccessTab({ setMsg }: { setMsg: (n: Note) => void }) {
+  const [q, setQ] = useState('')
+  const [email, setEmail] = useState('')
+  const [days, setDays] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [items, setItems] = useState<AccessUser[] | null>(null)
+  const load = useCallback(() => labsApi.admin.users(q.trim() || undefined).then(setItems).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) }), [q, setMsg])
+  useEffect(() => { const t = setTimeout(() => { void load() }, 300); return () => clearTimeout(t) }, [load])
+  async function activate(addr: string, d?: number) {
+    setBusy(true)
+    try { const u = await labsApi.admin.activate(addr.trim(), d); setMsg({ type: 'ok', text: `${u.email} is active until ${u.paidUntil.slice(0, 10)}.` }); setEmail(''); setDays(''); await load() }
+    catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  async function revoke(addr: string) {
+    if (!window.confirm(`End paid access for ${addr}?`)) return
+    try { await labsApi.admin.deactivate(addr); await load() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) }
+  }
+  return (
+    <div className="sl-card">
+      <h2>Activate a student</h2>
+      <form className="sl-form inline" onSubmit={(e) => { e.preventDefault(); if (email.trim()) void activate(email, days ? Number(days) : undefined) }}>
+        <input type="email" placeholder="Student email (the one they sign in with)" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input type="number" min={1} max={400} placeholder="Days (default 120)" value={days} onChange={(e) => setDays(e.target.value)} />
+        <button className="sl-primary small" disabled={busy || !email.trim()}>Activate</button>
+      </form>
+      <h2>Students</h2>
+      <input placeholder="Search by email or name" value={q} onChange={(e) => setQ(e.target.value)} />
+      {!items ? <Loading /> : items.length === 0 ? <Empty title="No students yet" /> : items.map((u) => (
+        <div key={u.email} className="sl-row-actions">
+          <span><b>{u.name || u.email}</b> · {u.email} · {u.status}{u.paidUntil ? ` · until ${u.paidUntil.slice(0, 10)}` : ''}</span>
+          <button className="sl-mini" disabled={busy} onClick={() => void activate(u.email)}>+ Activate</button>
+          {u.status === 'paid' && <button className="sl-mini ghost" onClick={() => void revoke(u.email)}>End access</button>}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -818,6 +898,19 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
   const [reporting, setReporting] = useState<Resource | null>(null)
   const [suggesting, setSuggesting] = useState<Programme | null>(null)
   const [toast, setToast] = useState<Note>(null)
+  const [access, setAccess] = useState<AccessInfo | null>(null)
+  const [paywall, setPaywall] = useState<{ payment: PaymentInfo | null } | null>(null)
+
+  useEffect(() => {
+    const on = (e: Event) => setPaywall({ payment: (e as CustomEvent<PaymentInfo | null>).detail ?? null })
+    window.addEventListener(PAYWALL_EVENT, on)
+    return () => window.removeEventListener(PAYWALL_EVENT, on)
+  }, [])
+  useEffect(() => {
+    setAccess(null)
+    if (!labsReady || !user) return
+    labsApi.access().then(setAccess).catch(() => {})
+  }, [user])
 
   const loadProgrammes = useCallback(() => labsApi.programmes().then(setProgrammes), [])
   const refreshProgrammes = useCallback(() => { loadProgrammes().catch(() => {}) }, [loadProgrammes])
@@ -872,6 +965,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {!labsReady && <Msg msg={{ type: 'err', text: 'Study Labs server not connected yet. Add VITE_LABS_API_URL to .env and restart npm run dev.' }} />}
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
       <Msg msg={toast} />
+      <TrialBanner access={access} onPay={() => setPaywall({ payment: access?.payment ?? null })} />
 
       {view.name === 'home' && (
         <Home programmes={programmes} loading={loading} user={user} isAdmin={isAdmin} onProgramme={(p) => setView({ name: 'programme', programme: p })}
@@ -883,6 +977,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {view.name === 'mine' && user && <MinePage />}
       {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
 
+      {paywall && <PaywallModal payment={paywall.payment} email={user?.email} onClose={() => setPaywall(null)} />}
       {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
       {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}
     </div>

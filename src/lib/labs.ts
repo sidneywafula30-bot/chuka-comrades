@@ -1,4 +1,3 @@
-
 import { auth } from './firebase'
 
 /** Study Labs Apps Script web app URL (the /exec link). */
@@ -191,6 +190,44 @@ export type ImportSummary = {
   otherCampusSkipped: number
 }
 
+/* ---------- access (free trial + support payment) ---------- */
+
+export type PaymentInfo = {
+  priceKes: number
+  trialDays: number
+  whatsapp: string
+  whatsappLink: string
+  note: string
+}
+
+export type AccessInfo = {
+  status: 'admin' | 'trial' | 'paid' | 'expired'
+  active: boolean
+  daysLeft: number
+  trialEndsAt: string
+  paidUntil: string
+  payment: PaymentInfo
+}
+
+export type AccessUser = {
+  email: string
+  name: string
+  trialStart: string
+  paidUntil: string
+  status: 'new' | 'trial' | 'paid' | 'expired'
+  activatedBy: string
+}
+
+/** Thrown when the free trial is over. The page listens for PAYWALL_EVENT and shows the payment card. */
+export const PAYWALL_EVENT = 'labs-paywall'
+export class PaywallError extends Error {
+  payment: PaymentInfo | null
+  constructor(message: string, payment: PaymentInfo | null) {
+    super(message)
+    this.payment = payment
+  }
+}
+
 /* ---------- transport ---------- */
 
 /** Calls the Study Labs Apps Script backend. */
@@ -239,6 +276,8 @@ async function call<T>(
     ok: boolean
     data?: unknown
     error?: string
+    code?: string
+    payment?: PaymentInfo | null
   }
 
   try {
@@ -250,6 +289,11 @@ async function call<T>(
   }
 
   if (!j.ok) {
+    if (j.code === 'payment_required') {
+      const err = new PaywallError(j.error || 'Your free trial has ended.', j.payment ?? null)
+      window.dispatchEvent(new CustomEvent(PAYWALL_EVENT, { detail: err.payment }))
+      throw err
+    }
     throw new Error(j.error || 'Request failed')
   }
 
@@ -268,6 +312,9 @@ export const labsApi = {
       signedIn: boolean
       isAdmin: boolean
     }>('admin_check'),
+
+  /** Signed-in student: trial / paid / expired status. Starts the 2-week trial on first call. */
+  access: () => call<AccessInfo>('access'),
 
   programmes: () => call<Programme[]>('programmes'),
 
@@ -362,6 +409,14 @@ export const labsApi = {
   admin: {
     queue: () =>
       call<AdminQueue>('admin_queue'),
+
+    users: (q?: string) => call<AccessUser[]>('admin_users', { q }),
+
+    activate: (email: string, days?: number) =>
+      call<AccessUser>('admin_activate', { email, days }),
+
+    deactivate: (email: string) =>
+      call<{ ok: boolean }>('admin_deactivate', { email }),
 
     review: (
       id: string,
