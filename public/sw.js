@@ -1,12 +1,12 @@
 /* Chuka Comrades service worker: offline app shell.
    Only same-origin files are cached. API calls (Supabase, Firebase, etc.) always go to the network. */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const CACHE = `comrades-${VERSION}`
 const SCOPE = self.registration.scope
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll([SCOPE, SCOPE + 'index.html', SCOPE + 'manifest.webmanifest', SCOPE + 'chukalogo-192.png', SCOPE + 'chukalogo-512.png'])).then(() => self.skipWaiting()),
+    caches.open(CACHE).then((c) => c.addAll([SCOPE, SCOPE + 'index.html', SCOPE + 'manifest.webmanifest', SCOPE + 'icon-192.png', SCOPE + 'icon-512.png'])).then(() => self.skipWaiting()),
   )
 })
 
