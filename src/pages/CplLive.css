@@ -1,0 +1,44 @@
+/* Landing-page widgets: EPL fixtures + weather. Colours adapt to light or dark themes. */
+.cpl-live { display: grid; grid-template-columns: 1fr; gap: 14px; width: 100%; max-width: 920px; margin: 22px auto 0; text-align: left; }
+@media (min-width: 760px) { .cpl-live { grid-template-columns: 3fr 2fr; align-items: start; } }
+
+.cpl-live-card { border: 1px solid rgba(127, 127, 127, .28); background: rgba(127, 127, 127, .07); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+.cpl-live-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.cpl-live-card h2 { font-size: 1rem; margin: 0; }
+.cpl-live-card > header > span { font-size: .8rem; opacity: .7; }
+.cpl-live-card > footer { margin-top: 10px; font-size: .7rem; opacity: .6; }
+.cpl-live-empty { margin: 8px 0; font-size: .9rem; opacity: .75; }
+
+.cpl-live-tabs { display: inline-flex; border: 1px solid rgba(127, 127, 127, .35); border-radius: 999px; overflow: hidden; }
+.cpl-live-tabs button { background: transparent; color: inherit; border: 0; padding: 4px 12px; font: inherit; font-size: .8rem; cursor: pointer; }
+.cpl-live-tabs button.on { background: rgba(127, 127, 127, .3); font-weight: 600; }
+
+.cpl-live-skel { display: grid; gap: 8px; }
+.cpl-live-skel i { display: block; height: 34px; border-radius: 8px; background: rgba(127, 127, 127, .18); animation: cpl-live-pulse 1.2s ease-in-out infinite; }
+@keyframes cpl-live-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .cpl-live-skel i { animation: none; } }
+
+/* fixtures */
+.cpl-epl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.cpl-epl-day { display: block; margin: 8px 0 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .65; }
+.cpl-epl-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127, 127, 127, .15); font-size: .88rem; }
+.cpl-epl-team { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.cpl-epl-team.home { justify-content: flex-end; text-align: right; }
+.cpl-epl-team b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cpl-epl-team img { flex: none; object-fit: contain; }
+.cpl-epl-fallback { flex: none; font-size: .6rem; font-weight: 700; border: 1px solid rgba(127, 127, 127, .4); border-radius: 6px; padding: 2px 4px; }
+.cpl-epl-mid { min-width: 56px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; background: rgba(127, 127, 127, .18); border-radius: 8px; padding: 3px 8px; }
+.cpl-epl-mid.live { background: rgba(220, 38, 38, .2); }
+.cpl-epl-mid em { display: block; font-style: normal; font-size: .58rem; color: #dc2626; letter-spacing: .06em; }
+@media (max-width: 420px) { .cpl-epl-row { font-size: .8rem; gap: 5px; } .cpl-epl-team b { font-size: .78rem; } }
+
+/* weather */
+.cpl-wx-now { display: flex; align-items: center; gap: 12px; }
+.cpl-wx-now strong { display: block; font-size: 2rem; line-height: 1; }
+.cpl-wx-now span { font-size: .82rem; opacity: .75; }
+.cpl-wx-meta { display: flex; gap: 14px; margin: 10px 0; font-size: .82rem; opacity: .85; }
+.cpl-wx-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.cpl-wx-days { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cpl-wx-days li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; background: rgba(127, 127, 127, .1); text-align: center; }
+.cpl-wx-days small { font-size: .7rem; opacity: .7; }
+.cpl-wx-days .rain { font-size: .64rem; }

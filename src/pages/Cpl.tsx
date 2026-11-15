@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { ArrowLeft, ArrowRightLeft, BarChart3, CalendarDays, ClipboardCheck, ExternalLink, Globe, MessageCircle, Phone, Play, Search, Shield, ShieldCheck, UserRound, X } from 'lucide-react'
 import { cpl, cplReady, type Category, type Highlight, type Me, type Profile, type SearchResult, type Fixture, type Season, type Venue } from '../lib/cpl'
+import CplLive from './CplLive'
 import CplProfile from './CplProfile'
 import CplDashboard from './CplDashboard'
 import CplSeasons from './CplSeasons'
@@ -154,6 +155,9 @@ function Home({ isChair, isCoach, isPlayer, isReferee, signedIn, checking, meErr
           <Videos items={res.videos} />
         </div>
       )}
+
+      {/* EPL fixtures (FPL API) + Chuka weather (Open-Meteo) */}
+      <CplLive />
 
       <nav className="cpl-links" aria-label="CPL links">
         {isCoach && <a className="cpl-link" href="#/cpl/my-team"><Shield size={16} /> My team</a>}
