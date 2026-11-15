@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Copy, Trophy } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
-import { driveImg, ef, fromParts, toParts, type AdminCourse, type Attention, type DisputedMatch, type Profile, type Tournament } from '../lib/efootball'
+import { driveImg, ef, fmtStamp, fromParts, toParts, type AdminCourse, type Attention, type FplAdminInfo, type HomeData, type Profile, type Tournament } from '../lib/efootball'
 
-type Tab = 'tournament' | 'attention' | 'courses' | 'players' | 'league'
+type Tab = 'tournament' | 'attention' | 'courses' | 'players' | 'league' | 'fpl'
 type Msg = { ok: boolean; text: string } | null
 
 export default function EfAdmin() {
@@ -11,13 +11,13 @@ export default function EfAdmin() {
   return (
     <div className="cpl-page">
       <h2>eFootball admin</h2>
-      <p className="cpl-sub">Tournaments, disputes, courses and players.</p>
+      <p className="cpl-sub">Tournaments, courses, players and the league. League results settle themselves.</p>
       <div className="ef-tabs" role="tablist">
-        {([['tournament', 'Tournament'], ['attention', 'Needs attention'], ['courses', 'Courses'], ['players', 'Players'], ['league', 'League']] as [Tab, string][]).map(([id, label]) => (
+        {([['tournament', 'Tournament'], ['attention', 'Needs attention'], ['courses', 'Courses'], ['players', 'Players'], ['league', 'League'], ['fpl', 'FPL']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
-      {tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'courses' ? <CoursesAdmin /> : tab === 'players' ? <PlayersAdmin /> : <LeagueAdmin />}
+      {tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'courses' ? <CoursesAdmin /> : tab === 'players' ? <PlayersAdmin /> : tab === 'fpl' ? <FplAdmin /> : <LeagueAdmin />}
     </div>
   )
 }
@@ -156,41 +156,54 @@ function AttentionAdmin() {
 }
 
 /* ---------------- courses ---------------- */
+type CourseFilter = 'all' | 'league' | 'requested' | 'off'
 function CoursesAdmin() {
   const [list, setList] = useState<AdminCourse[] | null>(null)
   const [name, setName] = useState('')
   const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<CourseFilter>('all')
   const [busy, setBusy] = useState(false)
   const { setMsg, el } = useMsg()
   const load = useCallback(() => ef<AdminCourse[]>('adminCourses').then(setList).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
   useEffect(() => { void load() }, [load])
 
-  async function imp() {
-    setBusy(true); setMsg(null)
-    try { const r = await ef<{ pages: number; found: number; added: number }>('importCourses'); setMsg({ ok: true, text: `Read ${r.pages} pages, found ${r.found} courses, added ${r.added} new.` }); await load() }
-    catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
-  }
   async function bach() {
     setBusy(true); setMsg(null)
-    try { const r = await ef<{ added: number; activated: number }>('addBachelors'); setMsg({ ok: true, text: `Added ${r.added} bachelor degree courses and switched on ${r.activated} more.` }); await load() }
-    catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
+    try {
+      const r = await ef<{ found: number; added: number; activated: number; others: number; leagueSeeded: number }>('addBachelors')
+      setMsg({ ok: true, text: `Found ${r.found} Bachelor degrees at the Main campus: ${r.added} added, ${r.activated} switched on.${r.leagueSeeded ? ` Electrical Engineering and Nursing were opened for the league (${r.leagueSeeded} course${r.leagueSeeded > 1 ? 's' : ''}).` : ''}${r.others ? ` ${r.others} other active course(s) (diploma, certificate and so on) are still on: switch them off below if you only want Bachelors.` : ''}` })
+      await load()
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
   }
-  async function toggle(c: AdminCourse) {
-    setList((l) => l && l.map((x) => (x.name === c.name ? { ...x, active: !x.active } : x)))
-    try { await ef('setCourseActive', { name: c.name, active: !c.active }) } catch (e) { setMsg({ ok: false, text: (e as Error).message }); await load() }
+  async function change(c: AdminCourse, patch: Partial<AdminCourse>, action: string, payload: Record<string, unknown>) {
+    setList((l) => l && l.map((x) => (x.name === c.name ? { ...x, ...patch } : x)))
+    try { await ef(action, { name: c.name, ...payload }); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }); await load() }
+  }
+  async function del(c: AdminCourse) {
+    if (!window.confirm(`Delete the course "${c.name}"?`)) return
+    try {
+      let r = await ef<{ deleted: boolean; players: number }>('deleteCourse', { name: c.name })
+      if (!r.deleted) {
+        if (!window.confirm(`${r.players} player(s) are registered under "${c.name}". They keep their profile but will have to pick another course. Delete anyway?`)) return
+        r = await ef<{ deleted: boolean; players: number }>('deleteCourse', { name: c.name, force: true })
+      }
+      setMsg({ ok: true, text: `Deleted "${c.name}".` }); await load()
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
   async function add() {
     try { await ef('addCourse', { name }); setName(''); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
-  const shown = (list ?? []).filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
+  const s = q.toLowerCase()
+  const shown = (list ?? []).filter((c) => c.name.toLowerCase().includes(s)
+    && (filter === 'all' || (filter === 'league' && c.league) || (filter === 'requested' && c.interested > 0) || (filter === 'off' && !c.active)))
+    .sort((a, b) => Number(b.league) - Number(a.league) || b.interested - a.interested || a.name.localeCompare(b.name))
   return (
     <>
       <section className="cpl-card">
         <h3>Courses from chuka.ac.ke</h3>
-        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Students pick their course from the active ones. Bachelor degree courses are switched on by default; diploma, certificate and postgraduate ones are off.</p>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Students pick their course from the <strong>Active</strong> ones. <strong>In league</strong> courses appear in the league course table with a Join button; open more as students ask for them.</p>
         <div className="ef-actions" style={{ marginTop: 0 }}>
-          <button className="lp-btn" disabled={busy} onClick={bach}>Add bachelor degree courses</button>
-          <button className="lp-btn" disabled={busy} onClick={imp}>{busy ? 'Working…' : 'Import full list from Chuka website'}</button>
+          <button className="lp-btn" disabled={busy} onClick={bach}>{busy ? 'Reading the Chuka website…' : 'Add all Bachelor degrees (Main campus)'}</button>
         </div>
         <div className="cpl-inline" style={{ marginTop: 14 }}>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a course by hand" maxLength={120} />
@@ -200,13 +213,24 @@ function CoursesAdmin() {
       </section>
       {list && (
         <section className="cpl-card">
-          <div className="cpl-inline" style={{ marginBottom: 8 }}><input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${list.length} courses`} /></div>
+          <div className="cpl-inline" style={{ marginBottom: 8 }}>
+            <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${list.length} courses`} />
+            <select className="ef-sel" value={filter} onChange={(e) => setFilter(e.target.value as CourseFilter)} aria-label="Filter courses">
+              <option value="all">All</option><option value="league">In league</option><option value="requested">Requested</option><option value="off">Switched off</option>
+            </select>
+          </div>
           {shown.slice(0, 120).map((c) => (
             <div className="cpl-row" key={c.name}>
-              <div><strong>{c.name}</strong><small>{[c.level, c.campuses].filter(Boolean).join(' · ')}</small></div>
-              <label className="cpl-file"><input type="checkbox" checked={c.active} onChange={() => toggle(c)} /> Active</label>
+              <div>
+                <strong>{c.name} {c.league && <span className="ef-pill gold">In league</span>}</strong>
+                <small>{[c.level, c.campuses].filter(Boolean).join(' · ')} · {c.players} registered{c.interested ? ` · ${c.interested} asked for the league` : ''}</small>
+              </div>
+              <label className="cpl-file"><input type="checkbox" checked={c.active} onChange={() => change(c, { active: !c.active, ...(c.active ? { league: false } : {}) }, 'setCourseActive', { active: !c.active })} /> Active</label>
+              <label className="cpl-file"><input type="checkbox" checked={c.league} disabled={!c.active} onChange={() => change(c, { league: !c.league }, 'setCourseLeague', { league: !c.league })} /> In league</label>
+              <button className="lp-btn cpl-danger" onClick={() => del(c)}>Delete</button>
             </div>
           ))}
+          {!shown.length && <p className="cpl-empty">No courses match.</p>}
           {shown.length > 120 && <p className="cpl-note">Showing 120 of {shown.length}. Search to narrow down.</p>}
         </section>
       )}
@@ -224,6 +248,9 @@ function PlayersAdmin() {
   async function ban(p: Profile) {
     try { await ef('setPlayerStatus', { uid: p.uid, banned: p.status === 'active' }); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
+  async function unlinkFpl(p: Profile) {
+    try { await ef('fplUnlinkPlayer', { uid: p.uid }); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  }
   const s = q.toLowerCase()
   const shown = (list ?? []).filter((p) => !s || p.username.toLowerCase().includes(s) || p.fullName.toLowerCase().includes(s) || p.whatsapp.includes(s) || p.email.toLowerCase().includes(s))
   return (
@@ -233,6 +260,7 @@ function PlayersAdmin() {
       {shown.slice(0, 100).map((p) => (
         <div className="cpl-row" key={p.uid}>
           <div><strong>{p.username} {p.status !== 'active' && <span className="ef-pill red">{p.status}</span>}</strong><small>{p.fullName} · {p.course} · {p.platform} · {p.strength} · {p.whatsapp}</small></div>
+          {p.fplId && <button className="lp-btn" title="Remove this player's FPL link" onClick={() => confirm(`Unlink FPL team ${p.fplId} from ${p.username}?`) && unlinkFpl(p)}>Unlink FPL {p.fplId}</button>}
           {p.squadId && <a href={driveImg(p.squadId, 1200)} target="_blank" rel="noopener noreferrer">Squad</a>}
           <button className={`lp-btn${p.status === 'active' ? ' cpl-danger' : ''}`} onClick={() => ban(p)}>{p.status === 'active' ? 'Ban' : 'Unban'}</button>
         </div>
@@ -243,39 +271,105 @@ function PlayersAdmin() {
 
 /* ---------------- league ---------------- */
 function LeagueAdmin() {
-  const [list, setList] = useState<DisputedMatch[] | null>(null)
+  const [asks, setAsks] = useState<{ course: string; count: number }[] | null>(null)
   const { setMsg, el } = useMsg()
-  const load = useCallback(() => ef<DisputedMatch[]>('disputedMatches').then(setList).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
+  const load = useCallback(() => ef<{ course: string; count: number }[]>('courseInterest').then(setAsks).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
   useEffect(() => { void load() }, [load])
-  async function resolve(id: string, s1: number, s2: number) {
-    try { await ef('resolveMatch', { matchId: id, s1, s2 }); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  async function fixtures() {
+    try {
+      const r = await ef<{ made: number; fixtureDay: boolean }>('runFixtures')
+      setMsg({ ok: true, text: r.fixtureDay ? `${r.made} new fixture(s) created for today.` : 'Today is not a fixture day (Mon, Wed, Fri, Sun).' })
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
-  async function pair() {
-    try { const r = await ef<{ made: number }>('runPairing'); setMsg({ ok: true, text: `${r.made} new matches created for this week.` }) } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  async function videos() {
+    try { await ef('refreshVideos'); setMsg({ ok: true, text: 'Home page videos refreshed.' }) } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  }
+  async function open(course: string) {
+    try { await ef('setCourseLeague', { name: course, league: true }); setMsg({ ok: true, text: `${course} is now open for the league.` }); await load() }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  }
+  const [wa, setWa] = useState('')
+  useEffect(() => { ef<HomeData>('home').then((h) => setWa(h.waGroup ?? '')).catch(() => {}) }, [])
+  async function saveWa() {
+    try { await ef('setWaGroup', { link: wa }); setMsg({ ok: true, text: wa.trim() ? 'WhatsApp group link saved. It shows on the landing page within a minute.' : 'WhatsApp group link removed.' }) }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
   return (
     <>
       <section className="cpl-card">
-        <h3>Weekly pairing</h3>
-        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Runs by itself every Monday at 6 am. Use this to top up the week after many new players joined.</p>
-        <button className="lp-btn" onClick={pair}>Pair this week now</button>
+        <h3>WhatsApp group</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Paste the Chuka eFootball group invite link (WhatsApp group info, Invite via link, Copy link). It appears as a button on the landing page. Leave it empty to hide the button.</p>
+        <div className="cpl-inline">
+          <input type="url" value={wa} onChange={(e) => setWa(e.target.value)} placeholder="https://chat.whatsapp.com/…" aria-label="WhatsApp group invite link" maxLength={200} />
+          <button className="lp-btn" onClick={saveWa}>Save</button>
+        </div>
         {el}
       </section>
       <section className="cpl-card">
-        <h3>Disputed league matches</h3>
-        {list && !list.length && <p className="cpl-empty">No disputed matches.</p>}
-        {list?.map((m) => (
-          <div className="cpl-row" key={m.id}>
-            <div>
-              <strong>{m.p1} vs {m.p2}</strong>
-              <small>{m.p1} says {m.r1 ? `${m.r1.a}–${m.r1.b}` : '?'} · {m.p2} says {m.r2 ? `${m.r2.a}–${m.r2.b}` : '?'}{m.proofIds.length ? ` · ${m.proofIds.length} screenshot(s)` : ''}</small>
-              {m.proofIds.map((id) => <a key={id} href={driveImg(id, 1200)} target="_blank" rel="noopener noreferrer">Screenshot</a>)}
-            </div>
-            {m.r1 && <button className="lp-btn" onClick={() => resolve(m.id, m.r1!.a, m.r1!.b)}>Use {m.p1}'s</button>}
-            {m.r2 && <button className="lp-btn" onClick={() => resolve(m.id, m.r2!.a, m.r2!.b)}>Use {m.p2}'s</button>}
+        <h3>Daily fixtures</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Fixtures are made automatically at 00:00 on Monday, Wednesday, Friday and Sunday. Players send scores before 21:00, and every fixture is settled by the rules at 21:00 (same score: confirmed; one screenshot beats none; no report: walkover or void). Nothing needs your decision. Use this button only if the automatic run was missed.</p>
+        <button className="lp-btn" onClick={fixtures}>Make today's fixtures now</button>
+      </section>
+      <section className="cpl-card">
+        <h3>Home page videos</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>The six video rows on the home page are saved automatically every 12 hours, so visitors never use your YouTube quota. Refresh them by hand after changing the API key.</p>
+        <button className="lp-btn" onClick={videos}>Refresh videos now</button>
+      </section>
+      <section className="cpl-card">
+        <h3>Courses asking to join the league</h3>
+        {asks && !asks.length && <p className="cpl-empty">No requests yet.</p>}
+        {asks?.map((a) => (
+          <div className="cpl-row" key={a.course}>
+            <div><strong>{a.course}</strong><small>{a.count} student(s) asked</small></div>
+            <button className="lp-btn" onClick={() => open(a.course)}>Open for league</button>
           </div>
         ))}
       </section>
+    </>
+  )
+}
+
+/* ---------------- Chuka FPL ---------------- */
+function FplAdmin() {
+  const [info, setInfo] = useState<FplAdminInfo | null>(null)
+  const [leagueId, setLeagueId] = useState('')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const { setMsg, el } = useMsg()
+  const apply = useCallback((i: FplAdminInfo) => { setInfo(i); setLeagueId(i.leagueId); setCode(i.leagueCode) }, [])
+  useEffect(() => { ef<FplAdminInfo>('fplInfo').then(apply).catch((e) => setMsg({ ok: false, text: (e as Error).message })) }, [apply, setMsg])
+  async function run(action: string, payload: Record<string, unknown>, ok: string) {
+    setBusy(true); setMsg(null)
+    try { apply(await ef<FplAdminInfo>(action, payload)); setMsg({ ok: true, text: ok }) }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <>
+      <section className="cpl-card">
+        <h3>Chuka FPL league</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Create a classic league on the FPL site (Leagues &amp; Cups, Create and join, Create a league). Paste its league ID below: it is the number in the standings address, fantasy.premierleague.com/leagues/<b>123456</b>/standings/c. Only managers inside this league can link and count. Optionally paste the league's join code so players get a join button.</p>
+        <div className="cpl-inline" style={{ marginBottom: 10 }}>
+          <input type="text" inputMode="numeric" value={leagueId} onChange={(e) => setLeagueId(e.target.value.replace(/\D/g, ''))} placeholder="League ID, e.g. 123456" aria-label="FPL league ID" maxLength={9} />
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Join code (optional)" aria-label="FPL league join code" maxLength={20} />
+        </div>
+        <div className="ef-actions" style={{ marginTop: 0 }}>
+          <button className="lp-btn" disabled={busy} onClick={() => run('fplSettings', { leagueId, leagueCode: code }, leagueId ? 'Saved and loaded from FPL.' : 'FPL league cleared.')}>{busy ? 'Working…' : 'Save league'}</button>
+          {info?.leagueId && <button className="lp-btn" disabled={busy} onClick={() => run('fplRefresh', {}, 'Refreshed from FPL.')}>Refresh now</button>}
+        </div>
+        {el}
+      </section>
+      {info?.leagueId && (
+        <section className="cpl-card">
+          <h3>Status</h3>
+          <p className="cpl-sub" style={{ margin: 0 }}>
+            {info.members} members in the FPL league · {info.linked} Chuka players linked ({info.inLeague} inside the league){info.gw ? ` · gameweek ${info.gw}` : ''}<br />
+            Last refreshed: {info.at ? fmtStamp(info.at) : 'not yet'} (automatic every 30 minutes).
+          </p>
+          {info.error && <p className="cpl-err" role="alert" style={{ marginTop: 10 }}>Last refresh failed: {info.error} The page keeps showing the last good data.</p>}
+          <p className="cpl-note" style={{ textAlign: 'left' }}>To remove a wrong link, open the Players tab and use Unlink FPL next to that player.</p>
+        </section>
+      )}
     </>
   )
 }

@@ -38,6 +38,7 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
   const [strength, setStrength] = useState(p ? String(p.strength) : '')
   const [whatsapp, setWhatsapp] = useState(p?.whatsapp ?? '')
   const [canHost, setCanHost] = useState(p?.canHost ?? false)
+  const [showWa, setShowWa] = useState(p?.showWhatsapp ?? true)
   const [free, setFree] = useState<string[]>(p?.freeTimes ?? [])
   const [squad, setSquad] = useState('')
   const [busy, setBusy] = useState(false)
@@ -49,9 +50,9 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
     e.preventDefault()
     setBusy(true); setMsg(null)
     try {
-      await ef('saveProfile', { profile: { username, fullName, course, year: Number(year), platform, strength: Number(strength), whatsapp, freeTimes: free, canHost, squad: squad || undefined } })
+      await ef('saveProfile', { profile: { username, fullName, course, year: Number(year), platform, strength: Number(strength), whatsapp, freeTimes: free, canHost, showWhatsapp: showWa, squad: squad || undefined } })
       await reload()
-      setMsg({ ok: true, text: p ? 'Profile saved.' : 'You are registered. League matches are paired automatically each week.' })
+      setMsg({ ok: true, text: p ? 'Profile saved.' : 'You are registered. Open the League page and tap Join to get daily fixtures.' })
     } catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
     finally { setBusy(false) }
   }
@@ -59,7 +60,7 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
   return (
     <div className="cpl-page">
       <h2>{p ? 'My eFootball profile' : 'Register as a player'}</h2>
-      <p className="cpl-sub">Your WhatsApp number is only shown to opponents you are matched with, and to the admin.</p>
+      <p className="cpl-sub">Your WhatsApp number is shown to opponents you are matched with and to the admin. Other players see it only if you tick the box below.</p>
       <form className="cpl-card cpl-form cpl-wide" onSubmit={save}>
         <label>eFootball username<input type="text" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={30} required /></label>
         <label>Full name<input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={60} required /></label>
@@ -99,9 +100,10 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
               <FragmentRow key={d} day={d} free={free} toggle={toggle} />
             ))}
           </div>
-          <small>Used to suggest when you and your league opponent can play. The weekly knockout is on Friday afternoon.</small>
+          <small>Shown on your player card and used to suggest when you and your league opponent can play. League fixtures come on Mon, Wed, Fri and Sun. Leave it empty if you are free any day.</small>
         </fieldset>
 
+        <label className="cpl-file"><input type="checkbox" checked={showWa} onChange={(e) => setShowWa(e.target.checked)} /> Show a WhatsApp “Chat” button on my player card. Other registered players can then message me on WhatsApp for a match, and will be able to see my number</label>
         <label className="cpl-file"><input type="checkbox" checked={canHost} onChange={(e) => setCanHost(e.target.checked)} /> I can host a tournament room (good internet)</label>
         <button className="lp-btn" disabled={busy}>{busy ? 'Saving…' : p ? 'Save profile' : 'Register'}</button>
         {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status">{msg.text}</p>}

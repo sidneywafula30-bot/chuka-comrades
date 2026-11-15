@@ -12,17 +12,17 @@ export type Video = { videoId: string; title: string; description: string; chann
 export type VideoResult = { videos: Video[]; warning?: string }
 export type VideoCategory = 'highlights' | 'goals' | 'skills' | 'tips' | 'formations' | 'updates'
 
-export type PublicPlayer = { uid: string; username: string; name: string; course: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean; whatsapp?: string }
-export type Profile = PublicPlayer & { fullName: string; whatsapp: string; freeTimes: string[]; status: string; email: string }
+export type PublicPlayer = { uid: string; username: string; name: string; course: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean; freeTimes: string[]; inLeague: boolean; fpl?: boolean; whatsapp?: string }
+export type Profile = Omit<PublicPlayer, 'whatsapp'> & { fullName: string; whatsapp: string; status: string; email: string; showWhatsapp: boolean; paused: boolean; strikes: number; leagueOpen?: boolean; fplId?: string; fplTeam?: string }
 export type ProfileInput = {
   username: string; fullName: string; course: string; year: number; platform: string; strength: number
-  whatsapp: string; freeTimes: string[]; canHost: boolean; squad?: string
+  whatsapp: string; freeTimes: string[]; canHost: boolean; showWhatsapp: boolean; squad?: string
 }
-export type Course = { name: string; department: string; level: string }
-export type AdminCourse = Course & { campuses: string; active: boolean }
+export type Course = { name: string; department: string; level: string; league?: boolean }
+export type AdminCourse = Course & { campuses: string; active: boolean; league: boolean; players: number; interested: number }
 
 export type MatchView = {
-  id: string; week: string; status: 'pending' | 'disputed' | 'confirmed'
+  id: string; week: string; day: string; deadline: string; note: string; status: 'pending' | 'disputed' | 'confirmed' | 'void'
   myClaim: { mine: number; theirs: number } | null; oppReported: boolean; final: { mine: number; theirs: number } | null
   opp: { uid: string; username: string; platform: string; strength: number; course: string; whatsapp: string; freeTimes: string[] }
 }
@@ -43,13 +43,15 @@ export type Champion = { name: string; date: string; username: string; course: s
 
 export type LeagueRow = { uid: string; username: string; course: string; platform: string; strength: number; squadId: string; p: number; w: number; d: number; l: number; gf: number; ga: number; gd: number; pts: number }
 export type CourseRow = { course: string; players: number; pts: number; avg: number; ranked: boolean }
-export type League = { table: LeagueRow[]; courses: CourseRow[]; recent: { id: string; p1: string; p2: string; s1: number; s2: number; at: string }[]; registered: number; week: string }
+export type League = {
+  table: LeagueRow[]; courses: CourseRow[]; recent: { id: string; p1: string; p2: string; s1: number; s2: number; at: string }[]; registered: number; week: string
+  openCourses: string[]; today: string; fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number; serverNow: number
+}
 
 export type Attention = {
   id: string; idx: number; why: string; status: string; hostUid: string; winnerUid: string; proofId: string; note: string
   disputes: { uid: string; reason: string }[]; members: { uid: string; username: string; whatsapp: string }[]
 }
-export type DisputedMatch = { id: string; week: string; p1: string; p2: string; r1: { a: number; b: number } | null; r2: { a: number; b: number } | null; proofIds: string[] }
 
 /** Calls the eFootball Apps Script. Sends the Firebase ID token when signed in; the server verifies it. */
 export async function ef<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
@@ -96,3 +98,46 @@ export function sharedSlots(a: string[], b: string[]): string[] {
   const set = new Set(b)
   return a.filter((s) => set.has(s)).map((s) => s.replace('-', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()))
 }
+
+/** Link that opens the league join page for a course (works for classmates who are not signed in yet). */
+export const leagueInviteLink = (course: string) => `${window.location.origin}${window.location.pathname}#/efootball/league/join/${encodeURIComponent(course)}`
+
+/** "Wed-Evening" slots -> { Mon: ['Morning', ...] } */
+export function slotsByDay(free: string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const s of free) { const [d, p] = s.split('-'); if (d && p) (out[d] ||= []).push(p) }
+  return out
+}
+
+export type HomeData = {
+  serverNow: number; players: number; registered: number
+  tournament: { id: string; name: string; status: 'open' | 'running' | 'done'; round: number; stages: number; regClose: string; start: string; cap: number; count: number; champion: string } | null
+  top: { username: string; course: string; p: number; pts: number; gd: number }[]
+  courses: CourseRow[]
+  league: { fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number }
+  champion: { name: string; date: string; username: string; course: string } | null
+  waGroup?: string
+  fpl?: { configured: boolean; ready: boolean; next: { id: number; name: string; at: string } | null; gw: number; managers: number; top: { username: string; course: string; total: number }[]; stale: boolean }
+}
+
+/** "2d 4h 10m" style countdown to an ISO time. Pass the server/client clock difference so wrong phone clocks do not matter. */
+export function countdown(iso: string, skew = 0): string {
+  const ms = Date.parse(iso) - (Date.now() + skew)
+  if (!(ms > 0)) return ''
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60)
+  return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m ${String(s % 60).padStart(2, '0')}s` : `${m}m ${String(s % 60).padStart(2, '0')}s`
+}
+
+export type FplRow = { uid: string; username: string; course: string; team: string; total: number; gwPts: number; rank: number; gwRank: number }
+export type FplBoard = {
+  configured: boolean; ready: boolean; leagueId: string; leagueCode: string; at: string; error: string; size: number; serverNow: number
+  gw: { id: number; name: string; finished: boolean; started: boolean } | null
+  next: { id: number; name: string; at: string } | null
+  rows: FplRow[]
+  courses: { course: string; managers: number; avg: number; gwAvg: number; ranked: boolean }[]
+  winners: { gw: number; name: string; pts: number; w: { u: string; c: string }[] }[]
+  captains: { gw: number; got: number; total: number; list: { name: string; n: number }[] } | null
+  status: 'anon' | 'unregistered' | 'unlinked' | 'linked' | 'outside'; fplId: string; mine: FplRow | null
+}
+export type FplAdminInfo = { leagueId: string; leagueCode: string; at: string; error: string; members: number; linked: number; inLeague: number; gw: number }
+export const fplJoinLink = (code: string) => (code ? `https://fantasy.premierleague.com/leagues/auto-join/${encodeURIComponent(code)}` : '')
