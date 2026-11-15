@@ -216,7 +216,7 @@ export default function Landing({ user }: { user: User | null }) {
                     ? (
                       <span className="lp-card-icon has-logo">
                         <img
-                          src={`${BASE}efootball-logo.png`}
+                          src={`${BASE}efootball.png`}
                           alt="Chuka eFootball logo"
                           onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith('efootball-logo.svg')) i.src = `${BASE}efootball-logo.svg` }}
                         />
@@ -358,3 +358,7 @@ export default function Landing({ user }: { user: User | null }) {
     </div>
   )
 }
+
+
+
+

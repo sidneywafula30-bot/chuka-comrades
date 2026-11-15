@@ -86,7 +86,7 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
   return (
     <div className="cpl-home">
       <div className="ef-mark">
-        <img src={`${import.meta.env.BASE_URL}efootball-logo.png`} alt="Chuka eFootball logo"
+        <img src={`${import.meta.env.BASE_URL}efootball.png`} alt="Chuka eFootball logo"
           onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith('efootball-logo.svg')) i.src = `${import.meta.env.BASE_URL}efootball-logo.svg` }} />
       </div>
       <h1>Chuka eFootball</h1>
