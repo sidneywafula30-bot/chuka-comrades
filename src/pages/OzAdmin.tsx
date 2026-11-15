@@ -443,6 +443,7 @@ function TrendTools() {
         <Msg msg={msg} bad={bad} />
         <small>Your YouTube channel videos and live streams appear automatically. Use this for TikTok links or extra videos.</small>
       </div>
+      <BulkAdd onDone={list.reload} />
       <Err msg={list.err} />
       {list.data?.map((t) => (
         <div className="oz-trow" key={t.id}>
@@ -455,6 +456,68 @@ function TrendTools() {
         </div>
       ))}
     </>
+  )
+}
+
+type BulkRow = { url: string; state: 'wait' | 'busy' | 'ok' | 'bad'; note: string }
+const BULK_MAX = 20
+
+/** Paste many TikTok / YouTube links at once. Each is added one after another (the server checks each link, so this is kept sequential). */
+function BulkAdd({ onDone }: { onDone: () => void }) {
+  const [text, setText] = useState('')
+  const [pin, setPin] = useState(false)
+  const [rows, setRows] = useState<BulkRow[]>([])
+  const [running, setRunning] = useState(false)
+
+  const links = Array.from(new Set((text.match(/https?:\/\/[^\s<>"']+/gi) ?? []).map((u) => u.replace(/[),.;]+$/, ''))))
+  const over = links.length > BULK_MAX
+
+  async function run(list: string[]) {
+    setRunning(true)
+    setRows(list.map((url) => ({ url, state: 'wait', note: '' })))
+    const set = (i: number, patch: Partial<BulkRow>) => setRows((cur) => cur.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+    for (let i = 0; i < list.length; i++) {
+      set(i, { state: 'busy' })
+      try { await oz('admin_trend_save', { url: list[i], pinned: pin }); set(i, { state: 'ok', note: 'Added' }) }
+      catch (x) { set(i, { state: 'bad', note: (x as Error).message }) }
+    }
+    setRunning(false)
+    onDone()
+  }
+
+  const failed = rows.filter((r) => r.state === 'bad')
+  const added = rows.filter((r) => r.state === 'ok').length
+  const finished = rows.length > 0 && !running
+
+  return (
+    <div className="cpl-form oz-form">
+      <label>Add many videos at once
+        <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Paste TikTok or YouTube links, one per line (or all mixed together)'} disabled={running} />
+      </label>
+      <small>{links.length ? `${links.length} link${links.length === 1 ? '' : 's'} found` : 'No links found yet'}{over && ` · only ${BULK_MAX} at a time, please split the list`}</small>
+      <label className="oz-chk"><input type="checkbox" checked={pin} onChange={(e) => setPin(e.target.checked)} disabled={running} /> Pin all to the top</label>
+      <div className="oz-actions">
+        <button type="button" className="lp-btn" disabled={running || !links.length || over} onClick={() => void run(links)}>
+          {running ? `Adding ${rows.filter((r) => r.state === 'ok' || r.state === 'bad').length + 1} of ${rows.length}…` : `Add ${links.length || ''} video${links.length === 1 ? '' : 's'}`}
+        </button>
+        {finished && failed.length > 0 && (
+          <button type="button" className="lp-btn lp-btn-soft" onClick={() => { setText(failed.map((r) => r.url).join('\n')); setRows([]) }}>Keep only the {failed.length} that failed</button>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <ul className="oz-bulk" aria-live="polite">
+          {rows.map((r) => (
+            <li key={r.url} className={r.state}>
+              <span>{r.state === 'ok' ? '✓' : r.state === 'bad' ? '✕' : r.state === 'busy' ? '…' : '·'}</span>
+              <span className="oz-bulk-u">{r.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+              {r.note && <small>{r.note}</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {finished && <p className={`cpl-msg${failed.length ? ' bad' : ''}`} role="status">{added} added{failed.length ? `, ${failed.length} failed (see above)` : '.'}</p>}
+      <small>Videos already on Trends are skipped with a note. Short links (vm.tiktok.com) work too.</small>
+    </div>
   )
 }
 

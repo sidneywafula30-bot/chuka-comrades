@@ -3,9 +3,9 @@ import { signInWithPopup, type User } from 'firebase/auth'
 import { ArrowLeft, Clapperboard, Flame, Megaphone, ShieldCheck, LifeBuoy, MessageCircle, Users } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { oz, ozReady, type Config, type Me } from '../lib/ozone'
-import type { OzCtx } from './OzCommon'
+import { ShareButton, type OzCtx } from './OzCommon'
 import { Compose, Feed, Thread } from './OzConfessions'
-import { Elections, Faculties, FacultyPage, IssueDetail, Issues, Polls, Promises, ReportIssue } from './OzSauti'
+import { AspirantPage, Elections, Faculties, FacultyPage, IssueDetail, Issues, Polls, Promises, ReportIssue } from './OzSauti'
 import Hookup from './OzHookup'
 import Trends from './OzTrends'
 import Admin from './OzAdmin'
@@ -13,7 +13,7 @@ import './Cpl.css'
 import './Efootball.css'
 import './Ozone.css'
 
-const SAUTI = ['sauti', 'issue', 'report', 'faculties', 'faculty', 'polls', 'promises', 'aspirants']
+const SAUTI = ['sauti', 'issue', 'report', 'faculties', 'faculty', 'polls', 'poll', 'promises', 'aspirants', 'aspirant']
 
 export default function Ozone({ user, route }: { user: User | null; route: string }) {
   const [cfg, setCfg] = useState<Config | null>(null)
@@ -56,6 +56,8 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
   else if (page === 'faculties') body = <Faculties />
   else if (page === 'faculty') body = <FacultyPage code={arg.toUpperCase()} ctx={ctx} />
   else if (page === 'polls') body = <Polls ctx={ctx} />
+  else if (page === 'poll') body = <Polls ctx={ctx} only={arg} />
+  else if (page === 'aspirant') body = <AspirantPage id={arg} />
   else if (page === 'promises') body = <Promises />
   else if (page === 'aspirants') body = <Elections ctx={ctx} />
   else if (page === 'hookup') body = <Hookup ctx={ctx} />
@@ -122,8 +124,13 @@ function Home({ ctx }: { ctx: OzCtx }) {
         <a className="cpl-link" href="#/ozone/confess">Confess now</a>
         <a className="cpl-link" href="#/ozone/report">Report an issue</a>
         <a className="cpl-link" href="#/ozone/faculties">Faculty scoreboard</a>
+        <a className="cpl-link" href="#/ozone/polls">Polls</a>
+        <a className="cpl-link" href="#/ozone/aspirants">Elections</a>
+        <a className="cpl-link" href="#/ozone/promises">Promise tracker</a>
         {me?.isAdmin && <a className="cpl-link" href="#/ozone/admin"><ShieldCheck size={16} /> Admin desk</a>}
       </nav>
+
+      <div className="oz-sharebar"><ShareButton text="Chuka O-Zone: anonymous confessions, student issues, campus videos and more." path="" label="Share O-Zone" /></div>
 
       {cfg && (
         <div className="oz-support oz-home-support">

@@ -71,6 +71,13 @@ export async function oz<T>(action: string, payload: Record<string, unknown> = {
 export const waLink = (n: string, text = '') => `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 export const pad = (n: number, w = 4) => String(n).padStart(w, '0')
 
+/** Link to a page inside O-Zone, on the site the person is using now. path example: 'thread/42' ('' = O-Zone home). */
+export const ozLink = (path = '') => `${window.location.origin}${window.location.pathname}#/ozone${path ? `/${path}` : ''}`
+/** Opens WhatsApp's chooser (contacts and groups) with the message ready to send. */
+export const waShare = (message: string) => `https://wa.me/?text=${encodeURIComponent(message)}`
+/** Short one-line preview of a longer text. */
+export const snip = (s: string, n = 200) => { const t = s.replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t }
+
 const TZ = 'Africa/Nairobi'
 export const ago = (iso: string): string => {
   if (!iso) return ''

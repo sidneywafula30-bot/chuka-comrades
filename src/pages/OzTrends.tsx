@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ExternalLink, Play, Plus } from 'lucide-react'
 import { oz, type TrendItem, type TrendList } from '../lib/ozone'
-import { Err, Gate, type OzCtx } from './OzCommon'
+import { Err, Gate, ShareButton, type OzCtx } from './OzCommon'
 
 const siteName = (t: TrendItem) => (t.source === 'tiktok' ? 'TikTok' : 'YouTube')
 
@@ -56,7 +56,10 @@ function Card({ t, playing, onPlay, onStop }: { t: TrendItem; playing: boolean; 
         <strong>{t.title}</strong>
         <div className="tr-row">
           <small>{t.author}{when && ` · ${when}`}</small>
-          <a className="tr-open" href={t.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> {siteName(t)}</a>
+          <span className="tr-acts">
+            <ShareButton text={`${t.title} (on Chuka Trends)`} url={t.url} />
+            <a className="tr-open" href={t.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> {siteName(t)}</a>
+          </span>
         </div>
       </div>
     </article>

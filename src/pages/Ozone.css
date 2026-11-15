@@ -202,3 +202,19 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-wa-t small { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #25533a; line-height: 1.4; }
 .oz-wa-go { flex-shrink: 0; padding: 9px 18px; border-radius: 99px; background: #128c4a; color: #fff; font-weight: 700; font-size: 14px; }
 @media (max-width: 520px) { .oz-wa { padding: 14px; gap: 10px; } .oz-wa-go { padding: 8px 14px; } }
+
+/* Bulk add (admin) */
+.oz-bulk { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.oz-bulk li { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 10px; background: #f4f6f8; min-width: 0; }
+.oz-bulk li > span:first-child { flex-shrink: 0; width: 14px; text-align: center; font-weight: 700; }
+.oz-bulk-u { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oz-bulk li.ok { background: #e7f9ee; color: #0b3d22; }
+.oz-bulk li.bad { background: #fdecec; color: #8a1f1f; flex-wrap: wrap; }
+.oz-bulk li.busy { background: #fff7e0; }
+.oz-bulk li small { flex-basis: 100%; padding-left: 22px; }
+
+/* Share buttons */
+.oz-share { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.oz-share .oz-wa-share { color: #128c4a; font-weight: 700; }
+.tr-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.oz-sharebar { display: flex; justify-content: center; margin-top: 14px; }

@@ -7,7 +7,7 @@ import {
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
   shareUrl, resourceIdFromHash, youtubeId, youtubeThumb, PAYWALL_EVENT,
-  type AccessInfo, type AccessUser, type PaymentInfo,
+  type AccessInfo, type AccessUser, type Countdown, type PaymentInfo,
   type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
 } from '../lib/labs'
 import { fileToB64, shrinkImage } from '../lib/files'
@@ -591,7 +591,7 @@ function MinePage() {
 /* Admin                                                               */
 /* ------------------------------------------------------------------ */
 function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
-  const [tab, setTab] = useState<'queue' | 'library' | 'calendar' | 'reports' | 'suggestions' | 'catalogue' | 'access'>('queue')
+  const [tab, setTab] = useState<'queue' | 'library' | 'calendar' | 'reports' | 'suggestions' | 'catalogue' | 'access' | 'countdown'>('queue')
   const [queue, setQueue] = useState<AdminQueue | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const loadQueue = useCallback(() => labsApi.admin.queue().then(setQueue).catch((e) => setMsg({ type: 'err', text: errMsg(e) })), [])
@@ -607,6 +607,7 @@ function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
         <button className={tab === 'suggestions' ? 'on' : ''} onClick={() => setTab('suggestions')}>Suggestions <b>{queue?.pendingSuggestions ?? 0}</b></button>
         <button className={tab === 'catalogue' ? 'on' : ''} onClick={() => setTab('catalogue')}>Programmes &amp; units</button>
         <button className={tab === 'access' ? 'on' : ''} onClick={() => setTab('access')}>Access &amp; payments</button>
+        <button className={tab === 'countdown' ? 'on' : ''} onClick={() => setTab('countdown')}>Exam countdown</button>
       </div>
       <Msg msg={msg} />
       {tab === 'queue' && <QueueTab queue={queue} reload={loadQueue} setMsg={setMsg} />}
@@ -616,6 +617,7 @@ function AdminPage({ onCatalogueChanged }: { onCatalogueChanged: () => void }) {
       {tab === 'suggestions' && <SuggestionsTab expected={queue?.pendingSuggestions ?? 0} reload={loadQueue} setMsg={setMsg} onChanged={onCatalogueChanged} />}
       {tab === 'catalogue' && <CatalogueTab setMsg={setMsg} onChanged={onCatalogueChanged} />}
       {tab === 'access' && <AccessTab setMsg={setMsg} />}
+      {tab === 'countdown' && <CountdownTab setMsg={setMsg} />}
     </>
   )
 }
@@ -656,6 +658,51 @@ function TrialBanner({ access, onPay }: { access: AccessInfo | null; onPay: () =
     return <p className="sl-alert ok">Free trial: {access.daysLeft} day{access.daysLeft === 1 ? '' : 's'} left. After that, support Study Labs with KSh {access.payment.priceKes}. <button className="sl-mini" onClick={onPay}>How to pay</button></p>
   }
   return <p className="sl-alert err">Your free trial has ended. <button className="sl-mini" onClick={onPay}>Activate with KSh {access.payment.priceKes}</button></p>
+}
+
+/** Admin: set the exam countdown shown at the top of the landing page. */
+function CountdownTab({ setMsg }: { setMsg: (n: Note) => void }) {
+  const [cur, setCur] = useState<Countdown | null>(null)
+  const [title, setTitle] = useState('Main exams start in')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('08:00')
+  const [endDate, setEndDate] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    labsApi.countdown().then((r) => {
+      setCur(r)
+      if (r.set) { setTitle(r.title ?? ''); setDate(r.date ?? ''); setTime(r.time ?? '08:00'); setEndDate(r.endDate && r.endDate !== r.date ? r.endDate : '') }
+    }).catch((e) => setMsg({ type: 'err', text: errMsg(e) }))
+  }, [setMsg])
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    if (!title.trim() || !date) return setMsg({ type: 'err', text: 'Enter a title and the exam date.' })
+    setBusy(true)
+    try { setCur(await labsApi.admin.setCountdown({ title: title.trim(), date, time, endDate: endDate || undefined })); setMsg({ type: 'ok', text: 'Countdown saved. It is now at the top of the landing page.' }) }
+    catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+  }
+  async function clear() {
+    if (!window.confirm('Remove the countdown from the landing page?')) return
+    setBusy(true)
+    try { setCur(await labsApi.admin.clearCountdown()); setDate(''); setEndDate(''); setMsg({ type: 'ok', text: 'Countdown removed.' }) }
+    catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="sl-card">
+      <h2>Exam countdown</h2>
+      <p>{cur?.set ? `Showing now: ${cur.title} on ${cur.date}.` : 'No countdown is showing on the landing page.'}</p>
+      <form className="sl-form" onSubmit={save}>
+        <label>Title<input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder="Main exams start in" /></label>
+        <label>First exam date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <label>Start time (Nairobi)<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+        <label>Last exam date (optional)<input type="date" value={endDate} min={date || undefined} onChange={(e) => setEndDate(e.target.value)} /></label>
+        <div className="sl-row-actions">
+          <button className="sl-primary small" disabled={busy}>Save countdown</button>
+          {cur?.set && <button type="button" className="sl-mini ghost" disabled={busy} onClick={() => void clear()}>Remove</button>}
+        </div>
+      </form>
+    </div>
+  )
 }
 
 /** Admin: activate a student after they pay, see who is on trial, paid or expired. */

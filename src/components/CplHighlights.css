@@ -1,0 +1,18 @@
+.cplh { margin: 0; }
+.cplh h2 { margin-top: .25rem; }
+.cplh-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.cplh-head a { font-size: .9rem; }
+.cplh-note { opacity: .8; }
+.cplh-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin-top: .75rem; }
+.cplh-card { border-radius: 12px; overflow: hidden; background: rgba(127,127,127,.1); }
+.cplh-thumb, .cplh-frame, .cplh-skel { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; padding: 0; }
+.cplh-thumb { position: relative; cursor: pointer; background: #000; }
+.cplh-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cplh-play { position: absolute; inset: 0; margin: auto; width: 56px; height: 56px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(0,0,0,.65); color: #fff; font-size: 1.25rem; }
+.cplh-thumb:hover .cplh-play, .cplh-thumb:focus-visible .cplh-play { background: #c4302b; }
+.cplh-meta { padding: .6rem .75rem .8rem; }
+.cplh-meta h3 { margin: 0 0 .2rem; font-size: .95rem; line-height: 1.3; }
+.cplh-meta time { font-size: .8rem; opacity: .7; }
+.cplh-skel { animation: cplh-pulse 1.2s ease-in-out infinite; }
+@keyframes cplh-pulse { 50% { opacity: .5; } }

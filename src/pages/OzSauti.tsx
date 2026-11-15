@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Hand, MessageCircle, PenLine } from 'lucide-react'
 import {
-  ago, day, ISSUE_STATUS, oz, pad, type Aspirant, type AspirantGroup, type Faculty, type FacultyFull, type Issue, type IssueFull, type Page,
+  ago, day, ISSUE_STATUS, oz, pad, snip, type Aspirant, type AspirantGroup, type Faculty, type FacultyFull, type Issue, type IssueFull, type Page,
   type Poll, type Promise_, type Question, type Score, type Support, type Upload,
 } from '../lib/ozone'
-import { Err, Gate, MediaPicker, MediaView, Pill, ReportButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
+import { Err, Gate, MediaPicker, MediaView, Pill, ReportButton, ShareButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
 
 const TABS = [
   ['sauti', 'Issues'], ['faculties', 'Faculties'], ['polls', 'Polls'], ['promises', 'Promises'], ['aspirants', 'Elections'],
@@ -109,6 +109,7 @@ export function IssueDetail({ ctx, id }: { ctx: OzCtx; id: string }) {
           <MediaView media={data.media} />
           <div className="oz-actions">
             <button type="button" className={`lp-btn${data.iMeToo ? ' lp-btn-soft' : ''}`} onClick={metoo} disabled={data.iMeToo}><Hand size={15} /> {data.iMeToo ? 'You said me too' : 'Me too'} · {data.meToo}</button>
+            <ShareButton text={`Student issue #${pad(data.id, 3)} (${data.facultyName}): ${data.title}. Status: ${ISSUE_STATUS[data.status]}.`} path={`issue/${data.id}`} />
             <ReportButton ctx={ctx} kind="issue" refId={data.id} />
           </div>
           <Err msg={msg} />
@@ -199,6 +200,7 @@ export function Faculties() {
     <div className="oz-wrap">
       <h2>Faculties</h2>
       <p className="cpl-sub">The scoreboard rates the office (how often and how fast it replies), never a person.</p>
+      <ShareButton text="Chuka faculty scoreboard: how often and how fast each office replies to student issues." path="faculties" />
       <SautiNav page="faculties" />
       <Err msg={err} />{loading && <p className="cpl-empty">Loading…</p>}
       {data && (
@@ -228,6 +230,7 @@ export function FacultyPage({ code, ctx }: { code: string; ctx: OzCtx }) {
         <>
           <h2>{data.name}</h2>
           {data.url && <p className="cpl-sub"><a href={data.url} target="_blank" rel="noopener noreferrer">Faculty website</a></p>}
+          <ShareButton text={`${data.name} on Chuka O-Zone: response scoreboard, leaders and student issues.`} path={`faculty/${data.code}`} />
           <div className="cpl-card"><h3>Response scoreboard</h3><ScoreBar s={data.score} /></div>
           <div className="cpl-card">
             <h3>Leaders</h3>
@@ -267,7 +270,7 @@ export function FacultyPage({ code, ctx }: { code: string; ctx: OzCtx }) {
 
 /* ---------------- polls and promises ---------------- */
 
-export function Polls({ ctx }: { ctx: OzCtx }) {
+export function Polls({ ctx, only }: { ctx: OzCtx; only?: string }) {
   const { data, err, loading, reload } = useLoad(() => oz<Poll[]>('polls_list'), [ctx.user?.uid])
   const [msg, setMsg] = useState('')
   async function vote(id: number, option: number) {
@@ -279,9 +282,10 @@ export function Polls({ ctx }: { ctx: OzCtx }) {
       <h2>Polls</h2>
       <p className="cpl-sub">What should the university fix first? One vote per student.</p>
       <SautiNav page="polls" />
+      {only && <p className="cpl-note"><a className="cpl-link" href="#/ozone/polls">See all polls</a></p>}
       <Err msg={err || msg} />{loading && !data && <p className="cpl-empty">Loading…</p>}
       <div className="oz-list">
-        {data?.map((p) => {
+        {(only ? data?.filter((p) => String(p.id) === only) : data)?.map((p) => {
           const voted = p.myVote !== null
           return (
             <div key={p.id} className="cpl-card">
@@ -299,10 +303,12 @@ export function Polls({ ctx }: { ctx: OzCtx }) {
                 })}
               </div>
               {p.counts ? <small>{p.total} vote{p.total === 1 ? '' : 's'}</small> : <small>{voted ? 'Thanks. Results show when the poll closes.' : 'Results show when the poll closes.'}</small>}
+              <div className="oz-actions"><ShareButton text={`Chuka O-Zone poll: ${p.question} Cast your vote.`} path={`poll/${p.id}`} /></div>
             </div>
           )
         })}
         {data && !data.length && <p className="cpl-empty">No polls right now.</p>}
+        {only && data && data.length > 0 && !data.some((p) => String(p.id) === only) && <p className="cpl-empty">That poll is not available.</p>}
       </div>
     </div>
   )
@@ -324,6 +330,7 @@ export function Promises() {
             <header className="oz-hd"><strong>{p.office}</strong><Pill tone={t[p.status]}>{lbl[p.status]}</Pill></header>
             <p className="oz-text">{p.promise}</p>
             <small>{p.due ? `Due ${p.due} · ` : ''}{/^https?:/.test(p.sourceUrl) ? <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a> : p.sourceUrl}</small>
+            <div className="oz-actions"><ShareButton text={`Promise by ${p.office} (${lbl[p.status]}): ${snip(p.promise, 180)}`} path="promises" /></div>
           </div>
         ))}
         {data && !data.length && <p className="cpl-empty">No promises recorded yet.</p>}
@@ -357,6 +364,7 @@ function AspirantGroups({ groups }: { groups: AspirantGroup[] }) {
                       {a.links?.map((l) => <a key={l.url} className="oz-chip" href={l.url} target="_blank" rel="noopener noreferrer nofollow">{l.label}</a>)}
                     </div>
                   )}
+                  <ShareButton text={`${a.name}, aspirant for ${g.position} (${a.facultyCode}). Read the manifesto and ask questions on Chuka O-Zone.`} path={`aspirant/${a.id}`} />
                 </div>
               </div>
             ))}
@@ -364,6 +372,20 @@ function AspirantGroups({ groups }: { groups: AspirantGroup[] }) {
         </div>
       ))}
     </>
+  )
+}
+
+/** One aspirant on their own page, so their link can be shared. */
+export function AspirantPage({ id }: { id: string }) {
+  const { data, err, loading } = useLoad(() => oz<AspirantGroup[]>('aspirants_list'), [])
+  const groups = (data ?? []).map((g) => ({ ...g, aspirants: g.aspirants.filter((a) => String(a.id) === id) })).filter((g) => g.aspirants.length)
+  return (
+    <div className="oz-wrap">
+      <a className="cpl-back" href="#/ozone/aspirants">← All aspirants</a>
+      <Err msg={err} />{loading && !data && <p className="cpl-empty">Loading…</p>}
+      {data && !groups.length && <p className="cpl-empty">This aspirant is not listed.</p>}
+      {groups.length > 0 && <AspirantGroups groups={groups} />}
+    </div>
   )
 }
 
@@ -408,7 +430,10 @@ export function Elections({ ctx }: { ctx: OzCtx }) {
             <p className="oz-text"><b>{q.question}</b></p>
             {q.answers.map((a) => <p key={a.aspirantId} className="oz-answer"><b>{a.name}:</b> {a.text}</p>)}
             {!q.answers.length && <small>No answers yet{q.deadline ? ` · answer by ${q.deadline}` : ''}.</small>}
-            <div className="oz-actions"><button type="button" className="lp-btn lp-btn-soft" onClick={() => void vote(q.id)}><Hand size={14} /> Same question · {q.votes}</button></div>
+            <div className="oz-actions">
+              <button type="button" className="lp-btn lp-btn-soft" onClick={() => void vote(q.id)}><Hand size={14} /> Same question · {q.votes}</button>
+              <ShareButton text={`Question to Chuka aspirants (${q.facultyCode}, ${q.position}): “${q.question}”`} path="aspirants" />
+            </div>
           </div>
         ))}
         {qs.data && !qs.data.length && <p className="cpl-empty">No questions yet.</p>}

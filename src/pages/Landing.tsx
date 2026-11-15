@@ -8,6 +8,7 @@ import { GoogleMapsLogo, YouTubeLogo } from '../components/BrandLogos'
 import Avatar from '../components/Avatar'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import WhatsAppGroups from '../components/WhatsAppGroups'
+import ExamCountdown from '../components/ExamCountdown'
 import { shareToWhatsApp, useInstall } from '../lib/install'
 import { WhatsAppLogo } from '../components/BrandLogos'
 import './Landing.css'
@@ -112,6 +113,7 @@ export default function Landing({ user }: { user: User | null }) {
 
   return (
     <div className="landing">
+      <ExamCountdown />
       <header className="lp-header">
         <a className="lp-brand" href="#home" aria-label="Chuka Comrades home">
           <span className="lp-brand-crest"><img src={`${BASE}chukalogo.png`} alt="Chuka University crest" /></span>
@@ -369,7 +371,3 @@ export default function Landing({ user }: { user: User | null }) {
     </div>
   )
 }
-
-
-
-

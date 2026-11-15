@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { Camera, Flag, LifeBuoy, Video, X } from 'lucide-react'
+import { Camera, Flag, Link2, LifeBuoy, MessageCircle, Video, X } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
-import { cleanPhoto, driveIdFrom, oz, prepVideo, type Config, type Me, type Media, type Prepared, type Support, type Upload } from '../lib/ozone'
+import { cleanPhoto, driveIdFrom, oz, ozLink, prepVideo, waShare, type Config, type Me, type Media, type Prepared, type Support, type Upload } from '../lib/ozone'
 
 export type OzCtx = {
   user: User | null; me: Me | null; cfg: Config | null; busy: boolean
@@ -142,6 +142,23 @@ export function ReportButton({ ctx, kind, refId }: { ctx: OzCtx; kind: 'confessi
 
 export function Pill({ tone, children }: { tone?: 'gold' | 'red' | 'green' | 'grey' | 'blue'; children: ReactNode }) {
   return <span className={`oz-pill ${tone ?? ''}`}>{children}</span>
+}
+
+/** Share to WhatsApp (contacts or groups) plus copy-link. Give `path` for a page inside O-Zone, or `url` for any other link. */
+export function ShareButton({ text, path, url, label = 'Share' }: { text: string; path?: string; url?: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+  const link = url ?? (path !== undefined ? ozLink(path) : '')
+  const message = link ? `${text}\n\n${link}` : text
+  return (
+    <span className="oz-share">
+      <a className="oz-ghost oz-wa-share" href={waShare(message)} target="_blank" rel="noopener noreferrer" aria-label={`${label} on WhatsApp`}><MessageCircle size={14} /> {label}</a>
+      {link && (
+        <button type="button" className="oz-ghost" onClick={() => { void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}>
+          <Link2 size={14} /> {copied ? 'Copied' : 'Copy link'}
+        </button>
+      )}
+    </span>
+  )
 }
 
 /** Copy-to-clipboard button. */

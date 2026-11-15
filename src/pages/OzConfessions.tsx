@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { CornerDownRight, MessageCircle, PenLine, Trash2 } from 'lucide-react'
-import { ago, oz, pad, type Page, type Post, type Upload } from '../lib/ozone'
-import { CopyButton, Err, Gate, MediaPicker, MediaView, ReportButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
+import { ago, oz, pad, snip, type Page, type Post, type Upload } from '../lib/ozone'
+import { CopyButton, Err, Gate, MediaPicker, MediaView, ReportButton, ShareButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
 import type { Support } from '../lib/ozone'
 
 function PostCard({ ctx, p, thread }: { ctx: OzCtx; p: Post; thread?: boolean }) {
@@ -18,6 +18,7 @@ function PostCard({ ctx, p, thread }: { ctx: OzCtx; p: Post; thread?: boolean })
       <footer>
         {!thread && <a className="oz-ghost" href={`#/ozone/thread/${p.number}`}><MessageCircle size={14} /> {p.replies ? `${p.replies} repl${p.replies === 1 ? 'y' : 'ies'}` : 'Open'}</a>}
         <a className="oz-ghost" href={`#/ozone/confess/${p.number}`}><CornerDownRight size={14} /> Reply anonymously</a>
+        <ShareButton text={`Confession #${pad(p.number)} on Chuka O-Zone (${p.categoryLabel}): “${snip(p.text)}”`} path={`thread/${p.number}`} />
         <ReportButton ctx={ctx} kind="confession" refId={p.number} />
       </footer>
     </article>

@@ -80,14 +80,14 @@ export default function CplDashboard({ me }: { me: Me }) {
         {!list.length && !msg && <p className="cpl-empty">Loading…</p>}
       </section>
 
-      <section className="cpl-card">
+      {isOwner && <section className="cpl-card">
         <h3>Add a chairman</h3>
         <form className="cpl-inline" onSubmit={add}>
           <input type="email" required placeholder="their Google email" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Chairman email" />
           <button className="lp-btn" disabled={busy}>Add chairman</button>
         </form>
-        {isOwner && <p className="cpl-note">To hand over ownership, add them here first, then press “Make owner” beside their name.</p>}
-      </section>
+        <p className="cpl-note">To hand over ownership, add them here first, then press “Make owner” beside their name.</p>
+      </section>}
       {msg && <p className={`cpl-msg${msg.bad ? ' bad' : ''}`} role="status">{msg.text}</p>}
     </div>
   )

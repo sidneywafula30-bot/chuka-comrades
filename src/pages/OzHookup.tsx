@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { EyeOff, Heart, MessageCircle, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { blurredCopy, cleanPhoto, day, oz, type HookupCard, type IntroRow, type MyProfile, type Prepared } from '../lib/ozone'
-import { Err, Gate, Pill, ReportButton, useLoad, type OzCtx } from './OzCommon'
+import { Err, Gate, Pill, ReportButton, ShareButton, useLoad, type OzCtx } from './OzCommon'
 
 type Tab = 'browse' | 'mine' | 'intros'
 
@@ -29,6 +29,7 @@ export default function Hookup({ ctx }: { ctx: OzCtx }) {
     <div className="oz-wrap">
       <h2>Hookup</h2>
       <p className="cpl-sub">Hidden profiles, admin-brokered intros. Be respectful and be safe: meet in public and tell a friend.</p>
+      <ShareButton text="Chuka O-Zone Hookup (18+ only): hidden profiles, and the admin connects two people only when both say yes." path="hookup" />
       <nav className="ef-tabs" aria-label="Hookup">
         {([['browse', 'Browse'], ['mine', 'My profile'], ['intros', 'My intros']] as const).map(([id, l]) => (
           <button key={id} type="button" className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{l}</button>

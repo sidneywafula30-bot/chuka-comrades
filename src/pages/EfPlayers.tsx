@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Gamepad2, MessageCircle, Search } from 'lucide-react'
-import { DAYS, PARTS, PLATFORMS, driveImg, ef, sharedSlots, slotsByDay, waLink, type Me, type PublicPlayer } from '../lib/efootball'
+import DriveImage from '../components/DriveImage'
+import { DAYS, PARTS, PLATFORMS, ef, sharedSlots, slotsByDay, waLink, type Me, type PublicPlayer } from '../lib/efootball'
 
 const PAGE = 24
 
@@ -33,7 +34,7 @@ export default function EfPlayers({ me, signedIn }: { me: Me | null; signedIn: b
       <p className="cpl-sub">{all ? `${all.length} players registered` : 'Loading…'}</p>
       {!registered && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>{signedIn ? 'Register as a player to see WhatsApp buttons on player cards.' : 'Sign in and register to message players on WhatsApp.'}</p>}
       {registered && me?.profile && !me.profile.showWhatsapp && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Your card has no WhatsApp button, so nobody can chat to you from here. <a href="#/efootball/profile">Turn it on in your profile</a>.</p>}
-      {registered && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>The green Chat button appears on a card only when that player has turned it on in their profile.</p>}
+      {registered && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Every card has a green Chat button, except for players who turned it off in their profile.</p>}
       <div className="cpl-search" style={{ width: '100%', marginBottom: 12 }}>
         <Search size={18} />
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE) }} placeholder="Search username, name or course" aria-label="Search players" />
@@ -54,7 +55,7 @@ export default function EfPlayers({ me, signedIn }: { me: Me | null; signedIn: b
           return (
             <article key={p.uid} className="ef-pcard">
               {p.squadId
-                ? <button type="button" onClick={() => setZoom(driveImg(p.squadId, 1200))} aria-label={`View ${p.username}'s squad`}><img src={driveImg(p.squadId, 400)} alt="" loading="lazy" /></button>
+                ? <button type="button" onClick={() => setZoom(p.squadId)} aria-label={`View ${p.username}'s squad`}><DriveImage id={p.squadId} w={400} fallback={<span className="ph"><Gamepad2 size={26} /></span>} /></button>
                 : <span className="ph"><Gamepad2 size={26} /></span>}
               <div>
                 <strong>{p.username}</strong>
@@ -78,7 +79,7 @@ export default function EfPlayers({ me, signedIn }: { me: Me | null; signedIn: b
         })}
       </div>
       {list.length > shown && <div className="ef-actions"><button className="lp-btn" onClick={() => setShown((n) => n + PAGE)}>Show more ({list.length - shown} left)</button></div>}
-      {zoom && <div className="ef-zoom" onClick={() => setZoom('')} role="dialog" aria-label="Squad image"><img src={zoom} alt="Squad" /></div>}
+      {zoom && <div className="ef-zoom" onClick={() => setZoom('')} role="dialog" aria-label="Squad image"><DriveImage id={zoom} w={1200} alt="Squad" /></div>}
     </div>
   )
 }

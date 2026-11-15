@@ -54,7 +54,6 @@ export default function Cpl({ user, route }: { user: User | null; route: string 
     if (!user) body = <Gate text="Sign in with your chairman Google account first." />
     else if (checking) body = <Gate text="Checking access…" />
     else if (!isChair || !me) body = <Gate text="This area is for CPL chairmen only." />
-    else if (page === 'profile') body = <CplProfile user={user} />
     else if (page === 'manage-seasons') body = <CplSeasons />
     else if (page === 'venues') body = <CplVenues />
     else if (page === 'referees') body = <CplReferees />

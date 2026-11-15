@@ -228,6 +228,14 @@ export class PaywallError extends Error {
   }
 }
 
+export type Countdown = {
+  set: boolean
+  title?: string
+  date?: string
+  time?: string
+  endDate?: string
+}
+
 /* ---------- transport ---------- */
 
 /** Calls the Study Labs Apps Script backend. */
@@ -315,6 +323,9 @@ export const labsApi = {
 
   /** Signed-in student: trial / paid / expired status. Starts the 2-week trial on first call. */
   access: () => call<AccessInfo>('access'),
+
+  /** Exam countdown for the landing page (public). */
+  countdown: () => call<Countdown>('countdown'),
 
   programmes: () => call<Programme[]>('programmes'),
 
@@ -409,6 +420,11 @@ export const labsApi = {
   admin: {
     queue: () =>
       call<AdminQueue>('admin_queue'),
+
+    setCountdown: (c: { title: string; date: string; time?: string; endDate?: string }) =>
+      call<Countdown>('admin_set_countdown', c),
+
+    clearCountdown: () => call<Countdown>('admin_clear_countdown'),
 
     users: (q?: string) => call<AccessUser[]>('admin_users', { q }),
 
