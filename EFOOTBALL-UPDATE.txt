@@ -1,0 +1,11 @@
+Chuka eFootball update (steps 1 + 2 + 3): daily league, course control, player cards, new home page, caching, Chuka FPL
+
+Extract this zip INTO your chuka-comrades project folder and choose "Replace". It includes everything from the earlier zips, so use this one only.
+Frontend files:
+  src/lib/efootball.ts, src/pages/Efootball.tsx, EfLeague.tsx, EfPlayers.tsx, EfProfile.tsx, EfAdmin.tsx, EfFpl.tsx (new), Efootball.css
+Backend: replace the Apps Script with efootball-apps-script/EfootballCode.gs, then follow "Chuka FPL" and "Upgrading from the previous version" in EFOOTBALL-SETUP.md
+(run setup, run installTriggers, deploy a NEW VERSION). No new .env values are needed.
+After deploying: Admin > FPL > paste your Chuka FPL classic league ID.
+
+Logo: the home page now uses public/efootball.png (put your efootball.png in the project's public folder; it is already there at C:\Users\USER\OneDrive\Desktop\chuka comrades\public\efootball.png).
+YouTube: no API key needed any more. In Apps Script press + next to Services, add "YouTube Data API v3" (identifier YouTube), replace appsscript.json with the one in this zip (or add the service by hand), run installTriggers and approve the YouTube permission, then deploy a NEW VERSION.
