@@ -127,6 +127,22 @@ function Home({ isChair, isCoach, isPlayer, isReferee, signedIn, checking, meErr
       <h1>Chuka Premier League</h1>
       <p>Campus football, all season long.</p>
 
+      <nav className="cpl-links" aria-label="CPL links">
+        {isCoach && <a className="cpl-link" href="#/cpl/my-team"><Shield size={16} /> My team</a>}
+        {isReferee && <a className="cpl-link" href="#/cpl/my-matches"><ClipboardCheck size={16} /> My matches</a>}
+        {isPlayer && <a className="cpl-link" href="#/cpl/my-stats"><BarChart3 size={16} /> Player dashboard</a>}
+        {isPlayer && <a className="cpl-link" href="#/cpl/my-player"><UserRound size={16} /> My player profile</a>}
+        {(isChair || isCoach || isPlayer) && <a className="cpl-link" href="#/cpl/transfers"><ArrowRightLeft size={16} /> Transfers</a>}
+        {(isChair || isCoach) && <a className="cpl-link" href="#/cpl/profile"><UserRound size={16} /> My profile</a>}
+        {isChair && <a className="cpl-link" href="#/cpl/dashboard"><ShieldCheck size={16} /> Chairman dashboard</a>}
+        <a className="cpl-link" href="#/cpl/seasons"><CalendarDays size={16} /> Seasons</a>
+        <a className="cpl-link" href="#/cpl/public"><Globe size={16} /> Public page</a>
+      </nav>
+      {!signedIn && <p className="cpl-note">Sign in with Google to see your profile, team and dashboard links if you are a CPL chairman or team coach.</p>}
+      {signedIn && checking && <p className="cpl-note">Checking your access…</p>}
+      {signedIn && !checking && meErr && <p className="cpl-err" role="alert">Could not check your access: {meErr}</p>}
+      {signedIn && !checking && !meErr && !isChair && !isCoach && !isPlayer && !isReferee && <p className="cpl-note">{email} is not a chairman, coach, player or referee. Ask your coach or the chairman to add this exact email.</p>}
+
       <form className="cpl-searchbox" onSubmit={submit} role="search">
         <div className="cpl-search">
           <Search size={18} />
@@ -159,21 +175,6 @@ function Home({ isChair, isCoach, isPlayer, isReferee, signedIn, checking, meErr
       {/* EPL fixtures (FPL API) + Chuka weather (Open-Meteo) */}
       <CplLive />
 
-      <nav className="cpl-links" aria-label="CPL links">
-        {isCoach && <a className="cpl-link" href="#/cpl/my-team"><Shield size={16} /> My team</a>}
-        {isReferee && <a className="cpl-link" href="#/cpl/my-matches"><ClipboardCheck size={16} /> My matches</a>}
-        {isPlayer && <a className="cpl-link" href="#/cpl/my-stats"><BarChart3 size={16} /> Player dashboard</a>}
-        {isPlayer && <a className="cpl-link" href="#/cpl/my-player"><UserRound size={16} /> My player profile</a>}
-        {(isChair || isCoach || isPlayer) && <a className="cpl-link" href="#/cpl/transfers"><ArrowRightLeft size={16} /> Transfers</a>}
-        {(isChair || isCoach) && <a className="cpl-link" href="#/cpl/profile"><UserRound size={16} /> My profile</a>}
-        {isChair && <a className="cpl-link" href="#/cpl/dashboard"><ShieldCheck size={16} /> Chairman dashboard</a>}
-        <a className="cpl-link" href="#/cpl/seasons"><CalendarDays size={16} /> Seasons</a>
-        <a className="cpl-link" href="#/cpl/public"><Globe size={16} /> Public page</a>
-      </nav>
-      {!signedIn && <p className="cpl-note">Sign in with Google to see your profile, team and dashboard links if you are a CPL chairman or team coach.</p>}
-      {signedIn && checking && <p className="cpl-note">Checking your access…</p>}
-      {signedIn && !checking && meErr && <p className="cpl-err" role="alert">Could not check your access: {meErr}</p>}
-      {signedIn && !checking && !meErr && !isChair && !isCoach && !isPlayer && !isReferee && <p className="cpl-note">{email} is not a chairman, coach, player or referee. Ask your coach or the chairman to add this exact email.</p>}
     </div>
   )
 }
