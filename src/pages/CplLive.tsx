@@ -150,11 +150,68 @@ function EplCard() {
   )
 }
 
+/* ---------- Football news: GNews API, via the CPL backend ---------- */
+
+type Article = { title: string; description: string; url: string; image: string; publishedAt: string; source: string }
+type News = { updated: string; articles: Article[]; stale?: boolean }
+
+function ago(iso: string) {
+  const t = Date.parse(iso)
+  if (isNaN(t)) return ''
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000))
+  if (m < 60) return `${Math.max(m, 1)}m ago`
+  if (m < 1440) return `${Math.round(m / 60)}h ago`
+  return `${Math.round(m / 1440)}d ago`
+}
+
+function Thumb({ src }: { src: string }) {
+  const [bad, setBad] = useState(false)
+  if (!src || bad) return <span className="cpl-news-img ph" aria-hidden />
+  return <img className="cpl-news-img" src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />
+}
+
+function NewsCard() {
+  const [d, setD] = useState<News | null>(null)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let live = true
+    cpl<News>('news').then((x) => live && setD(x)).catch((e) => live && setErr((e as Error).message))
+    return () => { live = false }
+  }, [])
+
+  return (
+    <section className="cpl-live-card cpl-news" aria-label="Football news">
+      <header><h2>Football news</h2></header>
+      {err && <p className="cpl-live-empty">{err}</p>}
+      {!d && !err && <div className="cpl-live-skel" aria-hidden><i /><i /><i /></div>}
+      {d && d.articles.length === 0 && <p className="cpl-live-empty">No news right now.</p>}
+      {d && d.articles.length > 0 && (
+        <ul className="cpl-news-list">
+          {d.articles.map((a) => (
+            <li key={a.url}>
+              <a href={a.url} target="_blank" rel="noopener noreferrer">
+                <Thumb src={a.image} />
+                <span className="cpl-news-text">
+                  <b>{a.title}</b>
+                  <small>{[a.source, ago(a.publishedAt)].filter(Boolean).join(' · ')}</small>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <footer>News from GNews{d?.stale ? ' (may be slightly out of date)' : ''}</footer>
+    </section>
+  )
+}
+
 export default function CplLive() {
   return (
     <div className="cpl-live">
       <EplCard />
       <WeatherCard />
+      <NewsCard />
     </div>
   )
 }
