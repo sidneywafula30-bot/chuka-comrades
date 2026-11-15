@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Gamepad2 } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
-import { DAYS, PARTS, PLATFORMS, driveImg, ef, type Course, type Me, type Profile } from '../lib/efootball'
+import { DAYS, PARTS, PLATFORMS, driveImg, ef, fmtStamp, ksh, type Course, type Me, type PayView, type Profile } from '../lib/efootball'
+import { useApi } from '../lib/efHooks'
 
 export default function EfProfile({ me, reload, error }: { me: Me | null; reload: () => Promise<void>; error: string }) {
   const [courses, setCourses] = useState<Course[]>([])
@@ -71,6 +72,7 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
               {course && !courses.some((c) => c.name === course) && <option value={course}>{course}</option>}
               {courses.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
+            <small>Course not here? <a href="#/efootball/league/list">List my course</a> (KSh 10, the admin opens it).</small>
           </label>
           <label>Year of study
             <select value={year} onChange={(e) => setYear(e.target.value)}>{[1, 2, 3, 4, 5, 6].map((y) => <option key={y} value={y}>Year {y}</option>)}</select>
@@ -108,6 +110,7 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
         <button className="lp-btn" disabled={busy}>{busy ? 'Saving…' : p ? 'Save profile' : 'Register'}</button>
         {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status">{msg.text}</p>}
       </form>
+      {p && <MyPayments />}
     </div>
   )
 }
@@ -121,5 +124,21 @@ function FragmentRow({ day, free, toggle }: { day: string; free: string[]; toggl
         return <button type="button" key={k} className={free.includes(k) ? 'on' : ''} aria-pressed={free.includes(k)} aria-label={`${day} ${x}`} onClick={() => toggle(k)}>{free.includes(k) ? '✓' : ''}</button>
       })}
     </>
+  )
+}
+
+function MyPayments() {
+  const { data } = useApi<PayView[]>('myPayments')
+  if (!data || !data.length) return null
+  return (
+    <section className="cpl-card" style={{ marginTop: 16 }}>
+      <h3>My payments</h3>
+      {data.map((x) => (
+        <div className="cpl-row" key={x.id}>
+          <div><strong>{x.label}</strong><small>{ksh(x.amount)} · {x.mpesa} · {fmtStamp(x.createdAt)}{x.note ? ` · ${x.note}` : ''}</small></div>
+          <span className={`ef-pill${x.status === 'verified' ? '' : x.status === 'rejected' ? ' red' : ' gold'}`}>{x.status === 'pending' ? 'waiting for admin' : x.status}</span>
+        </div>
+      ))}
+    </section>
   )
 }

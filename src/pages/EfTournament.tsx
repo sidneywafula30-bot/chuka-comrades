@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Copy, Crown, MessageCircle, Trophy } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import ImagePicker from '../components/ImagePicker'
-import { driveImg, ef, fmtDay, fmtStamp, fmtTime, stageName, stageWindow, waLink, type Champion, type Me, type Pool, type Tournament } from '../lib/efootball'
+import { PayBox, PendingPay } from '../components/EfPay'
+import { driveImg, ksh, ef, fmtDay, fmtStamp, fmtTime, stageName, stageWindow, waLink, type Champion, type Me, type Pool, type Tournament } from '../lib/efootball'
 
 type Props = { token: string; me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void> }
 
@@ -51,10 +52,13 @@ export default function EfTournament({ token, me, signedIn, onSignIn, reload }: 
 
 function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t: Tournament; skew: number; me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void>; refresh: () => Promise<void>; champs: Champion[] }) {
   const [accept, setAccept] = useState(false)
+  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const left = useCountdown(t.regClose, skew)
   const joined = !!me && me.tid === t.id && me.joined
+  const pendingPay = !!me && me.tid === t.id && me.entry === 'pending'
+  const fee = t.fee ?? 0
   const profile = me?.profile ?? null
   const link = `${window.location.origin}${window.location.pathname}#/efootball/join/${t.token}`
   const myPools = t.pools.filter((p) => p.members.some((m) => m.uid === me?.uid))
@@ -96,10 +100,23 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
                 <p className="cpl-msg">You are in. Your pool is announced when registration closes{left ? '' : ' (any moment now)'}.</p>
                 <div className="ef-actions"><button className="lp-btn cpl-danger" disabled={busy} onClick={() => act(() => ef('leaveTournament', { tid: t.id }))}>Leave tournament</button></div>
               </>
+            ) : pendingPay ? (
+              <>
+                <PendingPay label={`Knockout entry: ${t.name}`} amount={fee} />
+                <div className="ef-actions"><button className="lp-btn cpl-danger" disabled={busy} onClick={() => act(() => ef('leaveTournament', { tid: t.id }), 'Entry withdrawn.')}>Withdraw my entry</button></div>
+              </>
             ) : (
               <>
                 {t.rules && <label className="cpl-file"><input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} /> I have read and accept the rules below</label>}
-                <div className="ef-actions"><button className="lp-btn" disabled={busy || (!!t.rules && !accept)} onClick={() => act(() => ef('joinTournament', { tid: t.id }), 'You have joined.')}>{busy ? 'Joining…' : 'Join tournament'}</button></div>
+                {fee > 0 ? (
+                  <>
+                    <p className="ef-deadline" style={{ color: 'var(--green)' }}>Entry fee: {ksh(fee)}. The admin verifies your payment before your entry counts.</p>
+                    <PayBox amount={fee} label={`Knockout entry: ${t.name}`} code={code} onCode={setCode} busy={busy} disabled={!!t.rules && !accept} button="Send code and join"
+                      onSubmit={() => act(() => ef('joinTournament', { tid: t.id, mpesa: code }), 'Payment code received. Chat the admin on WhatsApp: your entry counts once it is verified.')} />
+                  </>
+                ) : (
+                  <div className="ef-actions"><button className="lp-btn" disabled={busy || (!!t.rules && !accept)} onClick={() => act(() => ef('joinTournament', { tid: t.id }), 'You have joined.')}>{busy ? 'Joining…' : 'Join tournament'}</button></div>
+                )}
               </>
             )}
           {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}

@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Copy, Trophy } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
-import { driveImg, ef, fmtStamp, fromParts, toParts, type AdminCourse, type Attention, type FplAdminInfo, type HomeData, type Profile, type Tournament } from '../lib/efootball'
+import { driveImg, ef, fmtStamp, fromParts, toParts, type AdminCourse, type AdminPay, type Attention, type FplAdminInfo, type HomeData, type PayAdmin, type Profile, type Tournament, ksh, waLink } from '../lib/efootball'
 
-type Tab = 'tournament' | 'attention' | 'courses' | 'players' | 'league' | 'fpl'
+type Tab = 'payments' | 'tournament' | 'attention' | 'courses' | 'players' | 'league' | 'fpl'
 type Msg = { ok: boolean; text: string } | null
 
 export default function EfAdmin() {
-  const [tab, setTab] = useState<Tab>('tournament')
+  const [tab, setTab] = useState<Tab>('payments')
   return (
     <div className="cpl-page">
       <h2>eFootball admin</h2>
+      <p className="cpl-sub">Verify M-Pesa payments, run tournaments, open courses. League results settle themselves.</p>
       <p className="cpl-sub">Tournaments, courses, players and the league. League results settle themselves.</p>
       <div className="ef-tabs" role="tablist">
-        {([['tournament', 'Tournament'], ['attention', 'Needs attention'], ['courses', 'Courses'], ['players', 'Players'], ['league', 'League'], ['fpl', 'FPL']] as [Tab, string][]).map(([id, label]) => (
+        {([['payments', 'Payments'], ['tournament', 'Tournament'], ['attention', 'Needs attention'], ['courses', 'Courses'], ['players', 'Players'], ['league', 'League'], ['fpl', 'FPL']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
-      {tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'courses' ? <CoursesAdmin /> : tab === 'players' ? <PlayersAdmin /> : tab === 'fpl' ? <FplAdmin /> : <LeagueAdmin />}
+      {tab === 'payments' ? <PaymentsAdmin /> : tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'courses' ? <CoursesAdmin /> : tab === 'players' ? <PlayersAdmin /> : tab === 'fpl' ? <FplAdmin /> : <LeagueAdmin />}
     </div>
   )
 }
@@ -26,6 +27,55 @@ function useMsg() {
   const [msg, setMsg] = useState<Msg>(null)
   const el = msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status">{msg.text}</p>
   return { setMsg, el }
+}
+
+/* ---------------- payments: verify M-Pesa codes ---------------- */
+function PaymentsAdmin() {
+  const [all, setAll] = useState(false)
+  const [d, setD] = useState<PayAdmin | null>(null)
+  const [busy, setBusy] = useState('')
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const { setMsg, el } = useMsg()
+  const load = useCallback(() => ef<PayAdmin>('payments', { status: all ? 'all' : 'pending' }).then(setD).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [all, setMsg])
+  useEffect(() => { void load() }, [load])
+  async function decide(p: AdminPay, approve: boolean) {
+    if (!approve && !window.confirm('Reject this payment? Remember to refund the player if the money reached you.')) return
+    setBusy(p.id); setMsg(null)
+    try { await ef('payDecide', { id: p.id, approve, note: notes[p.id] ?? '' }); setMsg({ ok: true, text: approve ? 'Verified and applied.' : 'Rejected.' }); await load() }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+    finally { setBusy('') }
+  }
+  const kindLabel: Record<string, string> = { course: 'List course', league: 'League entry', knockout: 'Knockout entry', listing: 'Marketplace listing' }
+  return (
+    <>
+      <section className="cpl-card">
+        <h3>M-Pesa payments</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 10px' }}>Check each code against your M-Pesa statement, then tap Verify. Verifying opens the course, adds the player, or publishes the listing. Each M-Pesa code can only be used once.</p>
+        {d && <div className="ef-facts"><div><small>Waiting</small><b>{d.summary.pending}</b></div><div><small>Verified</small><b>{d.summary.verified}</b></div><div><small>Verified total</small><b>{ksh(d.summary.verifiedTotal)}</b></div><div><small>Your 10% cut (leagues)</small><b>{ksh(d.summary.cutTotal)}</b></div></div>}
+        <div className="ef-actions"><button className="lp-btn" onClick={() => setAll((v) => !v)}>{all ? 'Show only waiting' : 'Show all payments'}</button><button className="lp-btn" onClick={() => void load()}>Refresh</button></div>
+        {el}
+      </section>
+      {d && !d.rows.length && <p className="cpl-empty">{all ? 'No payments yet.' : 'Nothing is waiting for verification.'}</p>}
+      {d?.rows.map((p) => (
+        <section className="cpl-card" key={p.id}>
+          <h3>{kindLabel[p.kind] ?? p.kind}: {ksh(p.amount)} <span className={`ef-pill${p.status === 'verified' ? '' : p.status === 'rejected' ? ' red' : ' gold'}`}>{p.status}</span></h3>
+          <p className="cpl-sub" style={{ margin: '0 0 6px' }}><strong>{p.label}</strong></p>
+          <p className="cpl-note" style={{ textAlign: 'left', margin: '0 0 8px' }}>M-Pesa code <strong>{p.mpesa}</strong> · {p.username || p.email} {p.fullName ? `(${p.fullName})` : ''} · {fmtStamp(p.createdAt)}{p.kind === 'league' && p.cut ? ` · your cut ${ksh(p.cut)}` : ''}{p.note ? ` · ${p.note}` : ''}</p>
+          {p.listing && <p className="cpl-note" style={{ textAlign: 'left', margin: '0 0 8px' }}>{p.listing.type === 'sell' ? 'For sale' : 'Wanted'}: {p.listing.title} · {p.listing.platform} · {ksh(p.listing.price)}{p.listing.imageId ? <> · <a href={driveImg(p.listing.imageId, 1200)} target="_blank" rel="noopener noreferrer">screenshot</a></> : ''}{p.listing.details ? ` · ${p.listing.details}` : ''}</p>}
+          <div className="ef-actions" style={{ marginTop: 6 }}>
+            {p.whatsapp && <a className="cpl-link" href={waLink(p.whatsapp, `Hi ${p.username}, about your KSh ${p.amount} payment (${p.mpesa}) for ${p.label}.`)} target="_blank" rel="noopener noreferrer">WhatsApp {p.username || 'player'}</a>}
+            {p.status === 'pending' && (
+              <>
+                <input className="ef-sel" value={notes[p.id] ?? ''} onChange={(e) => setNotes((n) => ({ ...n, [p.id]: e.target.value }))} placeholder="Note (optional)" maxLength={200} aria-label="Note" />
+                <button className="lp-btn" disabled={busy === p.id} onClick={() => decide(p, true)}>Verify</button>
+                <button className="lp-btn cpl-danger" disabled={busy === p.id} onClick={() => decide(p, false)}>Reject</button>
+              </>
+            )}
+          </div>
+        </section>
+      ))}
+    </>
+  )
 }
 
 /* ---------------- tournament form ---------------- */
@@ -50,7 +100,7 @@ function TournamentAdmin() {
       {live && t && (
         <section className="cpl-card">
           <h3>{t.name} <span className="ef-pill">{t.status === 'open' ? 'registration open' : `round ${t.round} of ${t.stages}`}</span></h3>
-          <p className="cpl-sub" style={{ margin: '0 0 12px' }}>{t.count} joined of {t.cap}.</p>
+          <p className="cpl-sub" style={{ margin: '0 0 12px' }}>{t.count} verified of {t.cap}{t.pending ? ` · ${t.pending} waiting for payment verification (Payments tab)` : ''} · entry KSh {t.fee ?? 0}.</p>
           <div className="ef-copy"><span style={{ flex: 1 }}>{link}</span>
             <button className="lp-btn" onClick={() => { void navigator.clipboard?.writeText(link); setMsg({ ok: true, text: 'Invite link copied.' }) }}><Copy size={14} /> Copy</button></div>
           <div className="ef-actions">
@@ -77,6 +127,7 @@ function TournamentForm({ t, onSaved }: { t: Tournament | null; onSaved: () => P
   const [regTime, setRegTime] = useState(reg.time || '13:00')
   const [times, setTimes] = useState([w(0, 0, '14:00'), w(0, 1, '15:15'), w(1, 0, '15:25'), w(1, 1, '16:10'), w(2, 0, '16:20'), w(2, 1, '17:00')])
   const [cap, setCap] = useState(String(t?.cap ?? 512))
+  const [fee, setFee] = useState(String(t?.fee ?? 20))
   const [rules, setRules] = useState(t?.rules ?? '')
   const [logo, setLogo] = useState('')
   const [removeLogo, setRemoveLogo] = useState(false)
@@ -90,7 +141,7 @@ function TournamentForm({ t, onSaved }: { t: Tournament | null; onSaved: () => P
     setBusy(true); setMsg(null)
     try {
       const [s1, e1, s2, e2, s3, e3] = times.map((x) => fromParts(date, x))
-      await ef('saveTournament', { t: { id: t?.id, name, rules, regClose: fromParts(date, regTime), s1, e1, s2, e2, s3, e3, cap: Number(cap), logo: logo || undefined, removeLogo } })
+      await ef('saveTournament', { t: { id: t?.id, name, rules, regClose: fromParts(date, regTime), s1, e1, s2, e2, s3, e3, cap: Number(cap), fee: Number(fee), logo: logo || undefined, removeLogo } })
       setMsg({ ok: true, text: t ? 'Saved.' : 'Tournament created. Share the invite link.' })
       await onSaved()
     } catch (x) { setMsg({ ok: false, text: (x as Error).message }) } finally { setBusy(false) }
@@ -117,6 +168,7 @@ function TournamentForm({ t, onSaved }: { t: Tournament | null; onSaved: () => P
         <small>With fewer players the Final always uses the Final times.</small>
       </fieldset>
       {open && <label>Maximum players<input type="number" min={8} max={512} value={cap} onChange={(e) => setCap(e.target.value)} /><small>512 players = 64 pools, then 8 pools, then the final.</small></label>}
+      {open && <label>Entry fee (KSh)<input type="number" min={0} max={1000} value={fee} onChange={(e) => setFee(e.target.value)} /><small>Players pay this by M-Pesa and you verify it in the Payments tab. 0 = free.</small></label>}
       <label>Rules<textarea rows={9} value={rules} onChange={(e) => setRules(e.target.value)} placeholder={'1. Be in the room on time.\n2. Match time: ...\n3. Disputes go to the admin with a screenshot.'} /></label>
       <button className="lp-btn" disabled={busy || !name || !date} onClick={save}>{busy ? 'Saving…' : t ? 'Save changes' : 'Create tournament'}</button>
       {el}
@@ -175,6 +227,12 @@ function CoursesAdmin() {
       await load()
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
   }
+  async function startOnly() {
+    if (!window.confirm('Switch OFF every course except Electrical Engineering and Nursing? Players keep their profiles.')) return
+    setBusy(true); setMsg(null)
+    try { const r = await ef<{ started: number; switchedOff: number }>('startCourses'); setMsg({ ok: true, text: `Electrical Engineering and Nursing are open. ${r.switchedOff} other course(s) switched off.` }); await load() }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
+  }
   async function change(c: AdminCourse, patch: Partial<AdminCourse>, action: string, payload: Record<string, unknown>) {
     setList((l) => l && l.map((x) => (x.name === c.name ? { ...x, ...patch } : x)))
     try { await ef(action, { name: c.name, ...payload }); await load() } catch (e) { setMsg({ ok: false, text: (e as Error).message }); await load() }
@@ -201,9 +259,10 @@ function CoursesAdmin() {
     <>
       <section className="cpl-card">
         <h3>Courses from chuka.ac.ke</h3>
-        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Students pick their course from the <strong>Active</strong> ones. <strong>In league</strong> courses appear in the league course table with a Join button; open more as students ask for them.</p>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Students pick their course from the <strong>Active</strong> ones. A student who pays KSh 10 to list a course appears in the Payments tab: verify it and the course opens by itself. <strong>In league</strong> courses appear in the league course table with a Join button; open more as students ask for them.</p>
         <div className="ef-actions" style={{ marginTop: 0 }}>
-          <button className="lp-btn" disabled={busy} onClick={bach}>{busy ? 'Reading the Chuka website…' : 'Add all Bachelor degrees (Main campus)'}</button>
+          <button className="lp-btn" disabled={busy} onClick={bach}>{busy ? 'Reading the Chuka website…' : 'Import Bachelor degrees (switched off)'}</button>
+          <button className="lp-btn cpl-danger" disabled={busy} onClick={startOnly}>Reset: only Electrical &amp; Nursing open</button>
         </div>
         <div className="cpl-inline" style={{ marginTop: 14 }}>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a course by hand" maxLength={120} />
@@ -223,7 +282,7 @@ function CoursesAdmin() {
             <div className="cpl-row" key={c.name}>
               <div>
                 <strong>{c.name} {c.league && <span className="ef-pill gold">In league</span>}</strong>
-                <small>{[c.level, c.campuses].filter(Boolean).join(' · ')} · {c.players} registered{c.interested ? ` · ${c.interested} asked for the league` : ''}</small>
+                <small>{[c.level, c.campuses].filter(Boolean).join(' · ')} · {c.players} registered{c.interested ? ` · ${c.interested} asked for the league` : ''}{c.league ? ` · entry ${c.fee ? ksh(c.fee) : c.founder ? 'free' : 'not set'}${c.founder ? ` (set by ${c.founder})` : ''}` : ''}</small>
               </div>
               <label className="cpl-file"><input type="checkbox" checked={c.active} onChange={() => change(c, { active: !c.active, ...(c.active ? { league: false } : {}) }, 'setCourseActive', { active: !c.active })} /> Active</label>
               <label className="cpl-file"><input type="checkbox" checked={c.league} disabled={!c.active} onChange={() => change(c, { league: !c.league }, 'setCourseLeague', { league: !c.league })} /> In league</label>
@@ -273,7 +332,7 @@ function PlayersAdmin() {
 function LeagueAdmin() {
   const [asks, setAsks] = useState<{ course: string; count: number }[] | null>(null)
   const { setMsg, el } = useMsg()
-  const load = useCallback(() => ef<{ course: string; count: number }[]>('courseInterest').then(setAsks).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
+  const load = useCallback(() => ef<{ course: string; count: number }[]>('adminInterest').then(setAsks).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
   useEffect(() => { void load() }, [load])
   async function fixtures() {
     try {

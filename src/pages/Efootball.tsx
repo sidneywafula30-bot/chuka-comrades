@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
-import { ArrowLeft, Clock, Crown, ExternalLink, MessageCircle, Target, Play, Search, ShieldCheck, Swords, Trophy, UserRound, Users, X, Table2 } from 'lucide-react'
+import { ArrowLeft, Clock, Crown, ExternalLink, MessageCircle, Target, Play, Search, ShieldCheck, Swords, Trophy, UserRound, Users, X, Table2, Tag } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { countdown, ef, efReady, fmtDay, fmtTime, type HomeData, type Me, type Video, type VideoCategory, type VideoResult } from '../lib/efootball'
 import GoogleSignInButton from '../components/GoogleSignInButton'
@@ -10,6 +10,7 @@ import EfTournament from './EfTournament'
 import EfLeague from './EfLeague'
 import EfAdmin from './EfAdmin'
 import EfFpl from './EfFpl'
+import EfMarket from './EfMarket'
 import './Cpl.css'
 import './Efootball.css'
 
@@ -51,7 +52,8 @@ export default function Efootball({ user, route }: { user: User | null; route: s
   let body
   if (!efReady) body = <p className="cpl-empty">The eFootball server is not connected yet. Add <code>VITE_EFOOTBALL_API_URL</code> to <code>.env</code> and restart.</p>
   else if (page === 'players') body = <EfPlayers me={me} signedIn={!!user} />
-  else if (page === 'league') body = <EfLeague me={me} reload={reload} signedIn={!!user} onSignIn={signIn} joinCourse={arg === 'join' ? safeDecode(parts[4] || '') : ''} joining={arg === 'join'} />
+  else if (page === 'league') body = <EfLeague me={me} reload={reload} signedIn={!!user} onSignIn={signIn} joinCourse={arg === 'join' ? safeDecode(parts[4] || '') : ''} joining={arg === 'join' || arg === 'list'} />
+  else if (page === 'market') body = <EfMarket me={me} signedIn={!!user} onSignIn={signIn} />
   else if (page === 'fpl') body = <EfFpl me={me} signedIn={!!user} onSignIn={signIn} reload={reload} />
   else if (page === 'tournament' || page === 'join') body = <EfTournament token={page === 'join' ? arg : ''} me={me} signedIn={!!user} onSignIn={signIn} reload={reload} />
   else if (page === 'profile') body = !user ? needSignIn : <EfProfile me={me} reload={reload} error={meErr} />
@@ -104,7 +106,8 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
       <nav className="ef-tiles" aria-label="eFootball sections">
         <a href="#/efootball/tournament"><Trophy size={20} /><b>Knockout</b><small>512-player weekly</small></a>
         <a href="#/efootball/league"><Table2 size={20} /><b>League</b><small>Daily fixtures</small></a>
-        <a href="#/efootball/fpl"><Target size={20} /><b>Chuka FPL</b><small>Fantasy league</small></a>
+        <a href="#/efootball/fpl"><Target size={20} /><b>FPL</b><small>EPL fixtures &amp; Chuka league</small></a>
+        <a href="#/efootball/market"><Tag size={20} /><b>Marketplace</b><small>Buy &amp; sell accounts</small></a>
         <a href="#/efootball/players"><Users size={20} /><b>Players</b><small>Find a match</small></a>
         <a href="#/efootball/profile"><UserRound size={20} /><b>{me?.profile ? 'My profile' : 'Register'}</b><small>Free times, squad</small></a>
         {me?.isAdmin && <a href="#/efootball/admin"><ShieldCheck size={20} /><b>Admin</b><small>Manage</small></a>}
@@ -152,8 +155,8 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
         </section>
 
         <a className="cpl-card ef-dcard ef-dlink" href="#/efootball/fpl">
-          <h3><Target size={15} /> Chuka FPL</h3>
-          {!h?.fpl?.configured ? <p className="cpl-sub" style={{ margin: 0 }}>Campus Fantasy Premier League is coming soon.</p> : (
+          <h3><Target size={15} /> Fantasy Premier League</h3>
+          {!h?.fpl?.configured ? <p className="cpl-sub" style={{ margin: 0 }}>EPL fixtures, results, live points and player stats. The Chuka campus league is coming soon.</p> : (
             <>
               {h.fpl.next && <p className="ef-big">{h.fpl.next.name}</p>}
               {h.fpl.next && <p className="ef-deadline"><Clock size={14} /> Deadline in {countdown(h.fpl.next.at, skew) || 'moments'}</p>}

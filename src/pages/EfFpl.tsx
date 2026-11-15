@@ -2,18 +2,19 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Clock, ExternalLink } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import { countdown, ef, fmtStamp, fplJoinLink, type FplBoard, type FplRow, type Me } from '../lib/efootball'
+import { useTick } from '../lib/efHooks'
+import { Live, ManagerModal, Matches, Overview, PlayerStats, PlTable } from './EfFplData'
 
+type Section = 'overview' | 'matches' | 'table' | 'live' | 'players' | 'chuka'
 type Tab = 'overall' | 'gw' | 'winners' | 'courses'
 
-function useTick() {
-  const [, set] = useState(0)
-  useEffect(() => { const i = setInterval(() => set((n) => n + 1), 1000); return () => clearInterval(i) }, [])
-}
+const SECTIONS: [Section, string][] = [['overview', 'Overview'], ['matches', 'Fixtures & results'], ['table', 'EPL table'], ['live', 'Live points'], ['players', 'Players'], ['chuka', 'Chuka league']]
 
 export default function EfFpl({ me, signedIn, onSignIn, reload }: { me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void> }) {
+  const [sec, setSec] = useState<Section>('overview')
+  // The Chuka board is loaded up front: the overview shows its captain picks, and the Chuka tab uses the rest.
   const [b, setB] = useState<FplBoard | null>(null)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState<Tab>('overall')
   const [skew, setSkew] = useState(0)
   useTick()
 
@@ -28,23 +29,43 @@ export default function EfFpl({ me, signedIn, onSignIn, reload }: { me: Me | nul
     return () => clearInterval(i)
   }, [load, me?.uid])
 
-  if (err && !b) return <div className="cpl-page"><h2>Chuka FPL</h2><p className="cpl-err" role="alert">{err}</p></div>
-  if (!b) return <div className="cpl-page"><h2>Chuka FPL</h2><p className="cpl-empty">Loading…</p></div>
-  if (!b.configured) return <div className="cpl-page"><h2>Chuka FPL</h2><p className="cpl-empty">The Chuka Fantasy Premier League is coming soon. The admin is setting up the campus league.</p></div>
+  const chukaCaps = b?.captains && b.gw ? { gw: b.gw.name, got: b.captains.got, total: b.captains.total, list: b.captains.list } : null
+
+  return (
+    <div className="cpl-page fpl">
+      <div className="fpl-banner"><span className="fpl-mark">FPL</span><div><h2>Fantasy Premier League</h2>
+      <p>Premier League fixtures, results, table, live points and player statistics, plus the Chuka campus FPL league.</p></div></div>
+      <div className="ef-tabs" role="tablist" aria-label="FPL sections">
+        {SECTIONS.map(([id, label]) => <button key={id} role="tab" aria-selected={sec === id} className={sec === id ? 'on' : ''} onClick={() => setSec(id)}>{label}</button>)}
+      </div>
+      {sec === 'overview' && <Overview chuka={chukaCaps} />}
+      {sec === 'matches' && <Matches />}
+      {sec === 'table' && <PlTable />}
+      {sec === 'live' && <Live />}
+      {sec === 'players' && <PlayerStats />}
+      {sec === 'chuka' && <ChukaLeague b={b} err={err} me={me} signedIn={signedIn} onSignIn={onSignIn} reload={reload} load={load} skew={skew} />}
+    </div>
+  )
+}
+
+function ChukaLeague({ b, err, me, signedIn, onSignIn, reload, load, skew }: { b: FplBoard | null; err: string; me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void>; load: () => Promise<void>; skew: number }) {
+  const [tab, setTab] = useState<Tab>('overall')
+  const [manager, setManager] = useState('')
+  if (err && !b) return <p className="cpl-err" role="alert">{err}</p>
+  if (!b) return <p className="cpl-empty">Loading…</p>
+  if (!b.configured) return <p className="cpl-empty">The Chuka Fantasy Premier League is coming soon. The admin is setting up the campus league. The Premier League tabs above work already.</p>
 
   const left = b.next ? countdown(b.next.at, skew) : ''
   const m = b.mine
   const joinUrl = fplJoinLink(b.leagueCode)
 
   return (
-    <div className="cpl-page">
-      <h2>Chuka FPL</h2>
-      <p className="cpl-sub">Campus Fantasy Premier League: leaderboard, gameweek winners and a course table. {b.rows.length} Chuka managers.</p>
-
+    <>
+      <p className="cpl-sub">Campus league: leaderboard, gameweek winners and a course table. {b.rows.length} Chuka managers. Tap a manager to see their statistics and team.</p>
       {b.error && <p className="ef-stale" role="status">FPL is updating or busy, so these standings are from {b.at ? fmtStamp(b.at) : 'earlier'}. They refresh on their own.</p>}
 
-      <section className="ef-fpl-hero" aria-label="Gameweek hub">
-        <small>{b.gw ? b.gw.name : 'Gameweek hub'}{b.gw?.finished ? ' · finished' : b.gw?.started ? ' · live' : ''}</small>
+      <section className="ef-fpl-hero" aria-label="Chuka league">
+        <small>{b.gw ? b.gw.name : 'Gameweek'}{b.gw?.finished ? ' · finished' : b.gw?.started ? ' · live' : ''}</small>
         <strong>{b.next ? `${b.next.name} deadline` : 'Season break'}</strong>
         {b.next && <p className="ef-deadline"><Clock size={14} /> {left ? `${left} left` : 'Deadline passing'} · {fmtStamp(b.next.at)}</p>}
         {m && (
@@ -58,31 +79,14 @@ export default function EfFpl({ me, signedIn, onSignIn, reload }: { me: Me | nul
 
       <LinkCard b={b} me={me} signedIn={signedIn} onSignIn={onSignIn} joinUrl={joinUrl} done={async () => { await reload(); await load() }} />
 
-      <section className="cpl-card">
-        <h3>Top captain picks</h3>
-        {b.captains && b.captains.list.length ? (
-          <>
-            <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>{b.gw?.name}: captains of {b.captains.got} of {b.captains.total} Chuka managers.</p>
-            <div className="ef-cap">
-              {b.captains.list.slice(0, 6).map((c) => (
-                <span key={c.name} style={{ display: 'contents' }}>
-                  <strong>{c.name}</strong><span>{c.n} ({Math.round((c.n / b.captains!.got) * 100)}%)</span>
-                  <i style={{ width: `${Math.max(4, (c.n / b.captains!.list[0].n) * 100)}%` }} />
-                </span>
-              ))}
-            </div>
-          </>
-        ) : <p className="cpl-empty" style={{ margin: 0 }}>Captain picks are secret until the deadline. They show up here soon after it passes.</p>}
-      </section>
-
       <div className="ef-tabs" role="tablist">
         {([['overall', 'Overall'], ['gw', 'This gameweek'], ['winners', 'GW winners'], ['courses', 'Courses']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
 
-      {tab === 'overall' && <Board rows={b.rows} by="total" me={m?.uid} />}
-      {tab === 'gw' && <Board rows={[...b.rows].sort((x, y) => x.gwRank - y.gwRank || y.total - x.total)} by="gw" me={m?.uid} note={b.gw && !b.gw.started ? 'The gameweek has not started, so points are 0 for now.' : ''} />}
+      {tab === 'overall' && <Board rows={b.rows} by="total" me={m?.uid} open={setManager} />}
+      {tab === 'gw' && <Board rows={[...b.rows].sort((x, y) => x.gwRank - y.gwRank || y.total - x.total)} by="gw" me={m?.uid} open={setManager} note={b.gw && !b.gw.started ? 'The gameweek has not started, so points are 0 for now.' : ''} />}
       {tab === 'winners' && (
         <div className="cpl-card">
           {!b.winners.length ? <p className="cpl-empty" style={{ margin: 0 }}>No gameweek winner yet. The best Chuka score of each finished gameweek is saved here.</p> : (
@@ -108,11 +112,12 @@ export default function EfFpl({ me, signedIn, onSignIn, reload }: { me: Me | nul
         </div>
       )}
       <p className="cpl-note" style={{ textAlign: 'left' }}>Data comes from the official FPL site and refreshes about every 30 minutes. Only managers inside the Chuka FPL league are counted.</p>
-    </div>
+      {manager && <ManagerModal entry={manager} onClose={() => setManager('')} />}
+    </>
   )
 }
 
-function Board({ rows, by, me, note }: { rows: FplRow[]; by: 'total' | 'gw'; me?: string; note?: string }) {
+function Board({ rows, by, me, note, open }: { rows: FplRow[]; by: 'total' | 'gw'; me?: string; note?: string; open: (entry: string) => void }) {
   const [shown, setShown] = useState(50)
   return (
     <div className="cpl-card ef-scroll">
@@ -121,7 +126,7 @@ function Board({ rows, by, me, note }: { rows: FplRow[]; by: 'total' | 'gw'; me?
         <table className="ef-table">
           <thead><tr><th>#</th><th>Manager</th><th>{by === 'gw' ? 'Total' : 'GW'}</th><th>{by === 'gw' ? 'GW pts' : 'Total'}</th></tr></thead>
           <tbody>{rows.slice(0, shown).map((r) => (
-            <tr key={r.uid} style={r.uid === me ? { background: '#fff9e3' } : undefined}>
+            <tr key={r.uid} className={r.entry ? 'ef-click' : ''} onClick={() => r.entry && open(r.entry)} style={r.uid === me ? { background: '#fff9e3' } : undefined}>
               <td>{by === 'gw' ? r.gwRank : r.rank}</td>
               <td><strong>{r.username}</strong><small>{r.team ? `${r.team} · ` : ''}{r.course}</small></td>
               <td>{by === 'gw' ? r.total : r.gwPts}</td><td><strong>{by === 'gw' ? r.gwPts : r.total}</strong></td>

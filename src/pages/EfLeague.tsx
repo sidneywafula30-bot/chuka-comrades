@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react'
 import { Clock, Link2, MessageCircle, Share2 } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import ImagePicker from '../components/ImagePicker'
-import { ef, fmtTime, leagueInviteLink, sharedSlots, waLink, type League, type MatchView, type Me } from '../lib/efootball'
+import { PayBox, PendingPay, usePayCfg } from '../components/EfPay'
+import { ef, fmtTime, ksh, leagueInviteLink, sharedSlots, waLink, type League, type MatchView, type Me } from '../lib/efootball'
 
 type Tab = 'table' | 'courses' | 'mine' | 'recent'
 type Props = { me: Me | null; reload: () => Promise<void>; signedIn: boolean; onSignIn: () => void; joinCourse: string; joining: boolean }
 
-function useCountdown(iso: string) {
+/** Time left to a deadline, by the SERVER clock (skew = server time minus this phone's time), so a wrong phone clock cannot hide the score form. */
+function useCountdown(iso: string, skew: number) {
   const [, tick] = useState(0)
   useEffect(() => { const i = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(i) }, [])
-  const ms = Date.parse(iso) - Date.now()
+  const ms = Date.parse(iso) - (Date.now() + skew)
   if (!(ms > 0)) return ''
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
   return h ? `${h}h ${m}m` : `${m}m ${String(s % 60).padStart(2, '0')}s`
@@ -20,7 +22,8 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
   const [lg, setLg] = useState<League | null>(null)
   const [err, setErr] = useState('')
   const [tab, setTab] = useState<Tab>(joining ? 'courses' : 'table')
-  const load = () => ef<League>('league').then(setLg).catch((e) => setErr((e as Error).message))
+  const [skew, setSkew] = useState(0)
+  const load = () => ef<League>('league').then((r) => { setLg(r); setSkew(r.serverNow - Date.now()) }).catch((e) => setErr((e as Error).message))
   useEffect(() => { void load() }, [])
   const both = async () => { await Promise.all([reload(), load()]) }
 
@@ -39,7 +42,7 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
         ))}
       </div>
       {err && <p className="cpl-err" role="alert">{err}</p>}
-      {tab === 'mine' ? <Mine me={me} signedIn={signedIn} reload={both} /> : !lg ? <p className="cpl-empty">Loading…</p>
+      {tab === 'mine' ? <Mine me={me} signedIn={signedIn} reload={both} skew={skew} /> : !lg ? <p className="cpl-empty">Loading…</p>
         : tab === 'table' ? (
           <div className="cpl-card ef-scroll">
             {!lg.table.length ? <p className="cpl-empty">No one has joined yet. Be the first: tap Join above.</p> : (
@@ -52,7 +55,7 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
             )}
           </div>
         ) : tab === 'courses' ? (
-          <CourseTable lg={lg} me={me} reload={both} highlight={joinCourse} />
+          <CourseTable lg={lg} me={me} reload={both} highlight={joinCourse} signedIn={signedIn} onSignIn={onSignIn} />
         ) : (
           <div className="cpl-card">
             {!lg.recent.length ? <p className="cpl-empty">No results yet.</p> : lg.recent.map((r) => (
@@ -94,18 +97,8 @@ function JoinCard({ lg, me, signedIn, onSignIn, reload, inviteCourse }: { lg: Le
       </div>
     </>
   )
-  else if (!p.leagueOpen) body = (
-    <>
-      <p className="cpl-sub" style={{ margin: '0 0 12px' }}><strong>{p.course}</strong> is not in the league yet. The admin opens new courses when enough students ask.</p>
-      <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={() => act('courseInterest', 'Thanks. The admin can see that your course wants in.')}>Request my course</button></div>
-    </>
-  )
-  else body = (
-    <>
-      <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Join to play one match on every fixture day against a player of similar strength, and earn points for <strong>{p.course}</strong>.</p>
-      <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={() => act('joinLeague', 'You are in. ' + (lg.fixtureToday ? 'If a fixture is available you will see it under My fixtures.' : 'Your first fixture comes on the next fixture day.'))}>{busy ? 'Joining…' : 'Join the league'}</button></div>
-    </>
-  )
+  else if (!p.leagueOpen) body = <ListMyCourse course={p.course} me={me} reload={reload} />
+  else body = <JoinPaid lg={lg} me={me} reload={reload} />
 
   return (
     <section className="cpl-card">
@@ -117,54 +110,161 @@ function JoinCard({ lg, me, signedIn, onSignIn, reload, inviteCourse }: { lg: Le
   )
 }
 
-function CourseTable({ lg, me, reload, highlight }: { lg: League; me: Me | null; reload: () => Promise<void>; highlight: string }) {
-  const [busy, setBusy] = useState(false)
+function CourseTable({ lg, me, reload, highlight, signedIn, onSignIn }: { lg: League; me: Me | null; reload: () => Promise<void>; highlight: string; signedIn: boolean; onSignIn: () => void }) {
   const [copied, setCopied] = useState('')
   const p = me?.profile ?? null
-  async function join() {
-    setBusy(true)
-    try { await ef('joinLeague'); await reload() } catch { /* the join card above shows the reason */ } finally { setBusy(false) }
-  }
   const copy = (c: string) => { void navigator.clipboard?.writeText(leagueInviteLink(c)); setCopied(c); setTimeout(() => setCopied(''), 2000) }
   return (
-    <div className="cpl-card ef-scroll">
-      <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by average points per player, so big courses do not win just by size. A course needs 3 players to be ranked. More courses are added by the admin.</p>
-      {!lg.courses.length ? <p className="cpl-empty">No course is open for the league yet.</p> : (
-        <table className="ef-table">
-          <thead><tr><th>#</th><th>Course</th><th>Players</th><th>Points</th><th>Avg</th><th /></tr></thead>
-          <tbody>{lg.courses.map((c, i) => (
-            <tr key={c.course} style={c.course === highlight ? { background: '#fff9e3' } : c.course === p?.course ? { background: '#f3f8f4' } : c.ranked ? undefined : { opacity: 0.8 }}>
-              <td>{c.ranked ? i + 1 : '–'}</td><td>{c.course}</td><td>{c.players}</td><td>{c.pts}</td><td><strong>{c.avg}</strong></td>
-              <td style={{ whiteSpace: 'nowrap' }}>
-                {p && p.course === c.course && !p.inLeague
-                  ? <button className="lp-btn" disabled={busy} onClick={join}>Join</button>
-                  : <button type="button" className="cpl-link" onClick={() => copy(c.course)} aria-label={`Copy invite link for ${c.course}`}><Link2 size={13} /> {copied === c.course ? 'Copied' : 'Invite'}</button>}
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
-    </div>
+    <>
+      <div className="cpl-card ef-scroll">
+        <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by average points per player, so big courses do not win just by size. A course needs 3 players to be ranked. The first member of a course sets its entry fee; the admin keeps 10% of each entry and the rest builds the course prize pool.</p>
+        {!lg.courses.length ? <p className="cpl-empty">No course is open for the league yet.</p> : (
+          <table className="ef-table">
+            <thead><tr><th>#</th><th>Course</th><th>Players</th><th>Points</th><th>Avg</th><th>Entry</th><th>Pool</th><th /></tr></thead>
+            <tbody>{lg.courses.map((c, i) => (
+              <tr key={c.course} style={c.course === highlight ? { background: '#fff9e3' } : c.course === p?.course ? { background: '#f3f8f4' } : c.ranked ? undefined : { opacity: 0.8 }}>
+                <td>{c.ranked ? i + 1 : '–'}</td><td>{c.course}{c.founder && <small>Set up by {c.founder}</small>}</td><td>{c.players}</td><td>{c.pts}</td><td><strong>{c.avg}</strong></td>
+                <td>{c.fee ? ksh(c.fee) : c.players ? 'Free' : 'Not set'}</td><td>{c.pool ? ksh(c.pool) : '–'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {p && p.course === c.course && !p.inLeague
+                    ? <button className="lp-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Join</button>
+                    : <button type="button" className="cpl-link" onClick={() => copy(c.course)} aria-label={`Copy invite link for ${c.course}`}><Link2 size={13} /> {copied === c.course ? 'Copied' : 'Invite'}</button>}
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+      <ListCourseCard signedIn={signedIn} onSignIn={onSignIn} me={me} reload={reload} />
+    </>
   )
 }
 
-function Mine({ me, signedIn, reload }: { me: Me | null; signedIn: boolean; reload: () => Promise<void> }) {
+/** "My course is not in the league": pick it (or type it), pay KSh 10 by M-Pesa, the admin verifies and opens it. */
+function ListCourseCard({ signedIn, onSignIn, me, reload }: { signedIn: boolean; onSignIn: () => void; me: Me | null; reload: () => Promise<void> }) {
+  const cfg = usePayCfg()
+  const [catalog, setCatalog] = useState<string[]>([])
+  const [pick, setPick] = useState('')
+  const [typed, setTyped] = useState('')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  useEffect(() => { ef<string[]>('courseCatalog').then(setCatalog).catch(() => {}) }, [])
+  const name = (typed.trim() || pick).trim()
+  const waiting = me?.pending.some((x) => x.kind === 'course' && x.ref.toLowerCase() === name.toLowerCase())
+  async function send() {
+    setBusy(true); setMsg(null)
+    try { await ef('courseRequest', { name, mpesa: code }); await reload(); setCode(''); setMsg({ ok: true, text: 'Payment code received. Chat the admin on WhatsApp so the course is opened.' }) }
+    catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <section className="cpl-card">
+      <h3>List my course ({ksh(cfg.fees.course)})</h3>
+      <p className="cpl-sub" style={{ margin: '0 0 12px' }}>The league starts with Electrical Engineering and Nursing. Pay {ksh(cfg.fees.course)} and the admin opens your course too. Then every classmate can register, join and play for it.</p>
+      {!signedIn ? <GoogleSignInButton onClick={onSignIn} label="Sign in to list a course" /> : (
+        <>
+          <div className="cpl-inline" style={{ marginBottom: 10 }}>
+            <select className="ef-sel" value={pick} onChange={(e) => { setPick(e.target.value); setTyped('') }} aria-label="Choose your course">
+              <option value="">Choose your course</option>{catalog.map((c) => <option key={c}>{c}</option>)}
+            </select>
+            <input className="ef-sel" value={typed} onChange={(e) => { setTyped(e.target.value); setPick('') }} placeholder="or type the course name" aria-label="Course name" maxLength={120} />
+          </div>
+          {waiting ? <PendingPay label={`List course: ${name}`} amount={cfg.fees.course} /> : name.length >= 3 && <PayBox amount={cfg.fees.course} label={`List course: ${name}`} code={code} onCode={setCode} onSubmit={send} busy={busy} button="Send payment code" />}
+          {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}
+        </>
+      )}
+    </section>
+  )
+}
+
+/** Player's own course exists but the league is not open for it yet. */
+function ListMyCourse({ course, me, reload }: { course: string; me: Me | null; reload: () => Promise<void> }) {
+  const cfg = usePayCfg()
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const waiting = !!me?.pending.some((x) => x.kind === 'course' && x.ref === course)
+  async function send() {
+    setBusy(true); setMsg(null)
+    try { await ef('courseRequest', { name: course, mpesa: code }); await reload(); setCode(''); setMsg({ ok: true, text: 'Payment code received. Chat the admin on WhatsApp so your course is opened.' }) }
+    catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <>
+      <p className="cpl-sub" style={{ margin: '0 0 12px' }}><strong>{course}</strong> is not in the league yet. Only Electrical Engineering and Nursing are open at the start. Pay {ksh(cfg.fees.course)} and the admin lists your course.</p>
+      {waiting ? <PendingPay label={`List course: ${course}`} amount={cfg.fees.course} /> : <PayBox amount={cfg.fees.course} label={`List course: ${course}`} code={code} onCode={setCode} onSubmit={send} busy={busy} button="Send payment code" />}
+      {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}
+    </>
+  )
+}
+
+/** Join the class league of my course. The first member sets the entry fee; the admin keeps 10% of every entry. */
+function JoinPaid({ lg, me, reload }: { lg: League; me: Me | null; reload: () => Promise<void> }) {
+  const cfg = usePayCfg()
+  const p = me!.profile!
+  const row = lg.courses.find((c) => c.course === p.course)
+  const first = !p.leagueFounder && !row?.players            // nobody joined this course yet: I decide the fee
+  const [fee, setFee] = useState(String(p.leagueFee ?? 0))
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [edit, setEdit] = useState(false)
+  const amount = first || edit ? Math.max(0, Math.round(Number(fee) || 0)) : p.leagueFee ?? row?.fee ?? 0
+  const cut = Math.round(amount * cfg.cutPct) / 100
+  const canSetFee = first || (p.leagueFounder === 'me' && !p.leaguePending)
+
+  async function join() {
+    setBusy(true); setMsg(null)
+    try {
+      if (edit && !first) await ef('setLeagueFee', { fee: amount })
+      const r = await ef<{ pendingPayment?: boolean }>('joinLeague', { fee: first ? amount : undefined, mpesa: amount > 0 ? code : undefined })
+      await reload(); setEdit(false)
+      setMsg({ ok: true, text: r.pendingPayment ? 'Payment code received. Chat the admin on WhatsApp: you join the league as soon as it is verified.' : 'You are in. ' + (lg.fixtureToday ? 'If a fixture is available you will see it under My fixtures.' : 'Your first fixture comes on the next fixture day.') })
+    } catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    finally { setBusy(false) }
+  }
+  if (p.leaguePending) return <PendingPay label={`League entry: ${p.course}`} amount={p.leagueFee ?? amount} />
+  return (
+    <>
+      <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Join to play one match on every fixture day against a player of similar strength, and earn points for <strong>{p.course}</strong>.</p>
+      {first && <p className="cpl-msg">You are the first member of {p.course}, so you decide the entry fee for your class. Everyone after you pays the same.</p>}
+      {p.leagueFounder === 'other' && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Entry fee set by the first member of your course{row?.founder ? ` (${row.founder})` : ''}.</p>}
+      {(first || edit) && (
+        <label className="ef-feebox">Entry fee per member (KSh, 0 = free, max {cfg.maxLeagueFee})
+          <input className="ef-sel" type="number" inputMode="numeric" min={0} max={cfg.maxLeagueFee} value={fee} onChange={(e) => setFee(e.target.value)} />
+        </label>
+      )}
+      <p className="ef-deadline" style={{ color: 'var(--green)' }}>{amount > 0 ? `Entry: ${ksh(amount)} · admin keeps ${cfg.cutPct}% (${ksh(cut)}), ${ksh(amount - cut)} goes to the course prize pool` : 'Entry is free for this course.'}</p>
+      {amount > 0
+        ? <PayBox amount={amount} label={`League entry: ${p.course}`} code={code} onCode={setCode} onSubmit={join} busy={busy} button="Send code and join" />
+        : <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={join}>{busy ? 'Joining…' : 'Join the league'}</button></div>}
+      {canSetFee && !first && !edit && <button type="button" className="cpl-link" style={{ marginTop: 10 }} onClick={() => setEdit(true)}>Change the entry fee (until somebody pays)</button>}
+      {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}
+    </>
+  )
+}
+
+function Mine({ me, signedIn, reload, skew }: { me: Me | null; signedIn: boolean; reload: () => Promise<void>; skew: number }) {
   if (!signedIn) return <p className="cpl-empty">Sign in with Google to see your fixtures.</p>
   if (!me) return <p className="cpl-empty">Loading…</p>
   if (!me.profile) return <div className="cpl-card"><p className="cpl-empty">Register first to join the league.</p><div className="ef-actions"><a className="lp-btn" href="#/efootball/profile">Register</a></div></div>
   if (!me.matches.length) return <p className="cpl-empty">{me.profile.inLeague ? 'No fixtures yet. They are made at 00:00 on fixture days.' : 'Join the league above to get fixtures.'}</p>
-  return <>{me.matches.map((m) => <MatchCard key={m.id} m={m} mySlots={me.profile?.freeTimes ?? []} reload={reload} />)}</>
+  return <>{me.matches.map((m) => <MatchCard key={m.id} m={m} mySlots={me.profile?.freeTimes ?? []} reload={reload} skew={skew} />)}</>
 }
 
-function MatchCard({ m, mySlots, reload }: { m: MatchView; mySlots: string[]; reload: () => Promise<void> }) {
+function MatchCard({ m, mySlots, reload, skew }: { m: MatchView; mySlots: string[]; reload: () => Promise<void>; skew: number }) {
   const [mine, setMine] = useState(m.myClaim ? String(m.myClaim.mine) : '')
   const [theirs, setTheirs] = useState(m.myClaim ? String(m.myClaim.theirs) : '')
   const [proof, setProof] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const left = useCountdown(m.deadline)
+  const left = useCountdown(m.deadline, skew)
   const slots = sharedSlots(mySlots, m.opp.freeTimes)
   const closed = m.status === 'confirmed' || m.status === 'void' || !left
+  // A one-sided win with no screenshot is voided at 21:00 unless the opponent agrees, so the form asks for the proof up front.
+  const needProof = Number(mine) > Number(theirs) && mine !== '' && theirs !== '' && !proof && !m.myClaim && !m.oppReported
 
   async function send() {
     setBusy(true); setMsg(null)
@@ -194,8 +294,8 @@ function MatchCard({ m, mySlots, reload }: { m: MatchView; mySlots: string[]; re
             <span>–</span><input type="number" min={0} max={30} value={theirs} onChange={(e) => setTheirs(e.target.value)} aria-label="Their goals" /><span>{m.opp.username}</span>
           </div>
           <div style={{ marginTop: 12 }}><ImagePicker current="" fallback={<span style={{ fontSize: 11 }}>Screenshot</span>} label="result screenshot" max={1280} onChange={(v) => setProof(v.data)} /></div>
-          <p className="cpl-note" style={{ textAlign: 'left' }}>Add a screenshot of the final score. If the scores differ, or your opponent never reports, the screenshot decides.</p>
-          <div className="ef-actions"><button className="lp-btn" disabled={busy || mine === '' || theirs === ''} onClick={send}>{busy ? 'Sending…' : m.myClaim ? 'Update score' : 'Submit score'}</button></div>
+          <p className="cpl-note" style={{ textAlign: 'left' }}>{needProof ? <strong>You are claiming a win, so a screenshot of the final score is required. Without it the match is voided and nobody gets points.</strong> : 'Add a screenshot of the final score. If the scores differ, or your opponent never reports, the screenshot decides.'}</p>
+          <div className="ef-actions"><button className="lp-btn" disabled={busy || mine === '' || theirs === '' || needProof} onClick={send}>{busy ? 'Sending…' : m.myClaim ? 'Update score' : 'Submit score'}</button></div>
           {m.myClaim && !msg && <p className="cpl-note" style={{ textAlign: 'left' }}>{m.oppReported ? 'Your opponent has reported too.' : 'Waiting for your opponent to report.'}</p>}
           {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}
         </>
