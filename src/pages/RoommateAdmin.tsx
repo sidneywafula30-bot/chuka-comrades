@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Loader2, Trash2, X } from 'lucide-react'
-import { LIFESTYLE_QUESTIONS, lifestyleLabel, roommateApi, type Report, type RoommatePost } from '../lib/roommate'
-import { kes, showPhone, timeAgo, waLink } from '../lib/hostel'
+import type { FormEvent } from 'react'
+import { LIFESTYLE_QUESTIONS, lifestyleLabel, roommateApi, type PassRow, type Report, type RoommatePost } from '../lib/roommate'
+import { kes, niceDate, niceDateTime, showPhone, timeAgo, waLink, type Settings } from '../lib/hostel'
 import { WhatsAppLogo } from '../components/BrandLogos'
 
-type Filter = 'pending' | 'approved' | 'rejected' | 'reported'
+type Filter = 'pending' | 'approved' | 'rejected' | 'reported' | 'passes'
 
-export default function RoommateAdmin() {
+export default function RoommateAdmin({ settings }: { settings: Settings }) {
   const [posts, setPosts] = useState<RoommatePost[]>([])
   const [phones, setPhones] = useState<Record<string, string>>({})
   const [reports, setReports] = useState<Report[]>([])
@@ -30,7 +31,7 @@ export default function RoommateAdmin() {
     rejected: posts.filter((p) => p.status === 'rejected').length,
     reported: posts.filter((p) => reportedIds.has(p.id)).length,
   }), [posts, reportedIds])
-  const shown = posts.filter((p) => (filter === 'reported' ? reportedIds.has(p.id) : p.status === filter))
+  const shown = filter === 'passes' ? [] : posts.filter((p) => (filter === 'reported' ? reportedIds.has(p.id) : p.status === filter))
 
   async function run(id: string, msg: string, fn: () => Promise<void>) {
     setBusy(id); setError(''); setNotice('')
@@ -55,12 +56,14 @@ export default function RoommateAdmin() {
       </div>
       <div className="hs-chips">
         {(['pending', 'approved', 'rejected', 'reported'] as Filter[]).map((f) => (
-          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{f[0].toUpperCase() + f.slice(1)} ({counts[f]})</button>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{f[0].toUpperCase() + f.slice(1)} ({counts[f as Exclude<Filter, 'passes'>]})</button>
         ))}
+        <button className={filter === 'passes' ? 'on' : ''} onClick={() => setFilter('passes')}>Paid passes</button>
       </div>
+      {filter === 'passes' && <PassesDesk settings={settings} />}
       {notice && <p className="hs-ok">{notice}</p>}
       {error && <p className="hs-error" role="alert">{error}</p>}
-      {!loading && shown.length === 0 && <p className="hs-empty">Nothing here.</p>}
+      {filter !== 'passes' && !loading && shown.length === 0 && <p className="hs-empty">Nothing here.</p>}
       <div className="hs-admin-list">
         {shown.map((p) => {
           const rs = reports.filter((r) => r.postId === p.id)
@@ -94,5 +97,75 @@ export default function RoommateAdmin() {
         })}
       </div>
     </section>
+  )
+}
+
+/* ---------- paid posting passes (KSh per semester) ---------- */
+
+function PassesDesk({ settings }: { settings: Settings }) {
+  const [rows, setRows] = useState<PassRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [expiresOn, setExpiresOn] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try { setRows(await roommateApi.passList()) } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  async function grant(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const end = expiresOn || settings.semesterEnd
+      if (!end) throw new Error('Set the semester end date first (Admin desk > Semester & prices), or pick an expiry date.')
+      await roommateApi.passGrant(email.trim(), code.trim(), new Date(`${end}T23:59:59+03:00`).toISOString())
+      setNotice(`${email.trim().toLowerCase()} can post until ${niceDate(end)}.`)
+      setEmail(''); setCode(''); setExpiresOn('')
+      await load()
+    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+  }
+  async function revoke(r: PassRow) {
+    if (!window.confirm(`Remove the posting pass for ${r.email}? Their post will be hidden.`)) return
+    setBusy(true); setError(''); setNotice('')
+    try { await roommateApi.passRevoke(r.email); await load(); setNotice(`${r.email} no longer has a pass.`) }
+    catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+  }
+
+  return (
+    <div>
+      <p className="hs-note">Roommate posting costs KSh {settings.roommatePrice} per semester. After a student pays and WhatsApps you their email and M-Pesa code, activate them here.</p>
+      <form className="hs-form hs-grant" onSubmit={grant}>
+        <div className="hs-fgrid">
+          <label>Student&apos;s Google email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="student@gmail.com" /></label>
+          <label>M-Pesa code<input value={code} onChange={(e) => setCode(e.target.value)} maxLength={30} /></label>
+          <label>Expires on <small>(empty = semester end)</small><input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></label>
+        </div>
+        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim()}>{busy ? <Loader2 size={15} className="hs-spin" /> : <Check size={15} />} Activate posting</button>
+      </form>
+      {notice && <p className="hs-ok">{notice}</p>}
+      {error && <p className="hs-error" role="alert">{error}</p>}
+      {loading ? <p className="hs-empty">Loading…</p> : rows.length === 0 ? <p className="hs-empty">No passes yet.</p> : (
+        <div className="hs-admin-list">
+          {rows.map((r) => {
+            const active = Date.parse(r.expiresAt) > Date.now()
+            return (
+              <article className="hs-admin-item" key={r.email}>
+                <header>
+                  <div><h3>{r.email}</h3><p>Activated {timeAgo(r.grantedAt)}{r.mpesaCode ? ` · ${r.mpesaCode}` : ''} · until {niceDateTime(r.expiresAt)}</p></div>
+                  <span className={`hs-status ${active ? 'published' : 'hidden'}`}>{active ? 'Active' : 'Expired'}</span>
+                </header>
+                <div className="hs-admin-actions"><button className="hs-btn hs-btn-danger" disabled={busy} onClick={() => void revoke(r)}><Trash2 size={14} /> Revoke</button></div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

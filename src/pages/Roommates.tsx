@@ -5,19 +5,22 @@ import {
   DEFAULT_LIFESTYLE, LIFESTYLE_QUESTIONS, budgetsOverlap, lifestyleLabel, matchScore, normalizePhone, rememberGender, rememberedGender,
   roommateApi, roommateReady, shareLink, type Gender, type Lifestyle, type PostInput, type ReceivedInterest, type RoommatePost, type SentInterest,
 } from '../lib/roommate'
-import { ROOM_TYPE_SUGGESTIONS, kes, showPhone, timeAgo, waLink } from '../lib/hostel'
+import { ROOM_TYPE_SUGGESTIONS, kes, niceDateTime, showPhone, timeAgo, waLink, type Settings } from '../lib/hostel'
 import { WhatsAppLogo } from '../components/BrandLogos'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import PayCard from '../components/PayCard'
 
 type Sub = 'find' | 'mine' | 'requests'
-type Props = { user: User | null; onSignIn: () => void; authBusy: boolean }
+type Props = { user: User | null; settings: Settings; onSignIn: () => void; authBusy: boolean }
 
-export default function Roommates({ user, onSignIn, authBusy }: Props) {
+export default function Roommates({ user, settings, onSignIn, authBusy }: Props) {
   const [sub, setSub] = useState<Sub>('find')
   const [mine, setMine] = useState<{ post: RoommatePost; whatsapp: string } | null | undefined>(undefined)
   const [gender, setGender] = useState<Gender | ''>(rememberedGender())
   const [error, setError] = useState('')
   const [pendingCount, setPendingCount] = useState(0)
+  const [pass, setPass] = useState<string | undefined>(undefined) // '' = no active pass, undefined = still checking
+  const [passBusy, setPassBusy] = useState(false)
 
   const uid = user?.uid
   const loadMine = useCallback(async () => {
@@ -25,6 +28,13 @@ export default function Roommates({ user, onSignIn, authBusy }: Props) {
     try { setMine(await roommateApi.myPost(uid)) } catch (e) { setError((e as Error).message); setMine(null) }
   }, [uid])
   useEffect(() => { void loadMine() }, [loadMine])
+
+  const loadPass = useCallback(async () => {
+    if (!uid) { setPass(undefined); return }
+    setPassBusy(true)
+    try { setPass(await roommateApi.myPass()) } catch (e) { setError((e as Error).message); setPass('') } finally { setPassBusy(false) }
+  }, [uid])
+  useEffect(() => { void loadPass() }, [loadPass])
 
   // If the student already has a post, their gender is the one on the post.
   useEffect(() => { if (mine?.post.gender) { setGender(mine.post.gender); rememberGender(mine.post.gender) } }, [mine])
@@ -58,7 +68,7 @@ export default function Roommates({ user, onSignIn, authBusy }: Props) {
       {error && <p className="hs-error" role="alert">{error}</p>}
 
       {sub === 'find' && <Browse user={user} mine={mine} gender={gender} setGender={(g) => { setGender(g); rememberGender(g) }} goPost={() => setSub('mine')} />}
-      {sub === 'mine' && <MyPost user={user} mine={mine} onChange={(m) => { setMine(m) }} />}
+      {sub === 'mine' && <MyPost user={user} mine={mine} onChange={(m) => { setMine(m) }} pass={pass} settings={settings} onSignIn={onSignIn} authBusy={authBusy} onRefreshPass={() => { void loadPass(); void loadMine() }} refreshing={passBusy} />}
       {sub === 'requests' && <Requests onChanged={() => void refreshCount()} />}
     </div>
   )
@@ -225,12 +235,25 @@ function PostCard({ p, score, user, gender, defaultName, defaultPhone, onSent }:
 
 /* ------------------------------ My post ------------------------------ */
 
-function MyPost({ user, mine, onChange }: { user: User; mine: { post: RoommatePost; whatsapp: string } | null | undefined; onChange: (m: { post: RoommatePost; whatsapp: string } | null) => void }) {
+type MyPostProps = {
+  user: User; mine: { post: RoommatePost; whatsapp: string } | null | undefined; onChange: (m: { post: RoommatePost; whatsapp: string } | null) => void
+  pass: string | undefined; settings: Settings; onSignIn: () => void; authBusy: boolean; onRefreshPass: () => void; refreshing: boolean
+}
+
+function MyPost({ user, mine, onChange, pass, settings, onSignIn, authBusy, onRefreshPass, refreshing }: MyPostProps) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  if (mine === undefined) return <p className="hs-empty">Loading…</p>
+  if (mine === undefined || pass === undefined) return <p className="hs-empty">Loading…</p>
+  const payCard = (headline: string, detail: string) => (
+    <PayCard kind="roommate" user={user} settings={settings} headline={headline} detail={detail} onSignIn={onSignIn} authBusy={authBusy} onRefresh={onRefreshPass} refreshing={refreshing} />
+  )
+  // Posting needs a paid semester pass. The database enforces this too, so this is only the friendly front door.
+  if (!mine && !pass) {
+    return payCard('Post a roommate request', `Posting costs a one-off fee for the whole semester. Browsing other students' posts and sending interest stays free.`)
+  }
+  const expired = Boolean(mine && !pass && mine.post.passExpiresAt && Date.parse(mine.post.passExpiresAt) < Date.now())
   if (!mine || editing) {
     return (
       <PostForm
@@ -252,6 +275,8 @@ function MyPost({ user, mine, onChange }: { user: User; mine: { post: RoommatePo
   }
   return (
     <section className="hs-panel">
+      {expired && payCard('Your semester pass has ended', `Your post is hidden from other students until you renew. Renew for the new semester and it shows again straight away.`)}
+      {pass && <p className="hs-access-ok"><Check size={15} /> Posting pass active until {niceDateTime(pass)}.</p>}
       <div className={`rm-status ${post.status}`}>
         {post.status === 'pending' && <><Clock size={18} /><span><strong>Waiting for admin approval.</strong> Nobody can see your post until it is approved.</span></>}
         {post.status === 'approved' && <><Check size={18} /><span><strong>Approved.</strong> {post.hidden ? 'You have hidden it, so others cannot see it.' : 'Students of the same gender can see it.'}</span></>}

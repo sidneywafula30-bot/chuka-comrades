@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { CheckCircle2, Eye, EyeOff, ImagePlus, Loader2, Minus, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, ImagePlus, Loader2, Minus, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react'
 import {
-  MAX_PHOTOS, PROVIDED_ITEMS, ROOM_TYPE_SUGGESTIONS, compressImage, hostelApi, isGoogleMapsUrl, kes, showPhone, timeAgo,
-  type Hostel, type HostelInput, type HostelImage, type Period, type ProvidedState, type RoomType, type UploadImage,
+  MAX_PHOTOS, PROVIDED_ITEMS, ROOM_TYPE_SUGGESTIONS, compressImage, hostelApi, isGoogleMapsUrl, kes, niceDate, niceDateTime, showPhone, timeAgo,
+  type AccessRow, type Hostel, type HostelInput, type HostelImage, type Period, type ProvidedState, type RoomType, type Settings, type UploadImage,
 } from '../lib/hostel'
 
-type Props = { onChanged: () => void }
+type Props = { onChanged: () => void; settings: Settings; onSettings: (s: Settings) => void }
+type Desk = 'hostels' | 'students' | 'semester'
 
-export default function HostelAdmin({ onChanged }: Props) {
+/** Admin desk: hostels, paid students, and the semester settings. */
+export default function HostelAdmin({ onChanged, settings, onSettings }: Props) {
+  const [desk, setDesk] = useState<Desk>('hostels')
+  return (
+    <>
+      <div className="hs-chips" role="tablist" aria-label="Admin sections">
+        <button className={desk === 'hostels' ? 'on' : ''} onClick={() => setDesk('hostels')}>Hostels</button>
+        <button className={desk === 'students' ? 'on' : ''} onClick={() => setDesk('students')}>Paid students</button>
+        <button className={desk === 'semester' ? 'on' : ''} onClick={() => setDesk('semester')}>Semester &amp; prices</button>
+      </div>
+      {desk === 'hostels' && <HostelsDesk onChanged={onChanged} />}
+      {desk === 'students' && <StudentsDesk settings={settings} />}
+      {desk === 'semester' && <SemesterDesk settings={settings} onSettings={(s) => { onSettings(s); onChanged() }} />}
+    </>
+  )
+}
+
+function HostelsDesk({ onChanged }: { onChanged: () => void }) {
   const [list, setList] = useState<Hostel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -86,7 +104,7 @@ export default function HostelAdmin({ onChanged }: Props) {
                     <h3>{h.name}</h3>
                     <p>{h.area}{h.landmark ? ` · ${h.landmark}` : ''} · {h.landlordName || 'landlord'} {h.landlordContact ? `(${showPhone(h.landlordContact)})` : ''}</p>
                   </div>
-                  <span className={`hs-status ${h.status}`}>{h.status === 'published' ? 'Published' : 'Hidden'}</span>
+                  <span className={`hs-status ${h.status}`}>{h.status === 'published' ? 'Published' : 'Hidden'}{h.freePreview ? ' · Free preview' : ''}</span>
                 </header>
 
                 <RoomsPanel key={`${h.id}-${h.roomsUpdatedAt}`} h={h} busy={busyId === h.id} onSave={(rooms) => saveRooms(h, rooms)} />
@@ -156,6 +174,7 @@ function HostelForm({ initial, onClose, onSaved }: { initial: Hostel | null; onC
   const [deposit, setDeposit] = useState(initial?.deposit ?? '')
   const [rules, setRules] = useState(initial?.rules ?? '')
   const [verified, setVerified] = useState(initial?.verified ?? false)
+  const [freePreview, setFreePreview] = useState(initial?.freePreview ?? false)
   const [status, setStatus] = useState<'published' | 'hidden'>(initial?.status ?? 'published')
   const [rooms, setRooms] = useState<RoomDraft[]>(
     initial?.roomTypes.map((r) => ({ type: r.type, rent: String(r.rent), period: r.period, total: String(r.total), available: String(r.available) })) ?? [blankRoom()],
@@ -210,7 +229,7 @@ function HostelForm({ initial, onClose, onSaved }: { initial: Hostel | null; onC
 
       const input: HostelInput = {
         status, name, area, landmark, walkingTime, locationUrl, description, landlordName, landlordContact, showContact,
-        roomTypes, provided, deposit, rules, verified,
+        roomTypes, provided, deposit, rules, verified, freePreview,
       }
       const added: UploadImage[] = newPhotos.map(({ name: n, mime, data }) => ({ name: n, mime, data }))
       setBusy(true)
@@ -325,6 +344,7 @@ function HostelForm({ initial, onClose, onSaved }: { initial: Hostel | null; onC
       <fieldset>
         <legend>Visibility</legend>
         <label className="hs-check"><input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} /> Verified (the admin has checked this hostel)</label>
+        <label className="hs-check"><input type="checkbox" checked={freePreview} onChange={(e) => setFreePreview(e.target.checked)} /> Free preview: the one hostel every student can see without paying (only one at a time; keep it a FULL hostel)</label>
         <label className="hs-check"><input type="checkbox" checked={status === 'published'} onChange={(e) => setStatus(e.target.checked ? 'published' : 'hidden')} /> Visible to students</label>
         {!initial && <label className="hs-check"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> The landlord agreed to this listing and to the use of these photos.</label>}
       </fieldset>
@@ -334,6 +354,145 @@ function HostelForm({ initial, onClose, onSaved }: { initial: Hostel | null; onC
         <button className="hs-btn hs-btn-green" disabled={busy}>{busy ? <Loader2 size={15} className="hs-spin" /> : <Save size={15} />} {initial ? 'Save changes' : 'Publish hostel'}</button>
         <button type="button" className="hs-btn hs-btn-soft" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
+    </form>
+  )
+}
+
+
+/* ---------- paid students (hostel access) ---------- */
+
+function StudentsDesk({ settings }: { settings: Settings }) {
+  const [rows, setRows] = useState<AccessRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [expiresOn, setExpiresOn] = useState('')
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    let live = true
+    hostelApi.accessList().then((r) => { if (live) setRows(r) }).catch((e: Error) => { if (live) setError(e.message) }).finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [])
+
+  async function grant(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError(''); setNotice('')
+    try {
+      setRows(await hostelApi.accessGrant(email.trim(), code.trim(), expiresOn || undefined))
+      setNotice(`${email.trim().toLowerCase()} can now see every hostel${expiresOn ? ` until ${niceDate(expiresOn)}` : settings.semesterEnd ? ` until ${niceDate(settings.semesterEnd)}` : ''}.`)
+      setEmail(''); setCode(''); setExpiresOn('')
+    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+  }
+  async function revoke(r: AccessRow) {
+    if (!window.confirm(`Remove hostel access for ${r.email}?`)) return
+    setBusy(true); setError(''); setNotice('')
+    try { setRows(await hostelApi.accessRevoke(r.email)); setNotice(`${r.email} no longer has access.`) }
+    catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+  }
+
+  const shown = rows.filter((r) => !q.trim() || `${r.email} ${r.mpesaCode}`.toLowerCase().includes(q.trim().toLowerCase()))
+  const active = rows.filter((r) => r.active).length
+
+  return (
+    <section className="hs-panel">
+      <div className="hs-admin-head">
+        <div>
+          <span className="hs-kicker dark">PAID STUDENTS</span>
+          <h2>Hostel access (KSh {settings.hostelPrice})</h2>
+          <p>After a student pays and WhatsApps you their email and M-Pesa code, activate them here. Access ends on the semester end date automatically{settings.semesterEnd ? ` (${niceDate(settings.semesterEnd)})` : ' once you set it under Semester & prices'}.</p>
+        </div>
+      </div>
+      <form className="hs-form hs-grant" onSubmit={grant}>
+        <div className="hs-fgrid">
+          <label>Student&apos;s Google email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="student@gmail.com" /></label>
+          <label>M-Pesa code<input value={code} onChange={(e) => setCode(e.target.value)} maxLength={30} placeholder="e.g. SJK3L9XYZ1" /></label>
+          <label>Expires on <small>(leave empty = semester end)</small><input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></label>
+        </div>
+        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim()}>{busy ? <Loader2 size={15} className="hs-spin" /> : <CheckCircle2 size={15} />} Activate access</button>
+      </form>
+      {notice && <p className="hs-ok" role="status"><CheckCircle2 size={16} /> {notice}</p>}
+      {error && <p className="hs-error" role="alert">{error}</p>}
+
+      <div className="hs-admin-head">
+        <p><strong>{active}</strong> active · {rows.length - active} expired</p>
+        <label className="hs-search"><Search size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search email or M-Pesa code…" aria-label="Search students" /></label>
+      </div>
+      {loading ? <p className="hs-empty">Loading…</p> : shown.length === 0 ? <p className="hs-empty">No students found.</p> : (
+        <div className="hs-admin-list">
+          {shown.map((r) => (
+            <article className="hs-admin-item" key={r.email}>
+              <header>
+                <div>
+                  <h3>{r.email}</h3>
+                  <p>Activated {timeAgo(r.activatedAt)} by {r.activatedBy || 'admin'}{r.mpesaCode ? ` · ${r.mpesaCode}` : ''} · until {niceDateTime(r.expiresAt)}</p>
+                </div>
+                <span className={`hs-status ${r.active ? 'published' : 'hidden'}`}>{r.active ? 'Active' : 'Expired'}</span>
+              </header>
+              <div className="hs-admin-actions"><button className="hs-btn hs-btn-danger" disabled={busy} onClick={() => void revoke(r)}><Trash2 size={14} /> Revoke</button></div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/* ---------- semester dates + prices ---------- */
+
+function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
+  const [name, setName] = useState(settings.semesterName)
+  const [start, setStart] = useState(settings.semesterStart)
+  const [end, setEnd] = useState(settings.semesterEnd)
+  const [hostelPrice, setHostelPrice] = useState(String(settings.hostelPrice))
+  const [roommatePrice, setRoommatePrice] = useState(String(settings.roommatePrice))
+  const [payNote, setPayNote] = useState(settings.payNote)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const next = await hostelApi.saveSettings({ semesterName: name, semesterStart: start, semesterEnd: end, hostelPrice: Number(hostelPrice), roommatePrice: Number(roommatePrice), payNote })
+      onSettings(next); setNotice('Saved. Students see the new dates and prices straight away.')
+    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+  }
+
+  return (
+    <form className="hs-panel hs-form" onSubmit={save}>
+      <div className="hs-admin-head">
+        <div>
+          <span className="hs-kicker dark">SEMESTER &amp; PRICES</span>
+          <h2>Semester calendar</h2>
+          <p>These dates appear in the calendar at the top of the hostel page, and decide when paid access ends.</p>
+        </div>
+      </div>
+      <fieldset>
+        <legend>Dates</legend>
+        <div className="hs-fgrid">
+          <label className="wide">Semester name<input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="e.g. Sept – Dec 2026 semester" /></label>
+          <label>Start date<input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+          <label>End date<input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Prices &amp; payment</legend>
+        <div className="hs-fgrid">
+          <label>Hostel access (KSh)<input type="number" inputMode="numeric" min={0} value={hostelPrice} onChange={(e) => setHostelPrice(e.target.value)} required /></label>
+          <label>Roommate posting (KSh)<input type="number" inputMode="numeric" min={0} value={roommatePrice} onChange={(e) => setRoommatePrice(e.target.value)} required /></label>
+          <label className="wide">Payment instructions shown to students <small>(optional)</small>
+            <textarea value={payNote} onChange={(e) => setPayNote(e.target.value)} rows={2} maxLength={300} placeholder="e.g. Send the money by M-Pesa to 0184 198 432 (Sidney W.), then WhatsApp the M-Pesa code." />
+          </label>
+        </div>
+      </fieldset>
+      {notice && <p className="hs-ok" role="status"><CheckCircle2 size={16} /> {notice}</p>}
+      {error && <p className="hs-error" role="alert">{error}</p>}
+      <div className="hs-admin-actions"><button className="hs-btn hs-btn-green" disabled={busy}>{busy ? <Loader2 size={15} className="hs-spin" /> : <Save size={15} />} Save settings</button></div>
     </form>
   )
 }

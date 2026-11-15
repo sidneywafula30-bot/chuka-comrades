@@ -2,17 +2,19 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { signInWithPopup, signOut, type User } from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
 import {
-  ArrowLeft, BadgeCheck, Bath, BedDouble, BookOpen, Building2, Car, ChevronLeft, ChevronRight, Clock, DoorOpen, Droplets,
-  ExternalLink, Footprints, MapPin, Phone, RefreshCw, Search, Shirt, ShieldCheck, Sofa, Table2, Trash2, Utensils, Wifi, X, Zap,
+  ArrowLeft, BadgeCheck, BedDouble, Building2, ChevronLeft, ChevronRight, Clock, DoorOpen, Droplets,
+  ExternalLink, Footprints, MapPin, Phone, RefreshCw, Search, ShieldCheck, Sofa, Table2, Wifi, X, Zap,
 } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import {
-  ADMIN_WHATSAPP, LANDLORD_GROUP_URL, STUDENT_GROUP_URL, hostelApi, hostelReady, isFull, isStale, kes, providedLabel,
-  roomTotals, showPhone, timeAgo, waLink, type Hostel as HostelT, type HostelImage,
+  ADMIN_WHATSAPP, DEFAULT_SETTINGS, STUDENT_GROUP_URL, cleanProvided, hostelApi, hostelReady, isFull, isStale, kes, niceDateTime,
+  providedLabel, roomTotals, showPhone, timeAgo, waLink, type Hostel as HostelT, type HostelImage, type Settings,
 } from '../lib/hostel'
 import { GoogleMapsLogo, WhatsAppLogo } from '../components/BrandLogos'
 import Avatar from '../components/Avatar'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import PayCard from '../components/PayCard'
+import SemesterCalendar from '../components/SemesterCalendar'
 import HostelAdmin from './HostelAdmin'
 import Roommates from './Roommates'
 import RoommateAdmin from './RoommateAdmin'
@@ -22,11 +24,9 @@ import './Hostel.css'
 const BASE = import.meta.env.BASE_URL
 
 const ICONS: Record<string, LucideIcon> = {
-  water: Droplets, electricity: Zap, wifi: Wifi, security: ShieldCheck, furnished: BedDouble,
-  bed: BedDouble, chair: Sofa, table: Table2, bin: Trash2,
-  bathroom: Bath, cooking: Utensils, laundry: Shirt, parking: Car, study: BookOpen,
+  water: Droplets, electricity: Zap, wifi: Wifi, security: ShieldCheck, bed: BedDouble, chair: Sofa, table: Table2,
 }
-const FILTER_FEATURES = ['wifi', 'bathroom', 'security', 'water']
+const FILTER_FEATURES = ['wifi', 'security', 'water', 'bed']
 
 type Tab = 'browse' | 'roommates' | 'landlords' | 'admin' | 'roommate-admin'
 type Lightbox = { images: HostelImage[]; index: number } | null
@@ -40,6 +40,10 @@ export default function Hostel({ user }: { user: User | null }) {
   const [rmAdmin, setRmAdmin] = useState(false)
   const [authBusy, setAuthBusy] = useState(false)
   const [lightbox, setLightbox] = useState<Lightbox>(null)
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const [locked, setLocked] = useState(true)
+  const [lockedCount, setLockedCount] = useState(0)
+  const [accessUntil, setAccessUntil] = useState('')
 
   const [search, setSearch] = useState('')
   const [area, setArea] = useState('')
@@ -50,11 +54,17 @@ export default function Hostel({ user }: { user: User | null }) {
   const refresh = useCallback(async () => {
     if (!hostelReady) { setLoading(false); return }
     setLoading(true); setError('')
-    try { setHostels(await hostelApi.list()) }
+    try {
+      const r = await hostelApi.list()
+      setHostels(r.hostels); setLocked(r.locked); setLockedCount(r.lockedCount); setAccessUntil(r.accessUntil); setSettings(r.settings)
+    }
     catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
   }, [])
-  useEffect(() => { void refresh() }, [refresh])
+  // Reload when the student signs in or out: what the server sends depends on who is asking.
+  const uid = user?.uid ?? ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh() }, [refresh, uid])
 
   // Ask the server whether this signed-in email is the hostel admin.
   useEffect(() => {
@@ -98,7 +108,8 @@ export default function Hostel({ user }: { user: User | null }) {
         const rooms = roomType ? h.roomTypes.filter((r) => r.type === roomType) : h.roomTypes
         if (roomType && rooms.length === 0) return false
         if (onlyAvailable && !rooms.some((r) => r.available > 0)) return false
-        return features.every((f) => h.provided[f])
+        const have = cleanProvided(h.provided).map(([k]) => k)
+        return features.every((f) => have.includes(f))
       })
       .sort((a, b) => Number(isFull(a)) - Number(isFull(b)) || Number(b.verified) - Number(a.verified))
   }, [hostels, search, area, roomType, onlyAvailable, features])
@@ -123,6 +134,8 @@ export default function Hostel({ user }: { user: User | null }) {
       </header>
 
       <main className="hs-main">
+        <SemesterCalendar settings={settings} />
+
         <section className="hs-hero" style={{ '--hostel-bg': `url(${BASE}hostel-bg.jpeg)` } as CSSProperties}>
           <span className="hs-kicker">CHUKA COMRADES ACCOMMODATION</span>
           <h1>Find a hostel. Find your space.</h1>
@@ -137,11 +150,6 @@ export default function Hostel({ user }: { user: User | null }) {
           <a href={STUDENT_GROUP_URL} target="_blank" rel="noopener noreferrer">
             <WhatsAppLogo size={30} />
             <span><strong>Students: Hostels &amp; Reviews</strong><small>Ask questions and share hostel experiences.</small></span>
-            <ExternalLink size={16} />
-          </a>
-          <a href={LANDLORD_GROUP_URL} target="_blank" rel="noopener noreferrer">
-            <WhatsAppLogo size={30} />
-            <span><strong>Landlords&apos; Group</strong><small>Landlords: join to list and update your rooms.</small></span>
             <ExternalLink size={16} />
           </a>
         </div>
@@ -160,17 +168,19 @@ export default function Hostel({ user }: { user: User | null }) {
 
         {activeTab === 'browse' && (
           <>
-            <div className="hs-filters">
+            {!locked && accessUntil && <p className="hs-access-ok"><BadgeCheck size={15} /> Full access active until {niceDateTime(accessUntil)}.</p>}
+            {isAdmin && locked === false && <p className="hs-access-ok"><BadgeCheck size={15} /> Admin view: you see every published hostel.</p>}
+            {!locked && <div className="hs-filters">
               <label className="hs-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search hostel, area, landmark or room type…" aria-label="Search hostels" /></label>
               <select value={area} onChange={(e) => setArea(e.target.value)} aria-label="Filter by area"><option value="">All areas</option>{areas.map((a) => <option key={a}>{a}</option>)}</select>
               <select value={roomType} onChange={(e) => setRoomType(e.target.value)} aria-label="Filter by room type"><option value="">All room types</option>{roomTypeNames.map((t) => <option key={t}>{t}</option>)}</select>
-            </div>
-            <div className="hs-chips" role="group" aria-label="Quick filters">
+            </div>}
+            {!locked && <div className="hs-chips" role="group" aria-label="Quick filters">
               <button className={onlyAvailable ? 'on' : ''} onClick={() => setOnlyAvailable(!onlyAvailable)}>Rooms available</button>
               {FILTER_FEATURES.map((f) => (
                 <button key={f} className={features.includes(f) ? 'on' : ''} onClick={() => toggleFeature(f)}>{providedLabel(f)}</button>
               ))}
-            </div>
+            </div>}
 
             {loading && hostels.length === 0 ? <p className="hs-empty">Loading hostels…</p>
               : shown.length === 0 ? <p className="hs-empty">{hostels.length === 0 ? 'No hostels have been listed yet. Check back soon.' : 'No hostels match these filters.'}</p>
@@ -180,14 +190,23 @@ export default function Hostel({ user }: { user: User | null }) {
                 </div>
               )}
 
+            {locked && !loading && (
+              <PayCard
+                kind="hostels" user={user} settings={settings} onSignIn={handleSignIn} authBusy={authBusy}
+                onRefresh={() => void refresh()} refreshing={loading}
+                headline={lockedCount > 0 ? `${lockedCount} more hostel${lockedCount === 1 ? '' : 's'} to browse` : 'Unlock every hostel'}
+                detail="You are viewing one free preview hostel. Pay once to see every hostel, with live room counts, prices and landlord contacts, for the whole semester."
+              />
+            )}
+
             <aside className="hs-soon"><Footprints size={18} /> <span><strong>Need a roommate?</strong> Match with students of the same gender by budget and lifestyle.</span><button className="hs-btn hs-btn-green" onClick={() => setTab('roommates')}>Find a roommate</button></aside>
           </>
         )}
 
-        {activeTab === 'roommates' && <Roommates user={user} onSignIn={handleSignIn} authBusy={authBusy} />}
-        {activeTab === 'roommate-admin' && <RoommateAdmin />}
+        {activeTab === 'roommates' && <Roommates user={user} settings={settings} onSignIn={handleSignIn} authBusy={authBusy} />}
+        {activeTab === 'roommate-admin' && <RoommateAdmin settings={settings} />}
         {activeTab === 'landlords' && <LandlordsTab />}
-        {activeTab === 'admin' && <HostelAdmin onChanged={() => void refresh()} />}
+        {activeTab === 'admin' && <HostelAdmin settings={settings} onSettings={setSettings} onChanged={() => void refresh()} />}
       </main>
 
       {lightbox && <PhotoViewer box={lightbox} onChange={setLightbox} />}
@@ -200,7 +219,7 @@ function HostelCard({ h, onOpen }: { h: HostelT; onOpen: (images: HostelImage[],
   const [showAll, setShowAll] = useState(false)
   const full = isFull(h)
   const { available, total } = roomTotals(h)
-  const provided = Object.entries(h.provided)
+  const provided = cleanProvided(h.provided)
   const chips = showAll ? provided : provided.slice(0, 6)
   const stale = isStale(h.roomsUpdatedAt)
   const firstName = h.landlordName.split(' ')[0]
@@ -339,7 +358,6 @@ function LandlordsTab() {
       </ol>
       <div className="hs-actions left">
         <a href={waLink(ADMIN_WHATSAPP, msg)} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Message the admin</a>
-        <a className="outline" href={LANDLORD_GROUP_URL} target="_blank" rel="noopener noreferrer">Join the landlords&apos; group <ExternalLink size={14} /></a>
       </div>
     </section>
   )

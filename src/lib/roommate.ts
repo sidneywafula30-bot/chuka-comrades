@@ -26,6 +26,7 @@ export type RoommatePost = {
   hasRoom: boolean; hostelName: string; lifestyle: Lifestyle; bio: string
   status: PostStatus; rejectReason: string; hidden: boolean
   updatedAt: string
+  passExpiresAt: string // when the paid semester pass behind this post ends ('' for older posts)
   interested?: boolean // only set when browsing
   userId?: string // only set for the owner / admin
 }
@@ -34,6 +35,7 @@ export type PostInput = Pick<RoommatePost, 'firstName' | 'gender' | 'course' | '
 
 export type ReceivedInterest = { id: string; postId: string; fromName: string; note: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string; whatsapp: string | null }
 export type SentInterest = { id: string; postId: string; firstName: string; area: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string; whatsapp: string | null }
+export type PassRow = { email: string; expiresAt: string; mpesaCode: string; grantedAt: string; grantedBy: string }
 export type Report = { postId: string; reason: string; createdAt: string }
 
 type Row = Record<string, unknown>
@@ -55,7 +57,7 @@ export function rowToPost(r: Row): RoommatePost {
     budgetMin: Number(r.budget_min) || 0, budgetMax: Number(r.budget_max) || 0, roomType: str(r.room_type), area: str(r.area),
     hasRoom: r.has_room === true, hostelName: str(r.hostel_name), lifestyle: toLifestyle(r.lifestyle), bio: str(r.bio),
     status: (['pending', 'approved', 'rejected'].includes(str(r.status)) ? str(r.status) : 'pending') as PostStatus,
-    rejectReason: str(r.reject_reason), hidden: r.hidden === true, updatedAt: str(r.updated_at),
+    rejectReason: str(r.reject_reason), hidden: r.hidden === true, updatedAt: str(r.updated_at), passExpiresAt: str(r.pass_expires_at),
     interested: r.interested === true,
   }
 }
@@ -117,6 +119,23 @@ export const roommateApi = {
     const { data, error } = await db().rpc('is_admin')
     return !error && data === true
   },
+
+  // ----- paid semester pass (KSh per semester, activated by the admin) -----
+  /** ISO time the student's pass ends, or '' when they have no active pass. */
+  async myPass(): Promise<string> {
+    const { data, error } = await db().rpc('roommate_my_pass')
+    fail(error)
+    return data ? str(data) : ''
+  },
+  async passList(): Promise<PassRow[]> {
+    const { data, error } = await db().rpc('roommate_pass_list')
+    fail(error)
+    return ((data ?? []) as Row[]).map((r) => ({ email: str(r.email), expiresAt: str(r.expires_at), mpesaCode: str(r.mpesa_code), grantedAt: str(r.granted_at), grantedBy: str(r.granted_by) }))
+  },
+  async passGrant(email: string, code: string, expiresIso: string): Promise<void> {
+    fail((await db().rpc('roommate_pass_grant', { p_email: email, p_code: code, p_expires: expiresIso })).error)
+  },
+  async passRevoke(email: string): Promise<void> { fail((await db().rpc('roommate_pass_revoke', { p_email: email })).error) },
 
   // ----- student: my own post -----
   async myPost(userId: string): Promise<{ post: RoommatePost; whatsapp: string } | null> {

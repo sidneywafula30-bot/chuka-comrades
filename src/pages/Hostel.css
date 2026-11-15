@@ -44,7 +44,7 @@
 .hs-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
 
 /* WhatsApp groups */
-.hs-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hs-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .hs-groups a { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--green); text-decoration: none; min-width: 0; transition: border-color .15s, box-shadow .15s; }
 .hs-groups a:hover { border-color: #25d366; box-shadow: 0 8px 20px #173d2512; }
 .hs-groups a span { display: grid; gap: 2px; flex: 1; min-width: 0; }
@@ -270,3 +270,56 @@
 .rm-adminwa { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: var(--green); text-decoration: none; }
 @media (max-width: 760px) { .rm-filters { grid-template-columns: 1fr 1fr; } }
 .rm-share svg { flex: 0 0 auto; }
+
+/* ================= semester calendar ================= */
+.hs-sem { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.hs-sem-empty { display: flex; align-items: center; gap: 12px; color: var(--muted); grid-template-columns: none; }
+.hs-sem-info h2 { margin: 6px 0 12px; font: 800 22px/1.15 'Manrope', sans-serif; color: var(--ink); letter-spacing: -.5px; }
+.hs-sem-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.hs-sem-dates div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #f3f8f5; min-width: 0; }
+.hs-sem-dates small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+.hs-sem-dates strong { color: var(--ink); font-size: 14px; }
+.hs-sem-bar { height: 8px; border-radius: 99px; background: #e4ede8; overflow: hidden; }
+.hs-sem-bar span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #1f8f5f, #36b37e); }
+.hs-sem-note { display: block; margin: 6px 0 12px; color: var(--muted); }
+.hs-sem-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hs-sem-actions a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 99px; color: var(--green); font-size: 13px; font-weight: 700; text-decoration: none; background: #fff; }
+.hs-sem-actions a:hover { border-color: #1f8f5f; background: #f3f8f5; }
+.hs-cal { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: #fcfefd; align-self: start; }
+.hs-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--ink); font-size: 14px; }
+.hs-cal-head button { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; }
+.hs-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+.hs-cal-wd { font-size: 11px; font-weight: 700; color: var(--muted); padding: 3px 0; }
+.hs-cal-day { display: grid; place-items: center; aspect-ratio: 1; border-radius: 8px; font-size: 13px; color: var(--ink); }
+.hs-cal-day.in { background: #e3f3ea; }
+.hs-cal-day.start, .hs-cal-day.end { background: #1f8f5f; color: #fff; font-weight: 800; }
+.hs-cal-day.end { background: #c2410c; }
+.hs-cal-day.today { outline: 2px solid #0f172a; outline-offset: -2px; font-weight: 800; }
+.hs-cal-key { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.hs-cal-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.hs-cal-key .s { background: #1f8f5f; } .hs-cal-key .e { background: #c2410c; margin-left: 8px; } .hs-cal-key .t { border: 2px solid #0f172a; margin-left: 8px; }
+
+/* ================= pay / unlock card ================= */
+.hs-pay { display: grid; gap: 16px; padding: 22px; border: 1.5px solid #e3c36b; border-radius: 18px; background: linear-gradient(180deg, #fffaf0, #fff); }
+.hs-pay-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+.hs-pay-lock { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: #fbeab8; color: #8a5a00; }
+.hs-pay h3 { margin: 0 0 4px; font: 800 18px/1.2 'Manrope', sans-serif; color: var(--ink); }
+.hs-pay p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+.hs-pay-price { display: grid; text-align: center; padding: 8px 14px; border-radius: 12px; background: #fff; border: 1px solid #efd99a; }
+.hs-pay-price small { font-size: 11px; color: var(--muted); }
+.hs-pay-price strong { font: 800 22px/1.1 'Manrope', sans-serif; color: #8a5a00; }
+.hs-pay-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.hs-pay-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink); line-height: 1.5; }
+.hs-pay-steps b { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 99px; background: #1f8f5f; color: #fff; font-size: 12px; }
+.hs-pay-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hs-pay-wa { display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 12px; background: #25d366; color: #05381c; font-weight: 800; text-decoration: none; }
+.hs-pay-fine { color: var(--muted); }
+.hs-access-ok { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; border-radius: 10px; background: #edf8f1; color: #185d43; font-size: 13px; font-weight: 600; }
+.hs-grant { padding: 0; border: 0; box-shadow: none; display: grid; gap: 12px; margin-bottom: 14px; }
+
+@media (max-width: 760px) {
+  .hs-sem { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .hs-sem-dates { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .hs-pay-top { grid-template-columns: auto minmax(0, 1fr); }
+  .hs-pay-price { grid-column: 1 / -1; grid-auto-flow: column; justify-content: center; gap: 8px; align-items: baseline; }
+}

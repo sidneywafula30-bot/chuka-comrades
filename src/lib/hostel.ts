@@ -26,7 +26,21 @@ export type Hostel = {
   roomTypes: RoomType[]; provided: Record<string, ProvidedState>
   deposit: string; rules: string; images: HostelImage[]; verified: boolean
   roomsUpdatedAt: string; createdAt: string; updatedAt: string
+  freePreview: boolean
 }
+
+/** Semester dates and prices, kept in the Apps Script (Admin desk > Semester). Dates are yyyy-mm-dd. */
+export type Settings = {
+  semesterName: string; semesterStart: string; semesterEnd: string
+  hostelPrice: number; roommatePrice: number; payNote: string
+}
+export const DEFAULT_SETTINGS: Settings = { semesterName: '', semesterStart: '', semesterEnd: '', hostelPrice: 150, roommatePrice: 100, payNote: '' }
+
+/** What the server returns to a student: either everything (paid / admin) or one free preview hostel. */
+export type HostelList = {
+  hostels: Hostel[]; locked: boolean; lockedCount: number; signedIn: boolean; accessUntil: string; settings: Settings
+}
+export type AccessRow = { email: string; activatedAt: string; expiresAt: string; mpesaCode: string; activatedBy: string; active: boolean }
 
 /** What the admin sends when adding or editing a hostel. */
 export type HostelInput = Omit<Hostel, 'id' | 'images' | 'roomsUpdatedAt' | 'createdAt' | 'updatedAt'>
@@ -41,16 +55,15 @@ export const PROVIDED_ITEMS: { key: string; label: string }[] = [
   { key: 'bed', label: 'Bed' },
   { key: 'chair', label: 'Chair' },
   { key: 'table', label: 'Table' },
-  { key: 'bin', label: 'Bin' },
-  { key: 'bathroom', label: 'Self-contained bathroom' },
-  { key: 'cooking', label: 'Cooking allowed' },
-  { key: 'laundry', label: 'Laundry / drying space' },
-  { key: 'parking', label: 'Parking' },
-  { key: 'study', label: 'Study area' },
 ]
-/** Old listings may still carry the retired "furnished" key (it used to say "Bed & mattress"). */
-const LEGACY_LABELS: Record<string, string> = { furnished: 'Bed' }
-export const providedLabel = (key: string) => PROVIDED_ITEMS.find((p) => p.key === key)?.label ?? LEGACY_LABELS[key] ?? key
+export const providedLabel = (key: string) => PROVIDED_ITEMS.find((p) => p.key === key)?.label ?? key
+
+/** Old listings may still carry retired keys (cooking, bin, laundry...). Show only today's list; "furnished" used to mean the bed. */
+export function cleanProvided(map: Record<string, ProvidedState>): [string, ProvidedState][] {
+  const m: Record<string, ProvidedState> = { ...map }
+  if (!m.bed && m.furnished) m.bed = m.furnished
+  return PROVIDED_ITEMS.filter((p) => m[p.key]).map((p) => [p.key, m[p.key]] as [string, ProvidedState])
+}
 
 export const ROOM_TYPE_SUGGESTIONS = ['Bedsitter', 'Single room', 'Double sharing', 'Self-contained single', 'One bedroom']
 
@@ -78,7 +91,7 @@ async function call<T>(action: string, payload: Record<string, unknown> = {}): P
 }
 
 export const hostelApi = {
-  list: () => call<Hostel[]>('list'),
+  list: () => call<HostelList>('list'),
   adminCheck: () => call<{ isAdmin: boolean }>('admin_check'),
   adminList: () => call<Hostel[]>('admin_list'),
   create: (hostel: HostelInput, newImages: UploadImage[]) => call<Hostel>('create', { hostel, newImages }),
@@ -86,6 +99,10 @@ export const hostelApi = {
     call<Hostel>('update', { id, hostel, ...photos }),
   updateRooms: (id: string, rooms: { type: string; available: number }[]) => call<Hostel>('update_rooms', { id, rooms }),
   remove: (id: string) => call<{ deleted: boolean }>('delete', { id }),
+  accessList: () => call<AccessRow[]>('access_list'),
+  accessGrant: (email: string, mpesaCode: string, expiresOn?: string) => call<AccessRow[]>('access_grant', { email, mpesaCode, expiresOn }),
+  accessRevoke: (email: string) => call<AccessRow[]>('access_revoke', { email }),
+  saveSettings: (settings: Settings) => call<Settings>('settings_save', { settings }),
 }
 
 /* ---------- helpers ---------- */
@@ -144,4 +161,37 @@ export function compressImage(file: File): Promise<UploadImage & { preview: stri
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that photo.')) }
     img.src = url
   })
+}
+
+/* ---------- semester + payment helpers ---------- */
+
+export const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const parseYmd = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+export const niceDate = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? parseYmd(s).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
+export const niceDateTime = (iso: string) => { const t = Date.parse(iso); return isNaN(t) ? '' : new Date(t).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) }
+
+export type SemesterInfo = { set: boolean; start: Date | null; end: Date | null; totalDays: number; dayNumber: number; daysLeft: number; progress: number; phase: 'upcoming' | 'running' | 'ended' | 'unset' }
+export function semesterInfo(s: Settings, today = new Date()): SemesterInfo {
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(s.semesterStart) && /^\d{4}-\d{2}-\d{2}$/.test(s.semesterEnd)
+  if (!ok) return { set: false, start: null, end: null, totalDays: 0, dayNumber: 0, daysLeft: 0, progress: 0, phase: 'unset' }
+  const start = parseYmd(s.semesterStart), end = parseYmd(s.semesterEnd)
+  const t = parseYmd(ymd(today)), DAY = 86400000
+  const totalDays = Math.round((end.getTime() - start.getTime()) / DAY) + 1
+  const dayNumber = Math.round((t.getTime() - start.getTime()) / DAY) + 1
+  const phase = t < start ? 'upcoming' : t > end ? 'ended' : 'running'
+  return { set: true, start, end, totalDays, dayNumber, daysLeft: Math.max(0, Math.round((end.getTime() - t.getTime()) / DAY)), progress: Math.min(1, Math.max(0, dayNumber / totalDays)), phase }
+}
+
+/** "Add to Google Calendar" link for an all-day event. Google wants the END date to be the day after. */
+export function googleCalendarLink(title: string, from: string, to = from): string {
+  const compact = (s: string) => s.replace(/-/g, '')
+  const after = parseYmd(to); after.setDate(after.getDate() + 1)
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${compact(from)}/${compact(ymd(after))}` })
+  return `https://calendar.google.com/calendar/render?${q.toString()}`
+}
+
+/** WhatsApp message a student sends the admin after paying. Includes the email so the admin can activate it. */
+export function paymentLink(kind: 'hostels' | 'roommate', email: string, price: number): string {
+  const what = kind === 'hostels' ? 'unlock all hostels' : 'post a roommate request'
+  return waLink(ADMIN_WHATSAPP, `Hello Chuka Comrades admin, I have paid KSh ${price} to ${what} this semester.\nMy Google email: ${email}\nM-Pesa code: `)
 }
