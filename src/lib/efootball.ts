@@ -116,6 +116,7 @@ export type HomeData = {
   courses: CourseRow[]
   league: { fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number }
   champion: { name: string; date: string; username: string; course: string } | null
+  waGroup?: string
   fpl?: { configured: boolean; ready: boolean; next: { id: number; name: string; at: string } | null; gw: number; managers: number; top: { username: string; course: string; total: number }[]; stale: boolean }
 }
 

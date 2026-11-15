@@ -136,3 +136,6 @@
   .ef-hero-logo { width: 96px; height: 96px; }
   .ef-tiles { grid-template-columns: repeat(2, 1fr); }
 }
+
+.ef-wa-group { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 99px; background: #25d366; color: #0b2e18; font-weight: 800; font-size: 14px; text-decoration: none; }
+.ef-wa-group:hover { filter: brightness(1.06); }

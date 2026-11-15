@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
-import { ArrowLeft, Clock, Crown, ExternalLink, Target, Play, Search, ShieldCheck, Swords, Trophy, UserRound, Users, X, Table2 } from 'lucide-react'
+import { ArrowLeft, Clock, Crown, ExternalLink, MessageCircle, Target, Play, Search, ShieldCheck, Swords, Trophy, UserRound, Users, X, Table2 } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { countdown, ef, efReady, fmtDay, fmtTime, type HomeData, type Me, type Video, type VideoCategory, type VideoResult } from '../lib/efootball'
 import GoogleSignInButton from '../components/GoogleSignInButton'
@@ -96,6 +96,7 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
           <div className="ef-hero-cta">
             {!p ? <a className="lp-btn" href="#/efootball/profile">Register as a player</a> : !p.inLeague ? <a className="lp-btn" href="#/efootball/league">Join the league</a> : <a className="lp-btn" href="#/efootball/league">My fixtures</a>}
             <a className="ef-ghost" href="#/efootball/tournament">Weekly knockout</a>
+            {h?.waGroup && <a className="ef-wa-group" href={h.waGroup} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Join our WhatsApp group</a>}
           </div>
         </div>
       </header>

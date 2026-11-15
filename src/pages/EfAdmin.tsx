@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Copy, Trophy } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
-import { driveImg, ef, fmtStamp, fromParts, toParts, type AdminCourse, type Attention, type FplAdminInfo, type Profile, type Tournament } from '../lib/efootball'
+import { driveImg, ef, fmtStamp, fromParts, toParts, type AdminCourse, type Attention, type FplAdminInfo, type HomeData, type Profile, type Tournament } from '../lib/efootball'
 
 type Tab = 'tournament' | 'attention' | 'courses' | 'players' | 'league' | 'fpl'
 type Msg = { ok: boolean; text: string } | null
@@ -288,13 +288,27 @@ function LeagueAdmin() {
     try { await ef('setCourseLeague', { name: course, league: true }); setMsg({ ok: true, text: `${course} is now open for the league.` }); await load() }
     catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
+  const [wa, setWa] = useState('')
+  useEffect(() => { ef<HomeData>('home').then((h) => setWa(h.waGroup ?? '')).catch(() => {}) }, [])
+  async function saveWa() {
+    try { await ef('setWaGroup', { link: wa }); setMsg({ ok: true, text: wa.trim() ? 'WhatsApp group link saved. It shows on the landing page within a minute.' : 'WhatsApp group link removed.' }) }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  }
   return (
     <>
+      <section className="cpl-card">
+        <h3>WhatsApp group</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Paste the Chuka eFootball group invite link (WhatsApp group info, Invite via link, Copy link). It appears as a button on the landing page. Leave it empty to hide the button.</p>
+        <div className="cpl-inline">
+          <input type="url" value={wa} onChange={(e) => setWa(e.target.value)} placeholder="https://chat.whatsapp.com/…" aria-label="WhatsApp group invite link" maxLength={200} />
+          <button className="lp-btn" onClick={saveWa}>Save</button>
+        </div>
+        {el}
+      </section>
       <section className="cpl-card">
         <h3>Daily fixtures</h3>
         <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Fixtures are made automatically at 00:00 on Monday, Wednesday, Friday and Sunday. Players send scores before 21:00, and every fixture is settled by the rules at 21:00 (same score: confirmed; one screenshot beats none; no report: walkover or void). Nothing needs your decision. Use this button only if the automatic run was missed.</p>
         <button className="lp-btn" onClick={fixtures}>Make today's fixtures now</button>
-        {el}
       </section>
       <section className="cpl-card">
         <h3>Home page videos</h3>
