@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { signInWithPopup, signOut, type User } from 'firebase/auth'
 import {
-  BookOpen, Building2, ChevronRight, Clapperboard, ExternalLink, Gamepad2, GraduationCap, Mail, MapPin, MessageCircle, Monitor, Phone, ShieldAlert, ShoppingBag, Stethoscope, Trophy, Wallet,
+  BookOpen, Building2, ChevronRight, Clapperboard, ExternalLink, Gamepad2, GraduationCap, Download, Mail, MapPin, MessageCircle, Monitor, Phone, ShieldAlert, ShoppingBag, Stethoscope, Trophy, Wallet,
 } from 'lucide-react'
 import { auth, firebaseReady, googleProvider } from '../lib/firebase'
 import { GoogleMapsLogo, YouTubeLogo } from '../components/BrandLogos'
 import Avatar from '../components/Avatar'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import WhatsAppGroups from '../components/WhatsAppGroups'
+import { shareToWhatsApp, useInstall } from '../lib/install'
+import { WhatsAppLogo } from '../components/BrandLogos'
 import './Landing.css'
 
 const BASE = import.meta.env.BASE_URL
@@ -87,6 +89,7 @@ const SERVICES = [
 export default function Landing({ user }: { user: User | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const { installed, canInstall, iosHelp, install } = useInstall()
 
   async function handleSignIn() {
     if (!auth) {
@@ -153,6 +156,14 @@ export default function Landing({ user }: { user: User | null }) {
             )}
 
             <div className="lp-actions">
+              {!installed && (canInstall || iosHelp) && (
+                <button className="lp-btn lp-btn-soft" onClick={() => (canInstall ? void install() : alert('On iPhone: tap the Share icon, then "Add to Home Screen".'))}>
+                  <Download size={16} /> Install app
+                </button>
+              )}
+              <button className="lp-btn lp-btn-soft" onClick={shareToWhatsApp}>
+                <WhatsAppLogo size={16} /> Share on WhatsApp
+              </button>
               {user ? (
                 <a className="lp-btn" href="#services">Explore services <ChevronRight size={16} /></a>
               ) : (

@@ -3,6 +3,7 @@ import { onAuthStateChanged, signInWithPopup, type User } from 'firebase/auth'
 import { auth, firebaseReady, googleProvider } from './lib/firebase'
 import { syncProfile } from './lib/profile'
 import Preloader from './components/Preloader'
+import InstallPopup from './components/InstallPopup'
 import Landing from './pages/Landing'
 import Cpl from './pages/Cpl'
 import Hostel from './pages/Hostel'
@@ -74,6 +75,7 @@ export default function App() {
   return (
     <>
       {inCy ? <Cyber user={user} route={hash} /> : inGigs ? <Gigs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSkills ? <Skills user={user} onSignIn={signIn} onBack={leaveSoko} /> : inLabs ? <StudyLabs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSoko ? <Soko user={user} onSignIn={signIn} onBack={leaveSoko} /> : inCpl ? <Cpl user={user} route={hash} /> : inOz ? <Ozone user={user} route={hash} /> : inEf ? <Efootball user={user} route={hash} /> : inHostel ? <Hostel user={user} /> : inMedia ? <Media /> : <Landing user={user} />}
+      {!showPreloader && <InstallPopup />}
       {showPreloader && <Preloader ready={authChecked} onDone={done} />}
     </>
   )
