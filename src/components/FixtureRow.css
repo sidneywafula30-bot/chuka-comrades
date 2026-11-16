@@ -1,0 +1,48 @@
+/* Fixture card: venue photo background, team logos, referee, Google Maps link and countdown. */
+.cpl-fx { border-radius: 18px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 4px 14px #173d2508; }
+.cpl-fx-hero { position: relative; overflow: hidden; color: #fff; isolation: isolate; background: linear-gradient(135deg, var(--green, #14532d), #0f172a); }
+.cpl-fx-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+.cpl-fx-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.42) 45%, rgba(0,0,0,.82) 100%); }
+.cpl-fx-body { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; min-height: 230px; }
+.cpl-fx-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+
+.cpl-fx-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; flex: 1; }
+.cpl-fx-team { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; min-width: 0; }
+.cpl-fx-team b { font: 700 15px/1.2 'Manrope', sans-serif; overflow-wrap: anywhere; text-shadow: 0 1px 3px rgba(0,0,0,.65); }
+.cpl-fx-me { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #facc15; }
+.cpl-fx-mid { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.cpl-fx-vs { font-weight: 800; font-size: 17px; letter-spacing: .08em; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.cpl-fx-score { font-weight: 800; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 2px 6px rgba(0,0,0,.65); white-space: nowrap; }
+.cpl-fx-pill { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.22); backdrop-filter: blur(4px); }
+.cpl-fx-pill.live { background: #dc2626; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.cpl-fx-pill.warn { background: #d97706; }
+
+.cpl-fx-logo, .cpl-fx-refpic { flex: none; border-radius: 50%; background: rgba(255,255,255,.95); color: #111827; border: 2px solid rgba(255,255,255,.9); box-shadow: 0 2px 8px rgba(0,0,0,.35); object-fit: contain; }
+.cpl-fx-logo { width: 62px; height: 62px; }
+.cpl-fx-refpic { width: 38px; height: 38px; border-width: 1.5px; object-fit: cover; }
+.cpl-fx-logo.ph, .cpl-fx-refpic.ph { display: inline-flex; align-items: center; justify-content: center; font-weight: 800; }
+.cpl-fx-refpic.ph { font-size: 12px; }
+
+.cpl-fx-count { display: flex; gap: 6px; }
+.cpl-fx-count div { display: flex; flex-direction: column; align-items: center; min-width: 44px; padding: 6px 4px; border-radius: 10px; background: rgba(0,0,0,.5); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,.2); }
+.cpl-fx-count b { font-size: 18px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cpl-fx-count small { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .85; }
+
+.cpl-fx-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.25); }
+.cpl-fx-venue { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; min-width: 0; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.cpl-fx-venue a { display: inline-flex; align-items: center; gap: 4px; color: #fff; font-weight: 700; text-decoration: none; background: rgba(255,255,255,.2); border-radius: 999px; padding: 3px 10px; text-shadow: none; }
+.cpl-fx-venue a:hover, .cpl-fx-venue a:focus-visible { background: rgba(255,255,255,.36); }
+.cpl-fx-ref { display: flex; align-items: center; gap: 8px; }
+.cpl-fx-ref span { display: flex; flex-direction: column; line-height: 1.2; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.cpl-fx-ref small { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; opacity: .85; }
+
+.cpl-fx-extra { padding: 12px 16px 14px; display: grid; gap: 10px; }
+.cpl-fx-extra .flip { transform: rotate(180deg); }
+
+@media (max-width: 480px) {
+  .cpl-fx-logo { width: 50px; height: 50px; }
+  .cpl-fx-count div { min-width: 38px; }
+  .cpl-fx-count b { font-size: 16px; }
+  .cpl-fx-score { font-size: 26px; }
+  .cpl-fx-team b { font-size: 13px; }
+}

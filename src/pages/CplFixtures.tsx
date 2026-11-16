@@ -4,7 +4,7 @@ import { cpl, type Division, type Fixture, type FixtureStatus, type Referee, typ
 import FixtureRow from '../components/FixtureRow'
 
 const EMPTY: Fixture = { id: '', seasonId: '', matchday: '', date: '', time: '', home: '', away: '', venue: '', homeScore: '', awayScore: '', status: 'scheduled',
-  homeId: '', awayId: '', venueId: '', refereeId: '', venueMapsUrl: '', refereeName: '', summary: '', scorers: '', cards: '', reportAt: '', seasonName: '' }
+  homeId: '', awayId: '', venueId: '', refereeId: '', venueMapsUrl: '', refereeName: '', homeLogoUrl: '', awayLogoUrl: '', venueImageUrl: '', refereeImageUrl: '', summary: '', scorers: '', cards: '', reportAt: '', seasonName: '' }
 const STATUSES: FixtureStatus[] = ['scheduled', 'live', 'finished', 'postponed']
 
 export default function CplFixtures({ season, onBack }: { season: Season; onBack: () => void }) {

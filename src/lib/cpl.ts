@@ -16,7 +16,7 @@ export type Player = {
 }
 export type MyPlayer = Player & { teamName: string; seasonName: string }
 export type Venue = { id: string; name: string; description: string; mapsUrl: string; imageUrl: string }
-export type Referee = { id: string; name: string; email: string }
+export type Referee = { id: string; name: string; email: string; imageUrl: string }
 export type MyTeam = Team & { seasonName: string; divisionName: string }
 export type Me = { email: string; role: Role; profile: Profile | null; teams: MyTeam[]; players: MyPlayer[]; isReferee: boolean }
 export type Chair = { email: string; role: Role; fullName: string }
@@ -57,6 +57,7 @@ export type Fixture = {
   home: string; away: string; venue: string; homeScore: string; awayScore: string; status: FixtureStatus
   homeId: string; awayId: string; venueId: string; refereeId: string
   venueMapsUrl: string; refereeName: string
+  homeLogoUrl: string; awayLogoUrl: string; venueImageUrl: string; refereeImageUrl: string // pictures shown on the fixture card
   summary: string; scorers: string; cards: string; reportAt: string // match report, filed by the referee
   seasonName: string
 }
