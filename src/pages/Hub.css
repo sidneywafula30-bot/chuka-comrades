@@ -44,3 +44,18 @@
 .cf-box{display:grid;gap:10px;border:1px dashed #cfe0d5;background:#f7fbf8;border-radius:14px;padding:14px;margin:14px 0}
 .cf-box strong{display:flex;align-items:center;gap:6px;color:#173b2c}.cf-box small{color:#63756a}
 .cf-linkrow{display:flex;gap:8px;align-items:center}.cf-linkrow input{flex:1;min-width:0}
+
+/* ---- Skills v4: shop, orders, cooking corner ---- */
+.pr-cover{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:#eaf4ed;display:flex;align-items:center;justify-content:center;color:#3a8a5f;margin:0 0 8px}
+.pr-price{font-weight:800;font-size:16px;color:#173b2c}
+.pr-steps{display:grid;gap:10px;margin:12px 0;padding:0;list-style:none}
+.pr-steps li{display:flex;gap:10px;align-items:flex-start;background:#f7fbf8;border:1px solid #e1ece5;border-radius:12px;padding:10px 12px;font-size:13px}
+.pr-num{flex:0 0 22px;height:22px;border-radius:50%;background:#2b7049;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.pr-pay{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.pr-pay code{background:#fff;border:1px dashed #9cc4aa;border-radius:8px;padding:4px 10px;font-size:16px;font-weight:800;color:#173b2c}
+.pr-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.pr-stat{background:#f7fbf8;border:1px solid #e1ece5;border-radius:12px;padding:10px;text-align:center;font-size:12px;color:#63756a}.pr-stat b{display:block;font-size:17px;color:#173b2c}
+.pr-ing{columns:2;font-size:13px;margin:0;padding-left:18px}
+.pr-day .hub-thumb{aspect-ratio:16/8}
+.cf-check{display:flex!important;align-items:flex-start;gap:8px;font-size:13px}.cf-check input{margin-top:3px}
+@media(max-width:600px){.pr-ing{columns:1}}

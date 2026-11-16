@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, ExternalLink, GraduationCap, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
+import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, ExternalLink, GraduationCap, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
 import { skillsApi, skillsReady, ADMIN_WA, FALLBACK_CONFIG, type ClassDetail, type ClassItem, type Mode, type Rec, type SkillsConfig, type UpcomingSession, type YtResponse } from '../lib/skills'
 import { COURSE_PROVIDERS, PROVIDER_TYPES, providerLink } from '../lib/courseProviders'
 import ProviderLogo from '../components/ProviderLogo'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
 import { AttachList, Empty, FilePicker, HubShell, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
+import { AdminOrders, AdminProducts, AdminSettings, Kitchen, Library, Shop } from './SkillsShop'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'teach' | 'admin' } | { name: 'class'; id: string }
+type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' } | { name: 'class'; id: string }
 const call = skillsApi.call
 
 /* ---------- recommendations ---------- */
@@ -95,16 +96,18 @@ function Learn({ user, onSignIn, config, onRecommend }: { user: User | null; onS
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
   const [kind, setKind] = useState('')
-  const [items, setItems] = useState<Rec[] | null>(null)
+  const [all, setAll] = useState<Rec[] | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const [yq, setYq] = useState('')
   const [yres, setYres] = useState<YtResponse | null>(null)
   const [ybusy, setYbusy] = useState(false)
   const load = useCallback(() => {
-    if (!skillsReady) { setItems([]); return }
-    skillsApi.recs({ q: q.trim(), category: cat, kind }).then(setItems).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) })
-  }, [q, cat, kind])
+    if (!skillsReady) { setAll([]); return }
+    skillsApi.recs({}).then(setAll).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setAll([]) })
+  }, [])
   useEffect(() => { load() }, [load, user])
+  const needle = q.trim().toLowerCase()
+  const items = all && all.filter((r) => (!kind || r.kind === kind) && (!cat || r.category === cat) && (!needle || `${r.title} ${r.skill} ${r.channel} ${r.provider}`.toLowerCase().includes(needle)))
   async function ytSearch(e: FormEvent) {
     e.preventDefault()
     if (!user) return onSignIn()
@@ -116,11 +119,11 @@ function Learn({ user, onSignIn, config, onRecommend }: { user: User | null; onS
     <>
       <section className="sl-hero">
         <div><span className="sl-kicker">CHUKA SKILLS</span><h1>Learn a skill <em>from comrades, free courses &amp; videos</em></h1>
-          <p>Browse videos and courses recommended by students, join a class run by the Chuka Skills team, or search free courses from 17 providers.</p></div>
+          <p>Browse videos and courses recommended by students, join a class run by the Chuka Skills team, or search free courses from {COURSE_PROVIDERS.length} providers.</p></div>
         <div className="sl-hero-art"><GraduationCap size={46} /><span>Grow your skills</span></div>
       </section>
       <div className="hub-bar">
-        <form className="sl-search" onSubmit={(e) => { e.preventDefault(); load() }}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recommended videos and courses, e.g. Excel, guitar, Python…" /></form>
+        <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recommended videos and courses, e.g. CapCut, barbering, Python…" /></form>
         <button className="sl-primary small" onClick={user ? () => onRecommend() : onSignIn}><Plus size={15} /> Recommend</button>
       </div>
       <div className="hub-chips">
@@ -148,6 +151,7 @@ function Learn({ user, onSignIn, config, onRecommend }: { user: User | null; onS
           </article>))}</div>
       ))}
 
+      <Kitchen user={user} onSignIn={onSignIn} />
       <CourseFinder />
     </>
   )
@@ -227,22 +231,16 @@ function ClassModal({ cls, config, admin, onClose, onDone }: { cls?: ClassItem; 
   const [capacity, setCapacity] = useState(String(cls?.capacity ?? 30))
   const [joinLink, setJoinLink] = useState(cls?.joinLink ?? '')
   const [tutorName, setTutorName] = useState(cls?.tutorName ?? '')
-  const [meetSpace, setMeetSpace] = useState(cls?.meetSpace ?? '')
+  const [meetSpace] = useState(cls?.meetSpace ?? '')
   const [sStart, setSStart] = useState('')
   const [sMins, setSMins] = useState('60')
+  const [sWeeks, setSWeeks] = useState('8')
+  const [sMeet, setSMeet] = useState(true)
   const [files, setFiles] = useState<File[]>([])
   const [removeIds, setRemoveIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [meetBusy, setMeetBusy] = useState(false)
   const [msg, setMsg] = useState<Note>(null)
   const [done, setDone] = useState<string | null>(null)
-  async function makeMeet() {
-    setMeetBusy(true); setMsg(null)
-    try {
-      const m = await skillsApi.admin.createMeet(); setJoinLink(m.meetingUri); setMeetSpace(m.space)
-      setMsg({ type: 'ok', text: m.open ? 'Google Meet link created. Anyone with the link can join.' : 'Google Meet link created. Google did not allow open access, so you will need to admit students when they join.' })
-    } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setMeetBusy(false) }
-  }
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setMsg(null)
     try {
@@ -253,8 +251,8 @@ function ClassModal({ cls, config, admin, onClose, onDone }: { cls?: ClassItem; 
       let note = cls ? 'Your changes are live.' : 'The class is live. Students can find and join it now.'
       if (!cls && sStart) {
         try {
-          const r = await skillsApi.admin.addSession({ classId: saved.id, start: sStart, minutes: Number(sMins) })
-          note += r.warning ? ` ${r.warning}` : ' The first session was added to your Google Calendar.'
+          const r = await skillsApi.admin.addSession({ classId: saved.id, start: sStart, minutes: Number(sMins), weeks: Number(sWeeks), meet: sMeet && mode !== 'physical' && !joinLink.trim() })
+          note += r.warning ? ` ${r.warning}` : ` ${r.count} weekly session${r.count > 1 ? 's were' : ' was'} added to your Google Calendar${r.joinLink ? ' with one Google Meet link for the whole class' : ''}.`
         } catch (err) { note += ` The class was saved, but the session was not added: ${errMsg(err)} Add it from the class page.` }
       }
       setDone(note); onDone()
@@ -278,9 +276,8 @@ function ClassModal({ cls, config, admin, onClose, onDone }: { cls?: ClassItem; 
         </div>
         {mode !== 'online' && <label>Venue<input value={venue} onChange={(e) => setVenue(e.target.value)} maxLength={100} placeholder="e.g. Library, Room 3" /></label>}
         {mode !== 'physical' && (
-          <label>Class link (Google Meet, Zoom or a WhatsApp group)
-            <span className="cf-linkrow"><input type="url" value={joinLink} onChange={(e) => setJoinLink(e.target.value)} placeholder="https://" />
-              {admin && <button type="button" className="sl-mini" disabled={meetBusy} onClick={makeMeet}><Video size={13} /> {meetBusy ? 'Creating…' : 'Create Meet link'}</button>}</span>
+          <label>Class link (Google Meet, Zoom or a WhatsApp group){admin && !cls ? ' · leave empty to create a Meet link below' : ''}
+            <input type="url" value={joinLink} onChange={(e) => setJoinLink(e.target.value)} placeholder="https://" />
           </label>
         )}
         <div className="sl-two">
@@ -289,12 +286,14 @@ function ClassModal({ cls, config, admin, onClose, onDone }: { cls?: ClassItem; 
         </div>
         {admin && !cls && (
           <div className="cf-box">
-            <strong><CalendarPlus size={15} /> First session (optional)</strong>
-            <small>Adds an event to your Google Calendar and shows it to students. You can add more sessions later from the class page.</small>
+            <strong><CalendarPlus size={15} /> Weekly schedule (optional)</strong>
+            <small>Adds a repeating event to your Google Calendar and shows every session to students. You can add more later from the class page.</small>
             <div className="sl-two">
-              <label>Date and time (Nairobi)<input type="datetime-local" value={sStart} onChange={(e) => setSStart(e.target.value)} /></label>
+              <label>First session (Nairobi time)<input type="datetime-local" value={sStart} onChange={(e) => setSStart(e.target.value)} /></label>
               <label>Length<select value={sMins} onChange={(e) => setSMins(e.target.value)}>{[30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m} minutes</option>)}</select></label>
             </div>
+            <label>Repeats weekly for<select value={sWeeks} onChange={(e) => setSWeeks(e.target.value)}>{[1, 2, 4, 6, 8, 10, 12, 16, 20, 26].map((w) => <option key={w} value={w}>{w === 1 ? 'One session only' : `${w} weeks`}</option>)}</select></label>
+            {mode !== 'physical' && <label className="cf-check"><input type="checkbox" checked={sMeet && !joinLink.trim()} disabled={!!joinLink.trim()} onChange={(e) => setSMeet(e.target.checked)} /> Create one Google Meet link for every week (students are invited by email)</label>}
           </div>
         )}
         <label>Maximum students<input type="number" min={2} max={200} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
@@ -315,6 +314,8 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
   const [busy, setBusy] = useState(false)
   const [sStart, setSStart] = useState('')
   const [sMins, setSMins] = useState('60')
+  const [sWeeks, setSWeeks] = useState('1')
+  const [sMeet, setSMeet] = useState(false)
   const [sTitle, setSTitle] = useState('')
   const load = useCallback(() => skillsApi.classGet(id).then(setD).catch((e) => setMsg({ type: 'err', text: errMsg(e) })), [id])
   useEffect(() => { void load() }, [load, user, tick])
@@ -330,9 +331,9 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
     e.preventDefault()
     setBusy(true); setMsg(null)
     try {
-      const r = await skillsApi.admin.addSession({ classId: c.id, start: sStart, minutes: Number(sMins), title: sTitle.trim() || undefined })
+      const r = await skillsApi.admin.addSession({ classId: c.id, start: sStart, minutes: Number(sMins), weeks: Number(sWeeks), meet: sMeet && c.mode !== 'physical', title: sTitle.trim() || undefined })
       setSStart(''); setSTitle(''); await load()
-      setMsg(r.warning ? { type: 'err', text: r.warning } : { type: 'ok', text: 'Session added to your Google Calendar.' })
+      setMsg(r.warning ? { type: 'err', text: r.warning } : { type: 'ok', text: `${r.count} session${r.count > 1 ? 's' : ''} added to your Google Calendar${r.joinLink ? ' with a new Meet link' : ''}.` })
     } catch (e2) { err(e2) } finally { setBusy(false) }
   }
   const now = Date.now()
@@ -378,11 +379,13 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
           {isAdmin && (
             <form className="sl-form cf-box" onSubmit={addSession}>
               <strong><CalendarPlus size={15} /> Add a session</strong>
-              <small>Creates an event on your Google Calendar with the class link.</small>
+              <small>Creates an event on your Google Calendar. Students who joined are invited, and new joiners are added automatically.</small>
               <div className="sl-two">
                 <label>Date and time (Nairobi)<input type="datetime-local" value={sStart} onChange={(e) => setSStart(e.target.value)} required /></label>
                 <label>Length<select value={sMins} onChange={(e) => setSMins(e.target.value)}>{[30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m} minutes</option>)}</select></label>
               </div>
+              <label>Repeats weekly for<select value={sWeeks} onChange={(e) => setSWeeks(e.target.value)}>{[1, 2, 4, 6, 8, 10, 12, 16, 20, 26].map((w) => <option key={w} value={w}>{w === 1 ? 'One session only' : `${w} weeks`}</option>)}</select></label>
+              {c.mode !== 'physical' && <label className="cf-check"><input type="checkbox" checked={sMeet} onChange={(e) => setSMeet(e.target.checked)} /> {c.joinLink ? 'Replace the class link with a NEW Google Meet link' : 'Create a Google Meet link for this class'}</label>}
               <label>Title (optional)<input value={sTitle} onChange={(e) => setSTitle(e.target.value)} maxLength={100} placeholder={c.title} /></label>
               <button className="sl-primary small" disabled={busy || !sStart}>{busy ? 'Adding…' : 'Add session'}</button>
             </form>
@@ -421,20 +424,22 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
 function Classes({ user, config, isAdmin, onOpen, onCreate }: { user: User | null; config: SkillsConfig; isAdmin: boolean; onOpen: (id: string) => void; onCreate: () => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
-  const [items, setItems] = useState<ClassItem[] | null>(null)
+  const [all, setAll] = useState<ClassItem[] | null>(null)
   const [up, setUp] = useState<UpcomingSession[]>([])
   const [msg, setMsg] = useState<Note>(null)
   const load = useCallback(() => {
-    if (!skillsReady) { setItems([]); return }
-    skillsApi.classes(q.trim(), cat).then(setItems).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setItems([]) })
-  }, [q, cat])
+    if (!skillsReady) { setAll([]); return }
+    skillsApi.classes().then(setAll).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setAll([]) })
+  }, [])
   useEffect(() => { load() }, [load, user])
+  const needle = q.trim().toLowerCase()
+  const items = all && all.filter((c) => (!cat || c.category === cat) && (!needle || `${c.title} ${c.skill} ${c.tutorName}`.toLowerCase().includes(needle)))
   useEffect(() => { if (skillsReady) skillsApi.upcoming().then(setUp).catch(() => setUp([])) }, [])
   return (
     <>
       <div className="sl-page-head"><div><span className="sl-kicker">CLASSES</span><h1>Join a class</h1></div></div>
       <div className="hub-bar">
-        <form className="sl-search" onSubmit={(e) => { e.preventDefault(); load() }}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search classes…" /></form>
+        <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search classes…" /></form>
         {isAdmin || config.allowTutorCreate
           ? <button className="sl-primary small" onClick={onCreate}><Plus size={15} /> {isAdmin ? 'Create class' : 'Teach a skill'}</button>
           : <WaRequest wa={config.whatsapp} />}
@@ -485,6 +490,7 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
           {!canCreate && <div className="cf-box"><strong>Want to teach a class?</strong><small>Chuka Skills classes are set up by the admin. Message the admin on WhatsApp with the skill, level and times you have in mind.</small><WaRequest wa={config.whatsapp} /></div>}
           <div className="hub-sec"><h2>Classes I joined</h2></div>
           {data.joined.length === 0 ? <Empty title="You have not joined a class" /> : <div className="sl-grid">{data.joined.map((c) => <ClassCard key={c.id} c={c} onOpen={onOpen} />)}</div>}
+          <Library config={config} user={user} />
           <div className="hub-sec"><h2>My recommendations</h2></div>
           {data.recs.length === 0 ? <Empty title="No recommendations yet" /> : <div className="sl-grid">{data.recs.map((r) => <RecCard key={r.id} r={r} user={user} onSignIn={onSignIn} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>}
         </>
@@ -494,8 +500,9 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
 }
 
 /* ---------- admin ---------- */
-function Admin({ tick, onNew, onEdit, onOpen }: { tick: number; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void }) {
-  const [tab, setTab] = useState<'classes' | 'recs' | 'all'>('all')
+function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick: number; config: SkillsConfig; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void; onConfigChanged: () => void }) {
+  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings'>('all')
+  const [edits, setEdits] = useState<Record<string, { title?: string; category?: string }>>({})
   const [q, setQ] = useState<{ classes: ClassItem[]; recs: Rec[] } | null>(null)
   const [all, setAll] = useState<ClassItem[] | null>(null)
   const [reasons, setReasons] = useState<Record<string, string>>({})
@@ -507,7 +514,7 @@ function Admin({ tick, onNew, onEdit, onOpen }: { tick: number; onNew: () => voi
   useEffect(() => { if (tab === 'all') void loadAll() }, [tab, loadAll, tick])
   const noop = () => {}
   const decide = (kind: 'class' | 'rec', id: string, d: 'approve' | 'reject') =>
-    (kind === 'class' ? skillsApi.admin.reviewClass(id, d, reasons[id]?.trim()) : skillsApi.admin.reviewRec(id, d, reasons[id]?.trim()))
+    (kind === 'class' ? skillsApi.admin.reviewClass(id, d, reasons[id]?.trim()) : skillsApi.admin.reviewRec(id, d, reasons[id]?.trim(), edits[id]))
       .then(() => { setMsg({ type: 'ok', text: d === 'approve' ? 'Approved.' : 'Rejected.' }); return loadQ() }).catch(err)
   const box = (id: string) => <input placeholder="Reason (if rejecting)" value={reasons[id] ?? ''} onChange={(e) => setReasons({ ...reasons, [id]: e.target.value })} />
   return (
@@ -516,7 +523,10 @@ function Admin({ tick, onNew, onEdit, onOpen }: { tick: number; onNew: () => voi
       <div className="sl-tabs">
         <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All classes</button>
         <button className={tab === 'recs' ? 'on' : ''} onClick={() => setTab('recs')}>Recommendations <b>{q?.recs.length ?? 0}</b></button>
-        <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>
+        {config.allowTutorCreate && <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>}
+        <button className={tab === 'products' ? 'on' : ''} onClick={() => setTab('products')}>Products</button>
+        <button className={tab === 'orders' ? 'on' : ''} onClick={() => setTab('orders')}>Orders</button>
+        <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>
       </div>
       <Msg msg={msg} />
       {tab === 'classes' && (!q ? <Loading /> : q.classes.length === 0 ? <Empty icon={<CheckCircle2 size={26} />} title="No classes waiting" text="Classes made by tutors only appear here if tutor requests are switched on." /> : (
@@ -530,9 +540,17 @@ function Admin({ tick, onNew, onEdit, onOpen }: { tick: number; onNew: () => voi
       {tab === 'recs' && (!q ? <Loading /> : q.recs.length === 0 ? <Empty icon={<CheckCircle2 size={26} />} title="No recommendations waiting" /> : (
         <div className="sl-grid">{q.recs.map((r) => (
           <RecCard key={r.id} r={r} user={null} onSignIn={noop} onError={(m) => setMsg({ type: 'err', text: m })}>
-            <span className="hub-decide">{box(r.id)}<button className="sl-mini" onClick={() => decide('rec', r.id, 'approve')}>Approve</button><button className="sl-mini danger" onClick={() => decide('rec', r.id, 'reject')}>Reject</button></span>
+            <span className="hub-decide">
+              <input placeholder="Fix title (optional)" value={edits[r.id]?.title ?? ''} onChange={(e) => setEdits({ ...edits, [r.id]: { ...edits[r.id], title: e.target.value } })} />
+              <select aria-label="Category" value={edits[r.id]?.category ?? ''} onChange={(e) => setEdits({ ...edits, [r.id]: { ...edits[r.id], category: e.target.value } })}>
+                <option value="">Keep: {r.category}</option>{config.categories.map((c) => <option key={c}>{c}</option>)}
+              </select>
+              {box(r.id)}<button className="sl-mini" onClick={() => decide('rec', r.id, 'approve')}>Approve</button><button className="sl-mini danger" onClick={() => decide('rec', r.id, 'reject')}>Reject</button></span>
           </RecCard>))}</div>
       ))}
+      {tab === 'products' && <AdminProducts config={config} tick={tick} />}
+      {tab === 'orders' && <AdminOrders tick={tick} />}
+      {tab === 'settings' && <AdminSettings config={config} onSaved={onConfigChanged} />}
       {tab === 'all' && (
         <>
           <div className="hub-sec"><h2>Classes</h2><button className="sl-primary small" onClick={onNew}><Plus size={15} /> Create class</button></div>
@@ -558,7 +576,8 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const [classOpen, setClassOpen] = useState<ClassItem | 'new' | null>(null)
   const [tick, setTick] = useState(0)
   const [fatal, setFatal] = useState('')
-  useEffect(() => { if (skillsReady) skillsApi.config().then((c) => setConfig({ ...FALLBACK_CONFIG, ...c, whatsapp: c.whatsapp || ADMIN_WA })).catch((e) => setFatal(errMsg(e))) }, [])
+  const loadConfig = useCallback(() => { if (skillsReady) skillsApi.config().then((c) => setConfig({ ...FALLBACK_CONFIG, ...c, whatsapp: c.whatsapp || ADMIN_WA })).catch((e) => setFatal(errMsg(e))) }, [])
+  useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => {
     setIsAdmin(false)
     if (skillsReady && user) skillsApi.adminCheck().then((r) => setIsAdmin(r.isAdmin)).catch(() => {})
@@ -574,6 +593,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       nav={<>
         <button className={name === 'learn' ? 'on' : ''} onClick={() => setView({ name: 'learn' })}>Learn</button>
         <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => setView({ name: 'classes' })}>Classes</button>
+        <button className={name === 'shop' ? 'on' : ''} onClick={() => setView({ name: 'shop' })}><ShoppingBag size={14} /> Shop</button>
         <button className={name === 'teach' ? 'on' : ''} onClick={() => gated({ name: 'teach' })}>My skills</button>
         {isAdmin && <button className={name === 'admin' ? 'on' : ''} onClick={() => setView({ name: 'admin' })}><ShieldCheck size={14} /> Admin</button>}
       </>}>
@@ -582,8 +602,9 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} onRecommend={(p) => setRecOpen(p ?? 'new')} />}
       {view.name === 'classes' && <Classes user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}
+      {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}
       {view.name === 'teach' && <Teach user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onOpen={open} onCreate={() => setClassOpen('new')} onEdit={setClassOpen} />}
-      {view.name === 'admin' && isAdmin && <Admin tick={tick} onNew={() => setClassOpen('new')} onEdit={setClassOpen} onOpen={open} />}
+      {view.name === 'admin' && isAdmin && <Admin tick={tick} config={config} onNew={() => setClassOpen('new')} onEdit={setClassOpen} onOpen={open} onConfigChanged={loadConfig} />}
       {recOpen && <RecModal config={config} prefill={recOpen === 'new' ? undefined : recOpen} onClose={() => setRecOpen(null)} onDone={bump} />}
       {classOpen && <ClassModal cls={classOpen === 'new' ? undefined : classOpen} config={config} admin={isAdmin} onClose={() => setClassOpen(null)} onDone={bump} />}
     </HubShell>

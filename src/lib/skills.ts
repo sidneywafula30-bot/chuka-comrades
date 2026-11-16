@@ -1,12 +1,23 @@
 import { makeApi, DEFAULT_RULES, type Attachment, type FileRules, type UploadFile } from './hub'
 
-const api = makeApi(import.meta.env.VITE_SKILLS_API_URL as string | undefined, 'Skills', 'VITE_SKILLS_API_URL')
-export const skillsReady = api.ready
+const raw = makeApi(import.meta.env.VITE_SKILLS_API_URL as string | undefined, 'Skills', 'VITE_SKILLS_API_URL')
+export const skillsReady = raw.ready
+/** Same as the shared call, but explains the common "Unknown action" problem (an old script is still deployed). */
+const api = {
+  ready: raw.ready,
+  call: (async (action: string, payload?: Record<string, unknown>) => {
+    try { return await raw.call(action, payload) } catch (e) {
+      const m = e instanceof Error ? e.message : ''
+      if (/unknown action/i.test(m)) throw new Error(`The Skills server does not know "${action}". The deployed Apps Script is an OLD version: paste Skills.gs, then Deploy > Manage deployments > Edit > New version, and make sure VITE_SKILLS_API_URL is that deployment's /exec URL.`)
+      throw e
+    }
+  }) as typeof raw.call,
+}
 
 export type Status = 'pending' | 'approved' | 'rejected'
 export type Mode = 'online' | 'physical' | 'hybrid'
 export type Provider = { name: string; about: string; url: string; search: boolean }
-export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean }
+export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean; payTo: string }
 export type Session = { id: string; title: string; startAt: string; endAt: string; note: string }
 export type UpcomingSession = { id: string; classId: string; classTitle: string; skill: string; mode: Mode; venue: string; title: string; startAt: string; endAt: string }
 
@@ -32,17 +43,38 @@ export type ClassInput = {
 }
 export type RecInput = { kind: 'video' | 'course'; url: string; title?: string; skill: string; category: string; reason: string; provider?: string; isFree?: string }
 
-export const FALLBACK_CONFIG: SkillsConfig = { categories: [], levels: ['All levels'], providers: [], files: DEFAULT_RULES, searchReady: false, whatsapp: ADMIN_WA, allowTutorCreate: false }
+export const PAY_TO = (import.meta.env.VITE_PAY_TO as string) || '0184198432'
+
+export type Product = {
+  id: string; title: string; description: string; skill: string; category: string; level: string; price: number; format: string; coverUrl: string
+  status: 'draft' | 'live' | 'archived'; createdAt: string; owned: boolean; myOrder: '' | 'pending' | 'active'; deliverLink?: string; attachments?: Attachment[]
+}
+export type ProductInput = {
+  id?: string; title: string; description: string; skill: string; category: string; level: string; price: number; format: string; deliverLink: string
+  status: 'draft' | 'live'; cover?: UploadFile; files?: UploadFile[]; removeFileIds?: string[]
+}
+export type OrderStatus = 'pending' | 'active' | 'rejected'
+export type Order = { id: string; productId: string; productTitle: string; price: number; name: string; email: string; mpesaCode: string; status: OrderStatus; note: string; createdAt: string; decidedAt: string }
+export type PendingOrder = { orderId: string; productId: string; title: string; price: number; mpesaCode: string; createdAt: string }
+export type Meal = { id: string; name: string; thumb: string; category?: string; area?: string; instructions?: string; ingredients?: { name: string; measure: string }[]; youtube?: string; source?: string }
+export type MealResponse = { items: Meal[]; error?: string }
+
+export const FALLBACK_CONFIG: SkillsConfig = { categories: [], levels: ['All levels'], providers: [], files: DEFAULT_RULES, searchReady: false, whatsapp: ADMIN_WA, allowTutorCreate: false, payTo: PAY_TO }
 
 export const skillsApi = {
   call: api.call,
   config: () => api.call<SkillsConfig>('config'),
+  ping: () => api.call<{ version: string }>('ping'),
   adminCheck: () => api.call<{ signedIn: boolean; isAdmin: boolean }>('admin_check'),
   recs: (f: { kind?: string; category?: string; q?: string } = {}) => api.call<Rec[]>('recs', { ...f }),
   submitRec: (r: RecInput) => api.call<{ id: string; status: 'pending' }>('rec_submit', { ...r }),
   vote: (id: string) => api.call<{ votes: number }>('rec_vote', { id }),
   ytSearch: (q: string) => api.call<YtResponse>('yt_search', { q }),
   upcoming: () => api.call<UpcomingSession[]>('sessions_upcoming'),
+  meals: (mode: 'day' | 'search' | 'ingredient' | 'lookup', q = '') => api.call<MealResponse>('meals', { mode, q }),
+  products: () => api.call<Product[]>('products'),
+  order: (productId: string, mpesaCode?: string) => api.call<{ id: string; status: OrderStatus; price: number; productTitle: string; payTo: string }>('order_create', { productId, mpesaCode }),
+  library: () => api.call<{ library: Product[]; pending: PendingOrder[] }>('my_library'),
   classes: (q = '', category = '') => api.call<ClassItem[]>('classes', { q, category }),
   classGet: (id: string) => api.call<ClassDetail>('class_get', { id }),
   saveClass: (c: ClassInput) => api.call<{ id: string; status: 'pending' }>('class_save', { ...c }),
@@ -54,8 +86,15 @@ export const skillsApi = {
   mine: () => api.call<{ teaching: ClassItem[]; joined: ClassItem[]; recs: Rec[] }>('my_skills'),
   admin: {
     saveClass: (c: ClassInput) => api.call<{ id: string; status: Status }>('admin_class_save', { ...c }),
-    createMeet: () => api.call<{ meetingUri: string; space: string; open: boolean }>('admin_meet_create'),
-    addSession: (s: { classId: string; start: string; minutes: number; title?: string; note?: string }) => api.call<{ id: string; warning: string }>('admin_session_add', { ...s }),
+    addSession: (s: { classId: string; start: string; minutes: number; weeks?: number; meet?: boolean; title?: string; note?: string }) =>
+      api.call<{ id: string; count: number; warning: string; joinLink: string }>('admin_session_add', { ...s }),
+    products: () => api.call<Product[]>('admin_products'),
+    saveProduct: (p: ProductInput) => api.call<{ id: string; status: string }>('admin_product_save', { ...p }),
+    deleteProduct: (id: string) => api.call<{ archived?: boolean; deleted?: boolean }>('admin_product_delete', { id }),
+    orders: () => api.call<{ stats: { pending: number; active: number; revenue: number }; orders: Order[] }>('admin_orders'),
+    decideOrder: (id: string, decision: 'activate' | 'reject', note?: string) => api.call<{ status: OrderStatus }>('admin_order_decide', { id, decision, note }),
+    saveCategories: (categories: string[]) => api.call<{ categories: string[] }>('admin_categories_save', { categories }),
+    importPlaylist: (p: { url: string; skill: string; category: string; limit?: number; reason?: string }) => api.call<{ added: number; skipped: number }>('admin_playlist_import', { ...p }),
     deleteSession: (id: string) => api.call<{ deleted: boolean }>('admin_session_delete', { id }),
     queue: () => api.call<{ classes: ClassItem[]; recs: Rec[] }>('admin_queue'),
     reviewClass: (id: string, decision: 'approve' | 'reject', reason?: string) => api.call<{ status: Status }>('admin_review_class', { id, decision, reason }),
