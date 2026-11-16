@@ -13,6 +13,7 @@ import {
 import { fileToB64, shrinkImage } from '../lib/files'
 import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
 import YouTubePanel from './StudyLabsYoutube'
+import WikiPanel from './StudyLabsWikipedia'
 import './StudyLabs.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
@@ -479,7 +480,7 @@ function ProgrammePage({ programme, user, onUnit, onSuggest, onSignIn }: { progr
 }
 
 function UnitPage({ unit, user, config, isAdmin, onSignIn, onReport }: { unit: Unit; user: User | null; config: LabsConfig | null; isAdmin: boolean; onSignIn: () => void; onReport: (r: Resource) => void }) {
-  const [type, setType] = useState<ResourceType | 'all' | 'youtube'>('all')
+  const [type, setType] = useState<ResourceType | 'all' | 'youtube' | 'wiki'>('all')
   const [list, setList] = useState<Resource[] | null>(null)
   const [msg, setMsg] = useState<Note>(null)
   const [uploading, setUploading] = useState(false)
@@ -512,9 +513,12 @@ function UnitPage({ unit, user, config, isAdmin, onSignIn, onReport }: { unit: U
       <div className="sl-tabs">
         {(['all', ...TYPES] as const).map((t) => <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t === 'all' ? 'All' : TYPE_LABELS[t]} <b>{counts[t] ?? 0}</b></button>)}
         <button className={`yt${type === 'youtube' ? ' on' : ''}`} onClick={() => setType('youtube')}><Play size={13} /> Find on YouTube</button>
+        <button className={`yt${type === 'wiki' ? ' on' : ''}`} onClick={() => setType('wiki')}><BookOpen size={13} /> Wikipedia</button>
       </div>
       <Msg msg={msg} />
-      {type === 'youtube' ? (
+      {type === 'wiki' ? (
+        <WikiPanel user={user} onSignIn={onSignIn} defaultQuery={unit.name} chips={[unit.name, `${unit.name} introduction`]} />
+      ) : type === 'youtube' ? (
         <YouTubePanel user={user} onSignIn={onSignIn} defaultQuery={unit.name}
           chips={[`${unit.name} lecture`, `${unit.name} tutorial`, `${unit.code} ${unit.name} revision`]}
           onPick={suggestVideo} pickLabel="Share with class" />

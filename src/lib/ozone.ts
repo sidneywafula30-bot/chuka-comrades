@@ -17,7 +17,7 @@ export type Config = {
     confessionMax: number; confessionPerDay: number; issueTitleMax: number; issueMax: number; questionMax: number; manifestoWords: number
     vibeMax: number; introNoteMax: number; imageBytes: number; videoBytes: number; maxMedia: number; galleryMax?: number
   }
-  studentEmailRequired: boolean; support: Support; youtubeUrl?: string; whatsappGroupUrl?: string
+  studentEmailRequired: boolean; support: Support; youtubeUrl?: string; whatsappGroupUrl?: string; newsEnabled?: boolean
 }
 export type TrendItem = { key: string; id: number; source: 'youtube' | 'tiktok'; videoId: string; url: string; title: string; author: string; thumb: string; vertical: boolean; pinned: boolean; live: boolean; createdAt: string }
 export type TrendList = { live: TrendItem | null; items: TrendItem[]; next: number | null }
@@ -29,7 +29,7 @@ export type Page<T> = { items: T[]; nextBefore: number | null }
 export type IssueStatus = 'verified' | 'sent' | 'responded' | 'resolved' | 'no_response'
 export type Issue = {
   id: number; facultyCode: string; facultyName: string; category: string; categoryLabel: string; title: string; details: string; media: Media[]
-  evidence: 'confirmed' | 'reported' | 'unverified'; status: IssueStatus; meToo: number
+  evidence: 'confirmed' | 'reported' | 'unverified'; status: IssueStatus; meToo: number; aspirantId?: number | null
   publishedAt: string; sentAt: string; respondedAt: string; resolvedAt: string
 }
 export type IssueUpdate = { kind: string; note: string; at: string }
@@ -38,7 +38,11 @@ export type IssueFull = Issue & { updates: IssueUpdate[]; iMeToo: boolean }
 export type Score = { total: number; sent: number; responded: number; resolved: number; noResponse: number; avgReplyDays: number | null }
 export type Faculty = { code: string; name: string; url: string; score: Score }
 export type Leader = { id: number; role: string; name: string; term: string; sourceUrl: string; status: string }
-export type Aspirant = { id: number; facultyCode: string; position: string; name: string; yearCourse: string; manifesto: string; photo: string; contact: string; status: string; sourceUrl: string; whatsappUrl: string; links: { label: string; url: string }[]; gallery: Media[] }
+export type Aspirant = { id: number; facultyCode: string; position: string; name: string; yearCourse: string; manifesto: string; photo: string; contact: string; status: string; sourceUrl: string; whatsappUrl: string; links: { label: string; url: string }[]; gallery: Media[]; acceptIssues?: boolean }
+export type AspirantFull = { aspirant: Aspirant; issues: Issue[] }
+export type MyAspirant = { id: number; name: string; position: string; facultyCode: string; status: string; acceptIssues: boolean }
+export type NewsItem = { id: string; title: string; summary: string; url: string; image: string; source: string; publishedAt: string; topic: 'politics' | 'general'; via: string }
+export type NewsList = { items: NewsItem[]; next: number | null; fetchedAt: string; note: string }
 export type AspirantGroup = { position: string; aspirants: Aspirant[] }
 export type FacultyFull = { code: string; name: string; url: string; score: Score; leaders: Leader[]; electionMode: boolean; aspirants?: AspirantGroup[] }
 export type Question = { id: number; facultyCode: string; position: string; question: string; votes: number; deadline: string; answers: { aspirantId: number; name: string; text: string; at: string }[] }

@@ -218,3 +218,20 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-share .oz-wa-share { color: #128c4a; font-weight: 700; }
 .tr-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .oz-sharebar { display: flex; justify-content: center; margin-top: 14px; }
+
+/* ---- news ---- */
+.nw-card { display: grid; gap: 0; padding: 0; overflow: hidden; }
+.nw-img { display: block; aspect-ratio: 16 / 9; background: var(--green-soft); }
+.nw-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nw-body { display: grid; gap: 8px; padding: 14px 16px 16px; }
+.nw-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.nw-meta small { color: var(--muted); }
+.nw-body h3 { margin: 0; font: 700 17px/1.35 'Manrope', sans-serif; }
+.nw-body h3 a { color: #12301f; text-decoration: none; }
+.nw-body h3 a:hover { text-decoration: underline; }
+.nw-body p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.nw-note { margin-top: 16px; }
+.oz-ic.e { background: #e8f0fe; color: #1a56c4; }
+.oz-aspissue { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.oz-inbox { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.oz-banner { padding: 10px 14px; border-radius: 12px; background: var(--green-soft); color: #12301f; font-size: 14px; }

@@ -1,3 +1,4 @@
+
 import { auth } from './firebase'
 
 /** Study Labs Apps Script web app URL (the /exec link). */
@@ -18,6 +19,14 @@ export type YtVideo = {
   channel: string
   publishedAt?: string
   thumbnail?: string
+}
+
+export type WikiPage = {
+  pageId: number
+  title: string
+  extract: string
+  thumbnail?: string
+  url: string
 }
 
 export type CalEvent = {
@@ -324,6 +333,7 @@ export const labsApi = {
   /** Signed-in student: trial / paid / expired status. Starts the 2-week trial on first call. */
   access: () => call<AccessInfo>('access'),
 
+
   /** Exam countdown for the landing page (public). */
   countdown: () => call<Countdown>('countdown'),
 
@@ -346,6 +356,10 @@ export const labsApi = {
 
   // YouTube search
   // Requires the Apps Script backend to implement "yt_search".
+
+  /** Wikipedia summaries for a topic (signed in, trial or paid). */
+  wikiSearch: (q: string) =>
+    call<WikiPage[]>('wiki_search', { q }),
 
   ytSearch: (q: string) =>
     call<YtVideo[]>('yt_search', { q }),

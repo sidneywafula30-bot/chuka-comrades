@@ -137,7 +137,7 @@ function IssueItem({ r, done }: { r: Row; done: () => void }) {
   const payload = { kind: 'issue', id: r.id, note, editedTitle: title !== r.title ? title : undefined, editedDetails: details !== r.details ? details : undefined }
   return (
     <>
-      <header className="oz-hd"><strong>#{pad(r.id, 3)}</strong><Pill tone={r.status === 'notified' ? 'blue' : 'grey'}>{r.status}</Pill><small>{r.facultyName} · {r.category}</small><small>{stamp(r.createdAt)}</small></header>
+      <header className="oz-hd"><strong>#{pad(r.id, 3)}</strong><Pill tone={r.status === 'notified' ? 'blue' : 'grey'}>{r.status}</Pill><small>{r.facultyName} · {r.category}</small>{r.aspirantId && <Pill tone="blue">For aspirant #{r.aspirantId}</Pill>}<small>{stamp(r.createdAt)}</small></header>
       {r.status === 'notified' && <small className={r.replyOverdue ? 'oz-over' : ''}>Right of reply until {stamp(r.replyDeadline)}{r.replyOverdue ? ' (passed)' : ''}</small>}
       <Flags flags={r.flags} />
       <input className="oz-edit" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
@@ -606,6 +606,7 @@ function AspirantTools() {
 
 const SETTING_LABELS: Record<string, string> = {
   SITE_URL: 'Site URL', ELECTION_MODE: 'Election mode', POSITIONS: 'Positions (JSON list)', STUDENT_EMAIL_DOMAINS: 'Student e-mail domains', BLOCKLIST: 'Extra blocked words', ADMIN_WHATSAPP: 'Admin WhatsApp', WA_GROUP_URL: 'WhatsApp group link (https://chat.whatsapp.com/...)',
+  NEWS_RSS_URLS: 'News RSS feed links (https, comma separated)', AUTO_PURGE_DAYS: 'Auto-clean confessions after N days (empty = off)',
 }
 function Settings() {
   const { data, err, loading } = useLoad(() => oz<Record<string, string | boolean>>('admin_settings_get'), [])
@@ -617,7 +618,7 @@ function Settings() {
   const set = (k: string, v: string) => setVals({ ...cur, [k]: v })
   return (
     <form className="cpl-form oz-form" onSubmit={(e) => { e.preventDefault(); void save('admin_settings_save', { values: cur }) }}>
-      <p className="cpl-sub oz-small">Firebase key: {data?.FIREBASE_CONFIGURED ? 'set' : <b className="oz-over">missing</b>} · Image check (Vision): {data?.VISION_CONFIGURED ? 'on' : 'off'}</p>
+      <p className="cpl-sub oz-small">Firebase key: {data?.FIREBASE_CONFIGURED ? 'set' : <b className="oz-over">missing</b>} · Image check (Vision): {data?.VISION_CONFIGURED ? 'on' : 'off'} · GNews key: {data?.NEWS_CONFIGURED ? 'set' : 'not set'}</p>
       {Object.entries(SETTING_LABELS).map(([k, l]) => k === 'ELECTION_MODE'
         ? <label key={k} className="cpl-file"><input type="checkbox" checked={cur[k] === 'true'} onChange={(e) => set(k, e.target.checked ? 'true' : 'false')} /> {l} (shows aspirants on faculty pages)</label>
         : <label key={k}>{l}<input type="text" value={cur[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></label>)}

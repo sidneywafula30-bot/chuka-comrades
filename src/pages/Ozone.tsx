@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
-import { ArrowLeft, Clapperboard, Flame, Megaphone, ShieldCheck, LifeBuoy, MessageCircle, Users } from 'lucide-react'
+import { ArrowLeft, Clapperboard, Flame, Megaphone, Newspaper, ShieldCheck, LifeBuoy, MessageCircle, Users } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { oz, ozReady, type Config, type Me } from '../lib/ozone'
 import { ShareButton, type OzCtx } from './OzCommon'
@@ -8,6 +8,7 @@ import { Compose, Feed, Thread } from './OzConfessions'
 import { AspirantPage, Elections, Faculties, FacultyPage, IssueDetail, Issues, Polls, Promises, ReportIssue } from './OzSauti'
 import Hookup from './OzHookup'
 import Trends from './OzTrends'
+import News from './OzNews'
 import Admin from './OzAdmin'
 import './Cpl.css'
 import './Efootball.css'
@@ -52,16 +53,17 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
   else if (page === 'confess') body = <Compose ctx={ctx} replyTo={arg} />
   else if (page === 'sauti') body = <Issues ctx={ctx} />
   else if (page === 'issue') body = <IssueDetail ctx={ctx} id={arg} />
-  else if (page === 'report') body = <ReportIssue ctx={ctx} />
+  else if (page === 'report') body = <ReportIssue ctx={ctx} aspirantId={arg} />
   else if (page === 'faculties') body = <Faculties />
   else if (page === 'faculty') body = <FacultyPage code={arg.toUpperCase()} ctx={ctx} />
   else if (page === 'polls') body = <Polls ctx={ctx} />
   else if (page === 'poll') body = <Polls ctx={ctx} only={arg} />
-  else if (page === 'aspirant') body = <AspirantPage id={arg} />
+  else if (page === 'aspirant') body = <AspirantPage id={arg} ctx={ctx} />
   else if (page === 'promises') body = <Promises />
   else if (page === 'aspirants') body = <Elections ctx={ctx} />
   else if (page === 'hookup') body = <Hookup ctx={ctx} />
   else if (page === 'trends') body = <Trends ctx={ctx} />
+  else if (page === 'news') body = <News ctx={ctx} />
   else if (page === 'admin') {
     body = !user ? <div className="cpl-home"><p className="cpl-empty">Sign in with Google to continue.</p><button type="button" className="lp-btn" onClick={signIn}>Sign in</button></div>
       : !me ? <p className="cpl-empty">Checking access…</p>
@@ -105,6 +107,11 @@ function Home({ ctx }: { ctx: OzCtx }) {
           <strong>Chuka Trends</strong>
           <small>Videos and live streams from campus. Scroll and watch.</small>
         </a>
+        <a className="oz-tile" href="#/ozone/news">
+          <span className="oz-ic e"><Newspaper size={24} /></span>
+          <strong>News</strong>
+          <small>Latest headlines and politics from Kenyan news sites.</small>
+        </a>
         <a className="oz-tile" href="#/ozone/hookup">
           <span className="oz-ic c">❤</span>
           <strong>Hookup <em>18+</em></strong>
@@ -121,6 +128,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
       )}
 
       <nav className="cpl-links" aria-label="O-Zone links">
+        <a className="cpl-link" href="#/ozone/news">News</a>
         <a className="cpl-link" href="#/ozone/confess">Confess now</a>
         <a className="cpl-link" href="#/ozone/report">Report an issue</a>
         <a className="cpl-link" href="#/ozone/faculties">Faculty scoreboard</a>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Hand, MessageCircle, PenLine } from 'lucide-react'
 import {
   ago, day, ISSUE_STATUS, oz, pad, snip, type Aspirant, type AspirantGroup, type Faculty, type FacultyFull, type Issue, type IssueFull, type Page,
-  type Poll, type Promise_, type Question, type Score, type Support, type Upload,
+  type AspirantFull, type MyAspirant, type Poll, type Promise_, type Question, type Score, type Support, type Upload,
 } from '../lib/ozone'
 import { Err, Gate, MediaPicker, MediaView, Pill, ReportButton, ShareButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
 
@@ -106,6 +106,7 @@ export function IssueDetail({ ctx, id }: { ctx: OzCtx; id: string }) {
           <h2>{data.title}</h2>
           <small>{data.facultyName} · {data.categoryLabel} · published {day(data.publishedAt)}</small>
           <p className="oz-text">{data.details}</p>
+          {data.aspirantId ? <p className="cpl-sub"><a className="cpl-link" href={`#/ozone/aspirant/${data.aspirantId}`}>Also sent to an aspirant's page</a></p> : null}
           <MediaView media={data.media} />
           <div className="oz-actions">
             <button type="button" className={`lp-btn${data.iMeToo ? ' lp-btn-soft' : ''}`} onClick={metoo} disabled={data.iMeToo}><Hand size={15} /> {data.iMeToo ? 'You said me too' : 'Me too'} · {data.meToo}</button>
@@ -124,8 +125,9 @@ export function IssueDetail({ ctx, id }: { ctx: OzCtx; id: string }) {
   )
 }
 
-export function ReportIssue({ ctx }: { ctx: OzCtx }) {
+export function ReportIssue({ ctx, aspirantId }: { ctx: OzCtx; aspirantId?: string }) {
   const cfg = ctx.cfg!
+  const target = useLoad(() => (aspirantId ? oz<AspirantFull>('aspirant_get', { id: Number(aspirantId) }) : Promise.resolve(null)), [aspirantId])
   const facs = useLoad(() => oz<{ faculties: Faculty[] }>('faculties'), [])
   const [f, setF] = useState({ facultyCode: 'ALL', category: 'other', title: '', details: '' })
   const [media, setMedia] = useState<Upload[]>([])
@@ -136,7 +138,7 @@ export function ReportIssue({ ctx }: { ctx: OzCtx }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setErr('')
-    try { setDone(await oz('issue_submit', { ...f, media: media.length ? media : undefined })) }
+    try { setDone(await oz('issue_submit', { ...f, aspirantId: aspirantId ? Number(aspirantId) : undefined, media: media.length ? media : undefined })) }
     catch (x) { setErr((x as Error).message) }
     finally { setBusy(false) }
   }
@@ -155,6 +157,10 @@ export function ReportIssue({ ctx }: { ctx: OzCtx }) {
       <a className="cpl-back" href="#/ozone/sauti">← All issues</a>
       <h2>Report an issue</h2>
       <p className="cpl-sub">Be factual. Name the office or service, never a person. Your identity is never shown.</p>
+      {target.data && (
+        <p className="oz-banner">This issue will also show on the page of <b>{target.data.aspirant.name}</b> ({target.data.aspirant.position}, {target.data.aspirant.facultyCode}) once the admin approves it.</p>
+      )}
+      <Err msg={target.err} />
       <Gate ctx={ctx} what="report an issue">
         <form className="cpl-card cpl-form oz-form" onSubmit={submit}>
           <div className="cpl-grid2">
@@ -354,7 +360,7 @@ function AspirantGroups({ groups }: { groups: AspirantGroup[] }) {
                 {a.photo ? <img src={a.photo} alt="" loading="lazy" /> : <span className="oz-noimg" />}
                 <div>
                   <strong>{a.name}</strong>
-                  <small>{a.yearCourse} · {a.facultyCode}{a.status !== 'cleared' ? ` · ${a.status}` : ''}</small>
+                  <small>{a.yearCourse} · {a.facultyCode}{a.status !== 'cleared' ? ` · ${a.status}` : ''}{a.acceptIssues ? ' · takes issues' : ''}</small>
                   <p>{a.manifesto}</p>
                   {a.gallery?.length > 0 && <MediaView media={a.gallery} />}
                   {a.contact && <small>Contact: {a.contact}</small>}
@@ -364,7 +370,10 @@ function AspirantGroups({ groups }: { groups: AspirantGroup[] }) {
                       {a.links?.map((l) => <a key={l.url} className="oz-chip" href={l.url} target="_blank" rel="noopener noreferrer nofollow">{l.label}</a>)}
                     </div>
                   )}
-                  <ShareButton text={`${a.name}, aspirant for ${g.position} (${a.facultyCode}). Read the manifesto and ask questions on Chuka O-Zone.`} path={`aspirant/${a.id}`} />
+                  <div className="oz-actions">
+                    <a className="lp-btn lp-btn-soft" href={`#/ozone/aspirant/${a.id}`}>Open page</a>
+                    <ShareButton text={`${a.name}, aspirant for ${g.position} (${a.facultyCode}). Read the manifesto and ask questions on Chuka O-Zone.`} path={`aspirant/${a.id}`} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -375,16 +384,50 @@ function AspirantGroups({ groups }: { groups: AspirantGroup[] }) {
   )
 }
 
-/** One aspirant on their own page, so their link can be shared. */
-export function AspirantPage({ id }: { id: string }) {
-  const { data, err, loading } = useLoad(() => oz<AspirantGroup[]>('aspirants_list'), [])
-  const groups = (data ?? []).map((g) => ({ ...g, aspirants: g.aspirants.filter((a) => String(a.id) === id) })).filter((g) => g.aspirants.length)
+/** One aspirant on their own page: profile, plus the verified issues students sent to this page. */
+export function AspirantPage({ id, ctx }: { id: string; ctx: OzCtx }) {
+  const { data, err, loading } = useLoad(() => oz<AspirantFull>('aspirant_get', { id: Number(id) }), [id])
+  const mine = useLoad(() => (ctx.user ? oz<{ items: MyAspirant[] }>('aspirant_mine').catch(() => ({ items: [] as MyAspirant[] })) : Promise.resolve({ items: [] as MyAspirant[] })), [ctx.user?.uid])
+  const [accept, setAccept] = useState<boolean | null>(null)
+  const [msg, setMsg] = useState('')
+  const isOwner = Boolean(mine.data?.items.some((x) => String(x.id) === id))
+  const open = accept ?? Boolean(data?.aspirant.acceptIssues)
+  async function toggle(v: boolean) {
+    try { const r = await oz<{ acceptIssues: boolean }>('aspirant_inbox_set', { id: Number(id), accept: v }); setAccept(r.acceptIssues); setMsg('') }
+    catch (x) { setMsg((x as Error).message) }
+  }
   return (
     <div className="oz-wrap">
       <a className="cpl-back" href="#/ozone/aspirants">← All aspirants</a>
       <Err msg={err} />{loading && !data && <p className="cpl-empty">Loading…</p>}
-      {data && !groups.length && <p className="cpl-empty">This aspirant is not listed.</p>}
-      {groups.length > 0 && <AspirantGroups groups={groups} />}
+      {data && (
+        <>
+          <AspirantGroups groups={[{ position: data.aspirant.position, aspirants: [data.aspirant] }]} />
+          {isOwner && (
+            <div className="cpl-card oz-inbox">
+              <label className="cpl-file"><input type="checkbox" checked={open} onChange={(e) => void toggle(e.target.checked)} /> Students can send issues to my page</label>
+              <small>Switching this off stops new issues. Issues already approved stay public.</small>
+              <Err msg={msg} />
+            </div>
+          )}
+          <div className="oz-title">
+            <h3 className="cpl-h3">Issues sent to {data.aspirant.name}</h3>
+            {open && <a className="lp-btn" href={`#/ozone/report/${data.aspirant.id}`}><PenLine size={15} /> Send an issue</a>}
+          </div>
+          <p className="cpl-sub oz-small">Issues are checked by the admin before they appear. They describe a problem, not a person.</p>
+          <div className="oz-list">
+            {data.issues.map((i) => (
+              <a key={i.id} className="cpl-card oz-issue" href={`#/ozone/issue/${i.id}`}>
+                <header><strong>#{pad(i.id, 3)}</strong><Pill tone={tone(i.status)}>{ISSUE_STATUS[i.status]}</Pill></header>
+                <h3>{i.title}</h3>
+                <small>{i.categoryLabel} · {ago(i.publishedAt)}</small>
+                <span className="oz-metoo"><Hand size={14} /> {i.meToo} me too</span>
+              </a>
+            ))}
+            {!data.issues.length && <p className="cpl-empty">{open ? 'No issues yet. Be the first to send one.' : 'This aspirant is not taking issues on their page.'}</p>}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -469,6 +512,7 @@ function AskForm({ ctx, cfg, faculties, onDone }: { ctx: OzCtx; cfg: NonNullable
 
 function ApplyForm({ ctx, cfg, faculties, onDone }: { ctx: OzCtx; cfg: NonNullable<OzCtx['cfg']>; faculties: Faculty[]; onDone: () => void }) {
   const [f, setF] = useState({ facultyCode: faculties[0]?.code ?? '', position: cfg.positions[0] ?? '', name: '', yearCourse: '', manifesto: '', contact: '', whatsappUrl: '', instagram: '', x: '', tiktok: '', facebook: '' })
+  const [acceptIssues, setAcceptIssues] = useState(false)
   const [photo, setPhoto] = useState<Upload[]>([])
   const [gallery, setGallery] = useState<Upload[]>([])
   const [err, setErr] = useState('')
@@ -478,7 +522,7 @@ function ApplyForm({ ctx, cfg, faculties, onDone }: { ctx: OzCtx; cfg: NonNullab
     e.preventDefault(); setBusy(true); setErr('')
     const { instagram, x, tiktok, facebook, ...rest } = f
     const links = [instagram, x, tiktok, facebook].map((v) => v.trim()).filter(Boolean)
-    try { await oz('aspirant_apply', { ...rest, links, facultyCode: f.facultyCode || faculties[0]?.code, photo: photo[0], gallery }); onDone() } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
+    try { await oz('aspirant_apply', { ...rest, links, acceptIssues, facultyCode: f.facultyCode || faculties[0]?.code, photo: photo[0], gallery }); onDone() } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
   }
   return (
     <Gate ctx={ctx} what="apply as an aspirant">
@@ -504,6 +548,7 @@ function ApplyForm({ ctx, cfg, faculties, onDone }: { ctx: OzCtx; cfg: NonNullab
           <label>TikTok (optional)<input type="url" inputMode="url" value={f.tiktok} maxLength={200} placeholder="https://tiktok.com/@yourname" onChange={(e) => setF({ ...f, tiktok: e.target.value })} /></label>
           <label>Facebook (optional)<input type="url" inputMode="url" value={f.facebook} maxLength={200} placeholder="https://facebook.com/yourname" onChange={(e) => setF({ ...f, facebook: e.target.value })} /></label>
         </div>
+        <label className="cpl-file"><input type="checkbox" checked={acceptIssues} onChange={(e) => setAcceptIssues(e.target.checked)} /> Let students send issues to my page (the admin checks every issue first; I cannot edit or hide them)</label>
         <div><span className="oz-lbl">Your photo (optional)</span><MediaPicker cfg={{ ...cfg, limits: { ...cfg.limits, maxMedia: 1 } }} allowVideo={false} onChange={setPhoto} /></div>
         <div><span className="oz-lbl">Campaign posters (optional, up to {cfg.limits.galleryMax ?? 3})</span><MediaPicker cfg={{ ...cfg, limits: { ...cfg.limits, maxMedia: cfg.limits.galleryMax ?? 3 } }} allowVideo={false} label="Add poster" onChange={setGallery} /></div>
         <Err msg={err} />

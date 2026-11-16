@@ -119,3 +119,11 @@
 .sl-ev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .sl-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px!important}.sl-check input{width:auto!important}
 @media(max-width:850px){.sl-yt-grid{grid-template-columns:1fr}.sl-cal-layout{grid-template-columns:1fr}}
+
+/* Wikipedia panel */
+.sl-wiki-list{display:grid;gap:12px;margin-bottom:20px}
+.sl-wiki-card{display:flex;gap:12px;background:#fff;border:1px solid #e5ece7;border-radius:16px;padding:12px;min-width:0;box-shadow:0 5px 18px #1b4a3010}
+.sl-wiki-card img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:none;background:#eef3ef}
+.sl-wiki-card h4{margin:0 0 4px;font-size:15px;color:#193a2c;overflow-wrap:anywhere}
+.sl-wiki-card p{margin:0 0 8px;font-size:13px;line-height:1.5;color:#3b4f44;overflow-wrap:anywhere}
+@media (max-width:520px){.sl-wiki-card img{width:64px;height:64px}}
