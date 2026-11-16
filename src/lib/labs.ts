@@ -29,6 +29,18 @@ export type WikiPage = {
   url: string
 }
 
+export type AdminUnit = { id: string; programmeId: string; year: number; semester: number; code: string; name: string; status: 'active' | 'hidden' }
+
+export type ScanCandidate = { unitId: string; code: string; name: string; programmeName: string; year: number; semester: number }
+export type ScanResult = {
+  isExamPaper: boolean
+  unitCode: string
+  unitName: string
+  examType: string
+  academicYear: string
+  candidates: ScanCandidate[]
+}
+
 export type CalEvent = {
   id: string
   title: string
@@ -361,6 +373,10 @@ export const labsApi = {
   wikiSearch: (q: string) =>
     call<WikiPage[]>('wiki_search', { q }),
 
+  /** AI reads a photo of a CAT or paper and suggests the unit, exam type and academic year. */
+  scanPaper: (image: string) =>
+    call<ScanResult>('scan_paper', { image }),
+
   ytSearch: (q: string) =>
     call<YtVideo[]>('yt_search', { q }),
 
@@ -577,6 +593,8 @@ export const labsApi = {
         programmeId,
         text,
       }),
+
+    units: (programmeId: string) => call<AdminUnit[]>('admin_units', { programmeId }),
 
     updateUnit: (
       id: string,

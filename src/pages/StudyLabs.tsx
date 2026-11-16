@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
 import {
-  ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
+  ArrowLeft, BookOpen, Camera, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
   LoaderCircle, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
 } from 'lucide-react'
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
   shareUrl, resourceIdFromHash, youtubeId, youtubeThumb, PAYWALL_EVENT,
-  type AccessInfo, type AccessUser, type Countdown, type PaymentInfo,
+  type AccessInfo, type AccessUser, type AdminUnit, type Countdown, type PaymentInfo,
   type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
 } from '../lib/labs'
 import { fileToB64, shrinkImage } from '../lib/files'
 import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
 import YouTubePanel from './StudyLabsYoutube'
 import WikiPanel from './StudyLabsWikipedia'
+import ScanBody from './StudyLabsScan'
 import './StudyLabs.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
@@ -341,9 +342,9 @@ function UnitRow({ u, onOpen }: { u: Unit; onOpen: (u: Unit) => void }) {
   )
 }
 
-function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport, isAdmin }: {
+function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport, isAdmin, onScan }: {
   programmes: Programme[]; loading: boolean; onProgramme: (p: Programme) => void; onUnit: (u: Unit) => void
-  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void; isAdmin: boolean
+  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void; isAdmin: boolean; onScan: () => void
 }) {
   const [q, setQ] = useState('')
   const [level, setLevel] = useState('All')
@@ -393,6 +394,7 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
           <span className="sl-kicker">CHUKA STUDY LABS</span>
           <h1>Notes, CATs &amp; past papers <em>by comrades, for comrades</em></h1>
           <p>Find your programme, open your unit and download what other students have shared. Add your own to help the next class.</p>
+          <button className="sl-primary inline" onClick={onScan}><Camera size={15} /> Scan a CAT or paper</button>
         </div>
         <div className="sl-hero-art"><BookOpen size={46} /><span>Study together</span></div>
       </section>
@@ -872,6 +874,78 @@ function SuggestionsTab({ expected, reload, setMsg, onChanged }: { expected: num
   )
 }
 
+
+/** Admin: all units of one programme grouped by year and semester. Edit, move, hide, delete. */
+function UnitManager({ programme, refreshToken, setMsg, onChanged }: { programme: Programme; refreshToken: number; setMsg: (n: Note) => void; onChanged: () => void }) {
+  const [units, setUnits] = useState<AdminUnit[] | null>(null)
+  const [editId, setEditId] = useState('')
+  const [draft, setDraft] = useState({ code: '', name: '', year: 1, semester: 1 })
+  const [picked, setPicked] = useState<string[]>([])
+  const [mv, setMv] = useState({ year: 1, semester: 1 })
+  const [busy, setBusy] = useState(false)
+  const load = useCallback(() => labsApi.admin.units(programme.id).then(setUnits).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setUnits([]) }), [programme.id, setMsg])
+  useEffect(() => { void load() }, [load, refreshToken])
+
+  async function act(fn: () => Promise<string>) {
+    setBusy(true)
+    try { setMsg({ type: 'ok', text: await fn() }); await load(); onChanged() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  function startEdit(u: AdminUnit) { setEditId(u.id); setDraft({ code: u.code, name: u.name, year: u.year, semester: u.semester }) }
+  function toggle(id: string) { setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])) }
+
+  if (!units) return <Loading />
+  const years = Array.from({ length: Math.max(programme.years || 4, ...units.map((u) => u.year), 1) }, (_, i) => i + 1)
+  return (
+    <section className="sl-card">
+      <h2>Edit units in {programme.name}</h2>
+      {units.length === 0 && <p className="sl-sub">No units yet. Add some above.</p>}
+      {picked.length > 0 && (
+        <div className="sl-row-actions">
+          <strong>{picked.length} selected</strong>
+          <label>Move to year<select value={mv.year} onChange={(e) => setMv({ ...mv, year: Number(e.target.value) })}>{years.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}</select></label>
+          <label>Semester<select value={mv.semester} onChange={(e) => setMv({ ...mv, semester: Number(e.target.value) })}>{[1, 2, 3].map((s) => <option key={s} value={s}>{semesterLabel(s)}</option>)}</select></label>
+          <button className="sl-primary small" disabled={busy} onClick={() => void act(async () => {
+            for (const id of picked) await labsApi.admin.updateUnit(id, { year: mv.year, semester: mv.semester })
+            const n = picked.length; setPicked([]); return `Moved ${n} unit${n === 1 ? '' : 's'} to ${yearLabel(mv.year)}, ${semesterLabel(mv.semester)}.`
+          })}>Move</button>
+          <button className="sl-mini ghost" onClick={() => setPicked([])}>Clear</button>
+        </div>
+      )}
+      {years.map((y) => [1, 2, 3].map((sem) => {
+        const group = units.filter((u) => u.year === y && u.semester === sem)
+        if (group.length === 0) return null
+        return (
+          <div key={`${y}-${sem}`}>
+            <h3>{yearLabel(y)} · {semesterLabel(sem)} <small>({group.length})</small></h3>
+            <div className="sl-unit-list">
+              {group.map((u) => editId === u.id ? (
+                <form key={u.id} className="sl-form inline" onSubmit={(e) => { e.preventDefault(); void act(async () => { await labsApi.admin.updateUnit(u.id, { code: draft.code.trim(), name: draft.name.trim(), year: draft.year, semester: draft.semester }); setEditId(''); return 'Unit saved.' }) }}>
+                  <label>Code<input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></label>
+                  <label>Name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+                  <label>Year<select value={draft.year} onChange={(e) => setDraft({ ...draft, year: Number(e.target.value) })}>{years.map((yy) => <option key={yy} value={yy}>{yearLabel(yy)}</option>)}</select></label>
+                  <label>Semester<select value={draft.semester} onChange={(e) => setDraft({ ...draft, semester: Number(e.target.value) })}>{[1, 2, 3].map((s) => <option key={s} value={s}>{semesterLabel(s)}</option>)}</select></label>
+                  <button className="sl-primary small" disabled={busy}>Save</button>
+                  <button type="button" className="sl-mini ghost" onClick={() => setEditId('')}>Cancel</button>
+                </form>
+              ) : (
+                <div key={u.id} className="sl-unit static">
+                  <label className="sl-unit-name"><input type="checkbox" checked={picked.includes(u.id)} onChange={() => toggle(u.id)} />{' '}
+                    <strong>{u.code}</strong> · {u.name}{u.status === 'hidden' ? <small> · hidden</small> : null}</label>
+                  <span className="sl-foot-actions">
+                    <button className="sl-mini" disabled={busy} onClick={() => startEdit(u)}>Edit</button>
+                    <button className="sl-mini ghost" disabled={busy} onClick={() => void act(async () => { await labsApi.admin.updateUnit(u.id, { status: u.status === 'active' ? 'hidden' : 'active' }); return u.status === 'active' ? 'Unit hidden from students.' : 'Unit is live.' })}>{u.status === 'active' ? 'Hide' : 'Show'}</button>
+                    <button className="sl-mini ghost" disabled={busy} onClick={() => { if (window.confirm(`Delete ${u.code}? This cannot be undone.`)) void act(async () => { await labsApi.admin.deleteUnit(u.id); return 'Unit deleted.' }) }}>Delete</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      }))}
+    </section>
+  )
+}
+
 function CatalogueTab({ setMsg, onChanged }: { setMsg: (n: Note) => void; onChanged: () => void }) {
   const [progs, setProgs] = useState<Programme[] | null>(null)
   const [sel, setSel] = useState('')
@@ -879,12 +953,13 @@ function CatalogueTab({ setMsg, onChanged }: { setMsg: (n: Note) => void; onChan
   const [np, setNp] = useState({ name: '', level: 'Undergraduate', department: '', years: 4 })
   const [uf, setUf] = useState({ year: 1, semester: 1, code: '', name: '' })
   const [bulk, setBulk] = useState('')
+  const [tick, setTick] = useState(0)
   const load = useCallback(() => labsApi.admin.programmes().then(setProgs).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setProgs([]) }), [setMsg])
   useEffect(() => { void load() }, [load])
 
   async function run(fn: () => Promise<string>) {
     setBusy(true); setMsg(null)
-    try { setMsg({ type: 'ok', text: await fn() }); await load(); onChanged() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+    try { setMsg({ type: 'ok', text: await fn() }); await load(); setTick((n) => n + 1); onChanged() } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
   }
   if (!progs) return <Loading />
   return (
@@ -899,7 +974,7 @@ function CatalogueTab({ setMsg, onChanged }: { setMsg: (n: Note) => void; onChan
             <div key={p.id} className={`sl-unit static${sel === p.id ? ' sel' : ''}`}>
               <span className="sl-unit-name"><strong>{p.name}</strong><small>{[p.level, p.department, `${p.years} yrs`].filter(Boolean).join(' · ')}</small></span>
               <span className="sl-foot-actions">
-                <button className="sl-mini" onClick={() => setSel(sel === p.id ? '' : p.id)}>{sel === p.id ? 'Close' : 'Add units'}</button>
+                <button className="sl-mini" onClick={() => setSel(sel === p.id ? '' : p.id)}>{sel === p.id ? 'Close' : 'Units'}</button>
                 <button className={`sl-mini ${p.active ? '' : 'ghost'}`} disabled={busy} onClick={() => run(async () => { await labsApi.admin.updateProgramme(p.id, { active: !p.active }); return p.active ? 'Programme hidden.' : 'Programme is live.' })}>{p.active ? 'Hide' : 'Show'}</button>
               </span>
             </div>
@@ -932,6 +1007,7 @@ function CatalogueTab({ setMsg, onChanged }: { setMsg: (n: Note) => void; onChan
           </div>
         </section>
       )}
+      {sel && progs.find((p) => p.id === sel) && <UnitManager programme={progs.find((p) => p.id === sel) as Programme} refreshToken={tick} setMsg={setMsg} onChanged={onChanged} />}
     </>
   )
 }
@@ -950,6 +1026,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
   const [suggesting, setSuggesting] = useState<Programme | null>(null)
   const [toast, setToast] = useState<Note>(null)
   const [access, setAccess] = useState<AccessInfo | null>(null)
+  const [scanning, setScanning] = useState(false)
   const [paywall, setPaywall] = useState<{ payment: PaymentInfo | null } | null>(null)
 
   useEffect(() => {
@@ -1019,7 +1096,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       <TrialBanner access={access} onPay={() => setPaywall({ payment: access?.payment ?? null })} />
 
       {view.name === 'home' && (
-        <Home programmes={programmes} loading={loading} user={user} isAdmin={isAdmin} onProgramme={(p) => setView({ name: 'programme', programme: p })}
+        <Home programmes={programmes} loading={loading} user={user} isAdmin={isAdmin} onScan={() => (user ? setScanning(true) : onSignIn())} onProgramme={(p) => setView({ name: 'programme', programme: p })}
           onUnit={(u) => openUnit(u)} onReport={setReporting} onResourceError={(m) => setToast({ type: 'err', text: m })} />
       )}
       {view.name === 'programme' && <ProgrammePage programme={view.programme} user={user} onSignIn={onSignIn} onUnit={(u) => openUnit(u, view.programme)} onSuggest={() => setSuggesting(view.programme)} />}
@@ -1028,6 +1105,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {view.name === 'mine' && user && <MinePage />}
       {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
 
+      {scanning && <Modal title="Scan a CAT or paper" onClose={() => setScanning(false)}><ScanBody onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
       {paywall && <PaywallModal payment={paywall.payment} email={user?.email} onClose={() => setPaywall(null)} />}
       {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
       {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}
