@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { onAuthStateChanged, signInWithPopup, type User } from 'firebase/auth'
 import { auth, firebaseReady, googleProvider } from './lib/firebase'
 import { syncProfile } from './lib/profile'
+import { markSignedIn, markSignedOut, wasSignedIn } from './lib/session'
+import SessionNotice from './components/SessionNotice'
 import Preloader from './components/Preloader'
 import InstallPopup from './components/InstallPopup'
 import Landing from './pages/Landing'
@@ -30,6 +32,7 @@ export default function App() {
   const [showPreloader, setShowPreloader] = useState(true)
   const [authChecked, setAuthChecked] = useState(!firebaseReady)
   const [user, setUser] = useState<User | null>(null)
+  const [lostSession, setLostSession] = useState(false)
   const hash = useHash()
   const inCpl = hash.startsWith('#/cpl')
   const inHostel = hash.startsWith('#/hostel')
@@ -48,6 +51,8 @@ export default function App() {
     return onAuthStateChanged(auth, (u) => {
       setUser(u)
       setAuthChecked(true)
+      if (u) { markSignedIn(); setLostSession(false) }
+      else if (wasSignedIn()) setLostSession(true) // signed in before, but the browser lost the session
     })
   }, [])
 
@@ -75,6 +80,7 @@ export default function App() {
   return (
     <>
       {inCy ? <Cyber user={user} route={hash} /> : inGigs ? <Gigs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSkills ? <Skills user={user} onSignIn={signIn} onBack={leaveSoko} /> : inLabs ? <StudyLabs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSoko ? <Soko user={user} onSignIn={signIn} onBack={leaveSoko} /> : inCpl ? <Cpl user={user} route={hash} /> : inOz ? <Ozone user={user} route={hash} /> : inEf ? <Efootball user={user} route={hash} /> : inHostel ? <Hostel user={user} /> : inMedia ? <Media /> : <Landing user={user} />}
+      {!showPreloader && <SessionNotice lostSession={lostSession && !user} onSignIn={signIn} onDismissLost={() => { markSignedOut(); setLostSession(false) }} />}
       {!showPreloader && <InstallPopup />}
       {showPreloader && <Preloader ready={authChecked} onDone={done} />}
     </>

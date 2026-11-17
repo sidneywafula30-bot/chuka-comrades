@@ -5,6 +5,7 @@ import {
   ArrowLeft, BadgeCheck, BedDouble, Building2, ChevronLeft, ChevronRight, Clock, DoorOpen, Droplets,
   ExternalLink, Footprints, MapPin, Phone, RefreshCw, Search, ShieldCheck, Sofa, Table2, Wifi, X, Zap,
 } from 'lucide-react'
+import { markSignedOut } from '../lib/session'
 import { auth, googleProvider } from '../lib/firebase'
 import {
   ADMIN_WHATSAPP, DEFAULT_SETTINGS, STUDENT_GROUP_URL, cleanProvided, hostelApi, hostelReady, isFull, isStale, kes, niceDateTime,
@@ -93,7 +94,7 @@ export default function Hostel({ user }: { user: User | null }) {
   async function handleSignOut() {
     if (!auth) return
     setAuthBusy(true)
-    try { await signOut(auth); setTab('browse') } finally { setAuthBusy(false) }
+    try { markSignedOut(); await signOut(auth); setTab('browse') } finally { setAuthBusy(false) }
   }
 
   const areas = useMemo(() => Array.from(new Set(hostels.map((h) => h.area).filter(Boolean))).sort(), [hostels])

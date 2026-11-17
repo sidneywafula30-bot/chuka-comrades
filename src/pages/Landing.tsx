@@ -4,6 +4,7 @@ import {
   BookOpen, Building2, ChevronRight, Clapperboard, ExternalLink, Gamepad2, GraduationCap, Download, Mail, MapPin, MessageCircle, Monitor, Phone, ShieldAlert, ShoppingBag, Stethoscope, Trophy, Wallet,
 } from 'lucide-react'
 import { auth, firebaseReady, googleProvider } from '../lib/firebase'
+import { markSignedOut } from '../lib/session'
 import { GoogleMapsLogo, YouTubeLogo } from '../components/BrandLogos'
 import Avatar from '../components/Avatar'
 import GoogleSignInButton from '../components/GoogleSignInButton'
@@ -106,7 +107,7 @@ export default function Landing({ user }: { user: User | null }) {
   async function handleSignOut() {
     if (!auth) return
     setBusy(true)
-    try { await signOut(auth) } finally { setBusy(false) }
+    try { markSignedOut(); await signOut(auth) } finally { setBusy(false) }
   }
 
   const firstName = user?.displayName?.split(' ')[0]
