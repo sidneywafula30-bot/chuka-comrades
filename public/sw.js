@@ -1,8 +1,11 @@
 /* Chuka Comrades service worker: offline app shell.
    Only same-origin files are cached. API calls (Supabase, Firebase, etc.) always go to the network. */
-const VERSION = 'v3'
+const VERSION = 'v4'
 const CACHE = `comrades-${VERSION}`
 const SCOPE = self.registration.scope
+
+// Background "scan a paper" jobs: keep working after the page or browser is closed.
+try { importScripts(SCOPE + 'scan-runner.js') } catch (err) { /* the scan job just runs in the page instead */ }
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -48,6 +51,30 @@ self.addEventListener('fetch', (e) => {
         return res
       }).catch(() => cached)
       return cached || fresh
+    }),
+  )
+})
+
+// Start (or continue) a scan job when the browser lets the service worker run in the background.
+self.addEventListener('sync', (e) => {
+  if (e.tag === 'comrades-scan' && self.__scanRunner) e.waitUntil(self.__scanRunner.resumeAll())
+})
+
+// Fallback for browsers without Background Sync: the page asks the worker to run the job.
+self.addEventListener('message', (e) => {
+  const d = e.data || {}
+  if (d.type !== 'scan-run' || !self.__scanRunner) return
+  if (e.ports && e.ports[0]) e.ports[0].postMessage('ok')
+  e.waitUntil(self.__scanRunner.run(d.id))
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = (e.notification.data && e.notification.data.url) || SCOPE
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) { c.navigate?.(url).catch(() => {}); return c.focus() } }
+      return self.clients.openWindow(url)
     }),
   )
 })

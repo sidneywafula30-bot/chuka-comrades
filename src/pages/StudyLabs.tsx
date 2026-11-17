@@ -15,6 +15,7 @@ import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
 import YouTubePanel from './StudyLabsYoutube'
 import WikiPanel from './StudyLabsWikipedia'
 import ScanBody from './StudyLabsScan'
+import { scanJob } from '../lib/scanJob'
 import { QaViewer } from './StudyLabsQa'
 import './StudyLabs.css'
 
@@ -1033,6 +1034,13 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
   const [toast, setToast] = useState<Note>(null)
   const [access, setAccess] = useState<AccessInfo | null>(null)
   const [scanning, setScanning] = useState(false)
+  // A scan started earlier (maybe before the browser was closed) is still running or has finished: show it.
+  useEffect(() => {
+    if (!user) return
+    let live = true
+    void scanJob.pending(user.uid).then((j) => { if (live && j) setScanning(true) }).catch(() => {})
+    return () => { live = false }
+  }, [user])
   const [paywall, setPaywall] = useState<{ payment: PaymentInfo | null } | null>(null)
 
   useEffect(() => {
@@ -1111,7 +1119,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {view.name === 'mine' && user && <MinePage />}
       {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
 
-      {scanning && <Modal title="Scan a CAT or paper" wide onClose={() => setScanning(false)}><ScanBody onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
+      {scanning && <Modal title="Scan a CAT or paper" wide onClose={() => setScanning(false)}><ScanBody uid={user?.uid ?? ''} onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
       {paywall && <PaywallModal payment={paywall.payment} email={user?.email} onClose={() => setPaywall(null)} />}
       {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
       {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}

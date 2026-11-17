@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, CheckCircle2, FileText, ImagePlus, LoaderCircle, Sparkles, X } from 'lucide-react'
 import {
   labsApi, EXAM_TYPES, yearLabel, semesterLabel, currentAcademicYear,
-  type Programme, type QaQuestion, type ScanCandidate, type ScanPageResult, type Unit,
+  type Programme, type QaQuestion, type ScanCandidate, type Unit,
 } from '../lib/labs'
 import { shrinkImage } from '../lib/files'
+import { scanJob, type ScanJob } from '../lib/scanJob'
 import LiveCamera from './StudyLabsCamera'
 import { QaList, type AnswerState } from './StudyLabsQa'
 
@@ -12,20 +13,23 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'Something went
 const MAX_PAGES = 8
 const BATCH = 4
 
-type Phase = 'capture' | 'camera' | 'reading' | 'readfail' | 'review' | 'saving' | 'done'
+type Phase = 'capture' | 'camera' | 'working' | 'jobfail' | 'review' | 'saving' | 'done'
 type Meta = { isExamPaper: boolean; unitCode: string; unitName: string; duration: string; totalMarks: string; instructions: string; duplicate: boolean }
 
 /**
  * "Scan a CAT or paper" window.
  * 1) take pages with the live camera (or pick photos)  2) AI types the paper out page by page
- * 3) AI writes an answer for every question while you review  4) a clean PDF is saved, not the photos.
+ * 3) AI writes an answer for every question  4) a clean PDF is saved, not the photos.
+ * Steps 2-4 run as a background job (see lib/scanJob.ts): they carry on after this window or the browser is closed.
  */
-export default function ScanBody({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+export default function ScanBody({ uid, onClose, onDone }: { uid: string; onClose: () => void; onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>('capture')
   const [files, setFiles] = useState<File[]>([])
   const [thumbs, setThumbs] = useState<string[]>([])
   const [err, setErr] = useState('')
-  const [progress, setProgress] = useState({ i: 0, total: 0 })
+  const [jobId, setJobId] = useState('')
+  const [job, setJob] = useState<ScanJob | null>(null)
+  const [pageCount, setPageCount] = useState(0)
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [cands, setCands] = useState<ScanCandidate[]>([])
@@ -44,8 +48,6 @@ export default function ScanBody({ onClose, onDone }: { onClose: () => void; onD
   const [pUnits, setPUnits] = useState<Unit[] | null>(null)
 
   // Refs hold the latest values for the async loops (reading pages, writing answers).
-  const pageRes = useRef<(ScanPageResult | undefined)[]>([])
-  const failedAt = useRef(0)
   const qRef = useRef<QaQuestion[]>([])
   const metaRef = useRef<Meta | null>(null)
   const idSeq = useRef(0)
@@ -72,58 +74,72 @@ export default function ScanBody({ onClose, onDone }: { onClose: () => void; onD
     setFiles((cur) => [...cur, ...imgs].slice(0, MAX_PAGES))
   }
 
-  /* ---------- 2. read the pages ---------- */
+  /* ---------- 2. hand the pages to the background job ---------- */
 
-  async function readPages(from: number) {
-    setPhase('reading'); setErr('')
-    for (let i = from; i < files.length; i++) {
-      setProgress({ i: i + 1, total: files.length })
-      try {
-        const small = await shrinkImage(files[i], 1600, 0.72)
-        pageRes.current[i] = await labsApi.scanPage(small.split(',')[1] ?? '', i + 1)
-      } catch (e) {
-        failedAt.current = i
-        setErr(e instanceof Error && e.message === 'bad image' ? 'That photo format is not supported. Use the live camera, or a JPG or PNG photo.' : errMsg(e))
-        setPhase('readfail')
-        return
-      }
-    }
-    finishReading()
-  }
-
-  function finishReading() {
-    const pages = pageRes.current.filter((p): p is ScanPageResult => Boolean(p))
-    const qs: QaQuestion[] = []
-    for (const p of pages) {
-      for (const q of p.questions) {
-        const last = qs[qs.length - 1]
-        if (q.continued && last) { last.text = `${last.text}\n${q.text}`; if (!last.marks && q.marks) last.marks = q.marks; continue }
-        if (qs.length >= 60) break
-        idSeq.current += 1
-        qs.push({ id: `q${idSeq.current}`, number: q.number, text: q.text, marks: q.marks, answer: '' })
-      }
-    }
-    if (!qs.length) {
-      setErr('No questions could be read. Retake the photos: good light, whole page in the frame, text sharp.')
+  async function startScan() {
+    setErr('')
+    try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission() } catch { /* ignore */ }
+    setPhase('working'); setJob(null)
+    try {
+      const images: string[] = []
+      for (const f of files) images.push((await shrinkImage(f, 1600, 0.72)).split(',')[1] ?? '')
+      const j = await scanJob.create(images)
+      setJobId(j.id); setJob(j)
+      void scanJob.start(j.id)
+    } catch (e) {
+      setErr(e instanceof Error && e.message === 'bad image' ? 'That photo format is not supported. Use the live camera, or a JPG or PNG photo.' : errMsg(e))
       setPhase('capture')
-      return
     }
-    const first = (k: 'unitCode' | 'unitName' | 'examType' | 'academicYear' | 'duration' | 'totalMarks' | 'instructions') => pages.map((p) => p[k]).find(Boolean) ?? ''
-    const m: Meta = {
-      isExamPaper: pages.some((p) => p.isExamPaper), unitCode: first('unitCode'), unitName: first('unitName'),
-      duration: first('duration'), totalMarks: first('totalMarks'), instructions: first('instructions'), duplicate: pages.some((p) => p.duplicate),
-    }
-    const candidates = pages.find((p) => p.candidates.length)?.candidates ?? []
-    const et = first('examType') || 'CAT'
-    const year = first('academicYear')
-    metaRef.current = m; setMeta(m)
-    setCands(candidates); setUnitId(candidates[0]?.unitId ?? ''); setManual(candidates.length === 0)
-    setExamType(et); if (year) setAy(year)
-    setTitle(`${candidates[0]?.code || m.unitCode || ''} ${et}${year ? ' ' + year : ''}`.trim())
-    setQs(qs); setState(Object.fromEntries(qs.map((q) => [q.id, 'wait' as AnswerState])))
-    setAnswerErr(''); setPhase('review')
-    void answerIds(qs.map((q) => q.id), run.current)
   }
+
+  /** Shows what the background job produced: done, needs a quick look, or failed. */
+  function showFinal(j: ScanJob) {
+    setJobId(j.id); setJob(j)
+    if (j.status === 'done') { setPhase('done'); onDone(); void scanJob.ack(j.id); return }
+    if (j.status === 'failed') { setErr(j.error || 'The paper could not be read.'); setPhase('jobfail'); return }
+    loadReview(j)
+  }
+
+  /** The job finished reading and answering but needs a person to confirm something (unit, missing answers). */
+  function loadReview(j: ScanJob) {
+    run.current += 1
+    const qs = j.questions
+    idSeq.current = qs.length + 100
+    metaRef.current = j.meta; setMeta(j.meta)
+    setCands(j.cands); setUnitId(j.cands[0]?.unitId ?? ''); setManual(j.cands.length === 0)
+    setExamType(j.examType); setAy(j.ay); setTitle(j.title); setPageCount(j.pagesRead)
+    setQs(qs); setState(Object.fromEntries(qs.map((q) => [q.id, (q.answer ? 'done' : 'wait') as AnswerState])))
+    setAnswerErr(''); setErr(j.reason ?? ''); setPhase('review')
+    const missing = qs.filter((q) => !q.answer).map((q) => q.id)
+    if (missing.length) void answerIds(missing, run.current)
+  }
+
+  // Coming back (window reopened, browser reopened, notification tapped): pick the job up where it is.
+  useEffect(() => {
+    if (!uid) return
+    let live = true
+    void scanJob.pending(uid).then((j) => {
+      if (!live || !j) return
+      if (j.status === 'done' || j.status === 'failed' || j.status === 'needs_review') { showFinal(j); return }
+      setJobId(j.id); setJob(j); setPhase('working'); void scanJob.resume(j.id)
+    }).catch(() => {})
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid])
+
+  // While the job runs, show its progress.
+  useEffect(() => {
+    if (phase !== 'working' || !jobId) return
+    const t = setInterval(() => {
+      void scanJob.get(jobId).then((j) => {
+        if (!j) return
+        if (j.status === 'done' || j.status === 'failed' || j.status === 'needs_review') showFinal(j)
+        else setJob(j)
+      }).catch(() => {})
+    }, 1500)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, jobId])
 
   /* ---------- 3. AI answers (a few questions per request, one request at a time) ---------- */
 
@@ -195,13 +211,16 @@ export default function ScanBody({ onClose, onDone }: { onClose: () => void; onD
         duration: meta?.duration, totalMarks: meta?.totalMarks, instructions: meta?.instructions,
         questions: questions.map((q) => ({ number: q.number, text: q.text, marks: q.marks, answer: q.answer })),
       })
+      if (jobId) void scanJob.ack(jobId)
       setPhase('done'); onDone()
     } catch (e) { setErr(errMsg(e)); setPhase('review') }
   }
 
   function startOver() {
     run.current += 1
-    pageRes.current = []; qRef.current = []; metaRef.current = null
+    if (jobId) void scanJob.discard(jobId)
+    setJobId(''); setJob(null); setPageCount(0)
+    qRef.current = []; metaRef.current = null
     setMeta(null); setQuestionsState([]); setState({}); setCands([]); setUnitId(''); setErr(''); setAnswerErr(''); setFiles([]); setPhase('capture')
   }
 
@@ -220,30 +239,30 @@ export default function ScanBody({ onClose, onDone }: { onClose: () => void; onD
     return <LiveCamera count={files.length} max={MAX_PAGES} onCapture={(f) => setFiles((cur) => [...cur, f].slice(0, MAX_PAGES))} onClose={() => setPhase('capture')} />
   }
 
-  if (phase === 'reading') {
+  if (phase === 'working') {
+    const paused = job?.status === 'paused'
     return (
-      <div className="sl-empty"><LoaderCircle className="sl-spin" size={26} />
-        <h3>Reading page {progress.i} of {progress.total}…</h3>
-        <p>The AI is typing out your paper. Keep this window open. Each page takes a few seconds.</p>
+      <div className="sl-empty">
+        {!paused && <LoaderCircle className="sl-spin" size={26} />}
+        <h3>{job?.message || 'Preparing your pages…'}</h3>
+        <p>You can close this window or leave the app. The paper keeps being read, answered and sent for review in the background where your browser allows it, and carries on from the same spot next time you open the app.</p>
+        {paused && <button className="sl-primary" onClick={() => jobId && void scanJob.resume(jobId, true)}>Continue now</button>}
+        <button className="sl-ghost" onClick={startOver}>Cancel this scan</button>
       </div>
     )
   }
 
-  if (phase === 'readfail') {
-    const more = failedAt.current + 1 < files.length || pageRes.current.some(Boolean)
+  if (phase === 'jobfail') {
     return (
       <div className="sl-form">
-        <p className="sl-alert err">Page {failedAt.current + 1}: {err}</p>
-        <button className="sl-primary" onClick={() => void readPages(failedAt.current)}>Try page {failedAt.current + 1} again</button>
-        {more && <button className="sl-ghost" onClick={() => (failedAt.current + 1 < files.length ? void readPages(failedAt.current + 1) : finishReading())}>Skip this page and continue</button>}
-        <button className="sl-ghost" onClick={startOver}>Start over</button>
+        <p className="sl-alert err">{err}</p>
+        <button className="sl-primary" onClick={startOver}>Scan again</button>
       </div>
     )
   }
 
   if ((phase === 'review' || phase === 'saving') && meta) {
     const saving = phase === 'saving'
-    const pageCount = pageRes.current.filter(Boolean).length
     return (
       <div className="sl-form">
         <p className="sl-alert ok"><CheckCircle2 size={16} /> Found {questions.length} question{questions.length === 1 ? '' : 's'} on {pageCount} page{pageCount === 1 ? '' : 's'}.</p>
@@ -327,7 +346,7 @@ export default function ScanBody({ onClose, onDone }: { onClose: () => void; onD
         </div>
       )}
       {err && <p className="sl-alert err">{err}</p>}
-      <button className="sl-primary" disabled={!files.length} onClick={() => { pageRes.current = []; void readPages(0) }}>Read the paper and write answers</button>
+      <button className="sl-primary" disabled={!files.length} onClick={() => void startScan()}>Read the paper and write answers</button>
     </div>
   )
 }
