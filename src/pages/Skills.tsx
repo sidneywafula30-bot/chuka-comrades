@@ -7,9 +7,10 @@ import ProviderLogo from '../components/ProviderLogo'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
 import { AttachList, Empty, FilePicker, HubShell, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
 import { AdminOrders, AdminProducts, AdminSettings, Kitchen, Library, Shop } from './SkillsShop'
+import Explore, { type Tab as ExploreTab } from './SkillsExplore'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' } | { name: 'class'; id: string }
+type View = { name: 'learn' | 'classes' | 'explore' | 'shop' | 'teach' | 'admin' } | { name: 'class'; id: string }
 const call = skillsApi.call
 
 /* ---------- recommendations ---------- */
@@ -92,7 +93,15 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   )
 }
 
-function Learn({ user, onSignIn, config, onRecommend }: { user: User | null; onSignIn: () => void; config: SkillsConfig; onRecommend: (p?: { url: string; title: string }) => void }) {
+const GOAL_LINKS: { tab: ExploreTab; label: string; hint: string }[] = [
+  { tab: 'earning', label: 'Earn', hint: 'Skills that can bring income' },
+  { tab: 'interest', label: 'Interest', hint: 'Learn something curious' },
+  { tab: 'health', label: 'Health', hint: 'Body and mind' },
+  { tab: 'hobby', label: 'Hobby', hint: 'Creative and fun' },
+  { tab: 'chuka', label: 'Chuka courses', hint: 'All university programmes' },
+]
+
+function Learn({ user, onSignIn, config, onRecommend, onExplore }: { user: User | null; onSignIn: () => void; config: SkillsConfig; onRecommend: (p?: { url: string; title: string }) => void; onExplore: (t: ExploreTab) => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
   const [kind, setKind] = useState('')
@@ -122,6 +131,8 @@ function Learn({ user, onSignIn, config, onRecommend }: { user: User | null; onS
           <p>Browse videos and courses recommended by students, join a class run by the Chuka Skills team, or search free courses from {COURSE_PROVIDERS.length} providers.</p></div>
         <div className="sl-hero-art"><GraduationCap size={46} /><span>Grow your skills</span></div>
       </section>
+      <div className="hub-sec"><h2>What do you want to learn for?</h2></div>
+      <div className="hub-chips">{GOAL_LINKS.map((g) => <button key={g.tab} title={g.hint} onClick={() => onExplore(g.tab)}>{g.label}</button>)}</div>
       <div className="hub-bar">
         <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recommended videos and courses, e.g. CapCut, barbering, Python…" /></form>
         <button className="sl-primary small" onClick={user ? () => onRecommend() : onSignIn}><Plus size={15} /> Recommend</button>
@@ -421,8 +432,8 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
   )
 }
 
-function Classes({ user, config, isAdmin, onOpen, onCreate }: { user: User | null; config: SkillsConfig; isAdmin: boolean; onOpen: (id: string) => void; onCreate: () => void }) {
-  const [q, setQ] = useState('')
+function Classes({ user, config, isAdmin, onOpen, onCreate, initialQ = '' }: { user: User | null; config: SkillsConfig; isAdmin: boolean; onOpen: (id: string) => void; onCreate: () => void; initialQ?: string }) {
+  const [q, setQ] = useState(initialQ)
   const [cat, setCat] = useState('')
   const [all, setAll] = useState<ClassItem[] | null>(null)
   const [up, setUp] = useState<UpcomingSession[]>([])
@@ -576,6 +587,8 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const [classOpen, setClassOpen] = useState<ClassItem | 'new' | null>(null)
   const [tick, setTick] = useState(0)
   const [fatal, setFatal] = useState('')
+  const [classQ, setClassQ] = useState('')
+  const [exploreTab, setExploreTab] = useState<ExploreTab>('earning')
   const loadConfig = useCallback(() => { if (skillsReady) skillsApi.config().then((c) => setConfig({ ...FALLBACK_CONFIG, ...c, whatsapp: c.whatsapp || ADMIN_WA })).catch((e) => setFatal(errMsg(e))) }, [])
   useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => {
@@ -592,15 +605,17 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : 'learn' }))}
       nav={<>
         <button className={name === 'learn' ? 'on' : ''} onClick={() => setView({ name: 'learn' })}>Learn</button>
-        <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => setView({ name: 'classes' })}>Classes</button>
+        <button className={name === 'explore' ? 'on' : ''} onClick={() => setView({ name: 'explore' })}>Explore</button>
+        <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => { setClassQ(''); setView({ name: 'classes' }) }}>Classes</button>
         <button className={name === 'shop' ? 'on' : ''} onClick={() => setView({ name: 'shop' })}><ShoppingBag size={14} /> Shop</button>
         <button className={name === 'teach' ? 'on' : ''} onClick={() => gated({ name: 'teach' })}>My skills</button>
         {isAdmin && <button className={name === 'admin' ? 'on' : ''} onClick={() => setView({ name: 'admin' })}><ShieldCheck size={14} /> Admin</button>}
       </>}>
       {!skillsReady && <Msg msg={{ type: 'err', text: 'Skills server not connected yet. Add VITE_SKILLS_API_URL to .env and restart npm run dev.' }} />}
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
-      {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} onRecommend={(p) => setRecOpen(p ?? 'new')} />}
-      {view.name === 'classes' && <Classes user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
+      {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} onRecommend={(p) => setRecOpen(p ?? 'new')} onExplore={(t) => { setExploreTab(t); setView({ name: 'explore' }) }} />}
+      {view.name === 'explore' && <Explore key={exploreTab} initialTab={exploreTab} onClasses={(q) => { setClassQ(q); setView({ name: 'classes' }) }} />}
+      {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}
       {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}
       {view.name === 'teach' && <Teach user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onOpen={open} onCreate={() => setClassOpen('new')} onEdit={setClassOpen} />}
