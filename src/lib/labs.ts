@@ -32,6 +32,38 @@ export type WikiPage = {
 export type AdminUnit = { id: string; programmeId: string; year: number; semester: number; code: string; name: string; status: 'active' | 'hidden' }
 
 export type ScanCandidate = { unitId: string; code: string; name: string; programmeName: string; year: number; semester: number }
+
+/** One typed-out exam question. answer is '' until the AI has written it. */
+export type QaQuestion = { id: string; number: string; text: string; marks: string; answer: string }
+
+/** What the AI read from ONE photographed page (live scan). */
+export type ScanPageResult = {
+  isExamPaper: boolean
+  unitCode: string
+  unitName: string
+  examType: string
+  academicYear: string
+  duration: string
+  totalMarks: string
+  instructions: string
+  questions: { number: string; text: string; marks: string; continued: boolean }[]
+  candidates: ScanCandidate[]
+  /** The library already has an upload for the matched unit with the same exam type and year. */
+  duplicate: boolean
+}
+
+export type ScanSaveInput = {
+  unitId: string
+  type: 'cat' | 'paper'
+  title: string
+  examType: string
+  academicYear: string
+  includeAnswers: boolean
+  duration?: string
+  totalMarks?: string
+  instructions?: string
+  questions: { number: string; text: string; marks: string; answer: string }[]
+}
 export type ScanResult = {
   isExamPaper: boolean
   unitCode: string
@@ -134,6 +166,8 @@ export type Resource = {
   rejectReason: string
   uploaderName: string
   createdAt: string
+  /** Number of typed questions (with AI answers) stored for this upload. 0 or missing = none. */
+  questionCount?: number
   files: LabFile[]
   uploaderEmail?: string
   uploaderId?: string
@@ -376,6 +410,25 @@ export const labsApi = {
   /** AI reads a photo of a CAT or paper and suggests the unit, exam type and academic year. */
   scanPaper: (image: string) =>
     call<ScanResult>('scan_paper', { image }),
+
+  /** Live scan, step 1: types out ONE photographed page (header, questions) and matches the unit. */
+  scanPage: (image: string, page: number) =>
+    call<ScanPageResult>('scan_page', { image, page }),
+
+  /** Live scan, step 2: AI answers for up to 4 questions at a time. */
+  scanAnswer: (
+    ctx: { unitCode: string; unitName: string },
+    questions: { id: string; number: string; text: string; marks: string }[],
+  ) =>
+    call<{ answers: { id: string; answer: string }[] }>('scan_answer', { ...ctx, questions }),
+
+  /** Live scan, step 3: the server builds a PDF from the reviewed questions and sends it for review. */
+  scanSave: (input: ScanSaveInput) =>
+    call<{ id: string; status: 'pending'; questions: number }>('scan_save', { ...input }),
+
+  /** Questions and AI answers of one upload (the "Questions & answers" button). */
+  resourceQuestions: (id: string) =>
+    call<{ questions: QaQuestion[] }>('resource_questions', { id }),
 
   ytSearch: (q: string) =>
     call<YtVideo[]>('yt_search', { q }),

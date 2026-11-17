@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import type { User } from 'firebase/auth'
 import {
   ArrowLeft, BookOpen, Camera, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
-  LoaderCircle, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
+  ListChecks, LoaderCircle, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
 } from 'lucide-react'
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
@@ -15,6 +15,7 @@ import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
 import YouTubePanel from './StudyLabsYoutube'
 import WikiPanel from './StudyLabsWikipedia'
 import ScanBody from './StudyLabsScan'
+import { QaViewer } from './StudyLabsQa'
 import './StudyLabs.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
@@ -40,10 +41,10 @@ function Loading({ text = 'Loading…' }: { text?: string }) {
 function Empty({ icon, title, text }: { icon?: ReactNode; title: string; text?: string }) {
   return <div className="sl-empty">{icon ?? <FolderOpen size={26} />}<h3>{title}</h3>{text && <p>{text}</p>}</div>
 }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
     <div className="sl-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="sl-modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`sl-modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="sl-modal-head"><h2>{title}</h2><button className="sl-icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
         {children}
       </div>
@@ -102,6 +103,7 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
 }) {
   const [busyFile, setBusyFile] = useState('')
   const [sharing, setSharing] = useState(false)
+  const [qaOpen, setQaOpen] = useState(false)
   const yt = youtubeId(r.link)
   const preview = async (id: string) => {
     setBusyFile(id)
@@ -125,6 +127,9 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
         </a>
       )}
       {r.link && <a className="sl-link" href={r.link} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> Open link</a>}
+      {(r.questionCount ?? 0) > 0 && (
+        <button className="sl-qa-open" onClick={() => setQaOpen(true)}><ListChecks size={15} /> Questions &amp; answers <b>{r.questionCount}</b></button>
+      )}
       {r.files.length > 0 && (
         <ul className="sl-files">
           {r.files.map((f) => (
@@ -153,6 +158,7 @@ function ResourceCard({ r, showUnit, canReport, onReport, onDelete, onError, adm
       </div>
       {children}
       {sharing && <ShareModal resource={r} onClose={() => setSharing(false)} />}
+      {qaOpen && <Modal title={r.title} wide onClose={() => setQaOpen(false)}><QaViewer resourceId={r.id} header={<p className="sl-sub">{r.unitCode} · {r.unitName}</p>} /></Modal>}
     </article>
   )
 }
@@ -394,7 +400,7 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
           <span className="sl-kicker">CHUKA STUDY LABS</span>
           <h1>Notes, CATs &amp; past papers <em>by comrades, for comrades</em></h1>
           <p>Find your programme, open your unit and download what other students have shared. Add your own to help the next class.</p>
-          <button className="sl-primary inline" onClick={onScan}><Camera size={15} /> Scan a CAT or paper</button>
+          <button className="sl-primary inline" onClick={onScan}><Camera size={15} /> Scan a paper with the live camera</button>
         </div>
         <div className="sl-hero-art"><BookOpen size={46} /><span>Study together</span></div>
       </section>
@@ -1105,7 +1111,7 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {view.name === 'mine' && user && <MinePage />}
       {view.name === 'admin' && isAdmin && <AdminPage onCatalogueChanged={refreshProgrammes} />}
 
-      {scanning && <Modal title="Scan a CAT or paper" onClose={() => setScanning(false)}><ScanBody onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
+      {scanning && <Modal title="Scan a CAT or paper" wide onClose={() => setScanning(false)}><ScanBody onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
       {paywall && <PaywallModal payment={paywall.payment} email={user?.email} onClose={() => setPaywall(null)} />}
       {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
       {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}
