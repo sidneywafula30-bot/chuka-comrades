@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
 import QRCode from 'qrcode'
-import { ArrowLeft, CalendarPlus, Check, Copy, LoaderCircle, MessageCircle, Send } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Check, ChevronLeft, ChevronRight, Copy, Download, Images, LoaderCircle, MessageCircle, Send, Trash2, X } from 'lucide-react'
 import DriveImage from '../components/DriveImage'
 import { fileToB64, shrinkImage } from '../lib/files'
-import { jcall, journeyReady, pageUrl, reminder, waAdmin, ytId, fmt, type AdminRow, type Home, type Me, type Msg, type PublicGrad } from '../lib/journey'
+import { jcall, journeyReady, MAX_PICS, pageUrl, picDownload, reminder, waAdmin, ytId, fmt, type AdminRow, type Home, type Me, type Msg, type Pic, type PublicGrad } from '../lib/journey'
 import './Journey.css'
 
 type Props = { user: User | null; route: string; onSignIn: () => void; onBack: () => void }
@@ -33,6 +33,80 @@ function Remind({ title, date, details, yearly, label }: { title: string; date: 
   if (!date) return null
   const r = reminder(title, date, details, yearly)
   return <span className="jr-remind"><CalendarPlus size={14} /> {label}: <a href={r.google} target="_blank" rel="noreferrer noopener">Google</a> · <a href={r.ics} download="reminder.ics">iPhone / Outlook</a></span>
+}
+
+/** Photo grid with a full-screen viewer: arrows, swipe, Esc to close. */
+function Gallery({ pics }: { pics: Pic[] }) {
+  const [open, setOpen] = useState<number | null>(null), [x0, setX0] = useState(0)
+  const n = pics.length
+  const step = useCallback((d: number) => setOpen((i) => (i === null ? i : (i + d + n) % n)), [n])
+  useEffect(() => {
+    if (open === null) return
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(null); else if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1) }
+    window.addEventListener('keydown', key); document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', key); document.body.style.overflow = '' }
+  }, [open, step])
+  if (n === 0) return null
+  const p = open === null ? null : pics[open]
+  return (<>
+    <div className="jr-gal">{pics.map((q, i) => <button key={q.id} type="button" className="jr-tile" onClick={() => setOpen(i)} aria-label={q.caption || `Open photo ${i + 1}`}><DriveImage id={q.photoId} w={500} alt={q.caption || 'Graduation day photo'} /></button>)}</div>
+    {p && open !== null && (
+      <div className="jr-lb" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => setOpen(null)}
+        onTouchStart={(e) => setX0(e.touches[0].clientX)} onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 60) step(dx < 0 ? 1 : -1) }}>
+        <button type="button" className="jr-lb-x" aria-label="Close" onClick={() => setOpen(null)}><X size={22} /></button>
+        {n > 1 && <button type="button" className="jr-lb-n prev" aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); step(-1) }}><ChevronLeft size={26} /></button>}
+        <figure onClick={(e) => e.stopPropagation()}>
+          <DriveImage id={p.photoId} w={1600} alt={p.caption || 'Graduation day photo'} />
+          <figcaption>{p.caption && <span>{p.caption}</span>}<small>{open + 1} of {n}</small><a href={picDownload(p.photoId)} target="_blank" rel="noreferrer noopener"><Download size={14} /> Save</a></figcaption>
+        </figure>
+        {n > 1 && <button type="button" className="jr-lb-n next" aria-label="Next photo" onClick={(e) => { e.stopPropagation(); step(1) }}><ChevronRight size={26} /></button>}
+      </div>)}
+  </>)
+}
+
+/** Owner tools: upload many ceremony photos at once, add a caption, delete. */
+function GalleryManager({ slug }: { slug: string }) {
+  const { data, error, reload } = useLoad(() => jcall<{ pics: Pic[] }>('gallery', { slug }), [slug])
+  const [caption, setCaption] = useState(''), [prog, setProg] = useState<{ done: number; total: number } | null>(null), [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  const pics = data?.pics ?? []
+  async function add(list: FileList | null) {
+    const files = Array.from(list ?? []).filter((f) => f.type.startsWith('image/'))
+    if (files.length === 0) return
+    const room = MAX_PICS - pics.length
+    if (room <= 0) { setMsg({ ok: false, t: `You have reached the limit of ${MAX_PICS} photos. Delete one to add another.` }); return }
+    const take = files.slice(0, room)
+    setMsg(null)
+    let ok = 0, fail = ''
+    for (let i = 0; i < take.length; i++) {
+      setProg({ done: i, total: take.length })
+      try { const d = await shrinkImage(take[i], 1600, 0.8); await jcall('galleryAdd', { photo: d.split(',')[1] ?? '', caption: caption.trim() }); ok++ }
+      catch (x) { fail = err(x); break }
+    }
+    setProg(null); if (ok > 0) setCaption('')
+    const skipped = files.length - take.length
+    setMsg(fail ? { ok: false, t: `${ok} uploaded, then it stopped: ${fail}` } : { ok: true, t: `${ok} photo${ok === 1 ? '' : 's'} added.${skipped > 0 ? ` ${skipped} skipped (limit ${MAX_PICS}).` : ''}` })
+    reload()
+  }
+  async function del(id: string) {
+    if (!confirm('Delete this photo for good?')) return
+    try { await jcall('galleryDel', { id }); reload() } catch (x) { setMsg({ ok: false, t: err(x) }) }
+  }
+  return (
+    <section className="jr-card"><h2><Images size={18} /> Graduation day photos ({pics.length}/{MAX_PICS})</h2>
+      <p className="jr-note">Upload photos from your ceremony. They appear on your public page, and anyone with your link can open and save them.</p>
+      {error && <p className="jr-alert">{error}</p>}
+      <div className="jr-form">
+        <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption for the next upload (optional), e.g. With mum at the gate" maxLength={120} />
+        <label className="jr-file">Choose photos (you can pick many)
+          <input type="file" accept="image/*" multiple disabled={!!prog || pics.length >= MAX_PICS} onChange={(e) => { const el = e.target; void add(el.files).then(() => { el.value = '' }) }} /></label>
+        {prog && <p className="jr-note"><LoaderCircle className="jr-spin" size={14} /> Uploading {prog.done + 1} of {prog.total}. Keep this page open.</p>}
+        {msg && <p className={msg.ok ? 'jr-ok' : 'jr-alert'}>{msg.t}</p>}
+      </div>
+      {pics.length > 0 && <div className="jr-gal jr-gal-edit">{pics.map((q) => (
+        <div key={q.id} className="jr-tile"><DriveImage id={q.photoId} w={400} alt={q.caption || 'Graduation day photo'} />
+          <button type="button" className="jr-del" aria-label="Delete photo" onClick={() => void del(q.id)}><Trash2 size={14} /></button></div>))}</div>}
+    </section>
+  )
 }
 
 export default function Journey({ user, route, onSignIn, onBack }: Props) {
@@ -72,6 +146,7 @@ function Landing({ user, onSignIn }: { user: User | null; onSignIn: () => void }
 function PublicPage({ slug, write }: { slug: string; write: boolean }) {
   const { data: g, error, reload } = useLoad(() => jcall<PublicGrad>('view', { slug }), [slug])
   const { data: h } = useLoad(() => jcall<Home>('home'), [])
+  const { data: gal } = useLoad(() => jcall<{ pics: Pic[] }>('gallery', { slug }).catch(() => ({ pics: [] as Pic[] })), [slug])
   const [name, setName] = useState(''), [text, setText] = useState(''), [priv, setPriv] = useState(false), [trap, setTrap] = useState('')
   const [busy, setBusy] = useState(false), [sent, setSent] = useState(false), [fail, setFail] = useState('')
   const draft = `jr-draft-${slug}`
@@ -120,6 +195,7 @@ function PublicPage({ slug, write }: { slug: string; write: boolean }) {
         </section>
         {g.story && <section className="jr-stop"><h2>My journey</h2><p className="jr-text">{g.story}</p></section>}
         {g.thanks && <section className="jr-stop"><h2>Thank you</h2><p className="jr-text">{g.thanks}</p></section>}
+        {gal && gal.pics.length > 0 && <section className="jr-stop"><h2>Graduation day</h2><Gallery pics={gal.pics} /></section>}
         {ytVid && <section className="jr-stop"><h2>Watch</h2><iframe className="jr-video" src={`https://www.youtube-nocookie.com/embed/${ytVid}?rel=0`} title="Video" allow="encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /></section>}
         <section className="jr-stop"><h2>Messages</h2>
           {g.wall.length === 0 && <p className="jr-note">No messages yet. Be the first.</p>}
@@ -189,6 +265,8 @@ function Dashboard({ me, reload }: { me: Me; reload: () => void }) {
           <p><Remind title="Open my Long Campus Journey" date={me.gradDate} details={pageUrl(g.slug)} label="Graduation day" /></p>
           <p><Remind title="Memory day: read my Long Campus Journey" date={me.gradDate} details={pageUrl(g.slug)} yearly label="Every year" /></p>
         </section>)}
+
+      {g?.status === 'active' && <GalleryManager slug={g.slug} />}
 
       {g && me.msgs.length > 0 && (
         <section className="jr-card"><h2>Messages ({me.msgs.length})</h2>

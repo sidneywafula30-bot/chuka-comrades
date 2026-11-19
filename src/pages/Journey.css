@@ -37,3 +37,21 @@
 .jr-shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:0 0 8px}.jr-shots img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
 .jr blockquote .jr-video{margin:0 0 8px}.jr-file small{font-weight:400;color:var(--mut)}
 .jr-write .jr-who{margin-bottom:20px}.jr-write .jr-photo{width:96px;height:96px}
+
+/* graduation-day gallery */
+.jr-card h2 svg{vertical-align:-3px;margin-right:4px}
+.jr-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+.jr-tile{position:relative;display:block;padding:0;border:0;border-radius:8px;overflow:hidden;background:#dfe7e1;aspect-ratio:1;cursor:pointer}
+.jr-tile img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s}
+.jr-tile:hover img{transform:scale(1.05)}
+.jr-gal-edit{margin-top:14px}.jr-gal-edit .jr-tile{cursor:default}.jr-gal-edit .jr-tile:hover img{transform:none}
+.jr-del{position:absolute;top:6px;right:6px;width:30px;height:30px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(138,28,28,.92);color:#fff;cursor:pointer}
+.jr-lb{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(8,16,11,.93);padding:56px 12px 20px}
+.jr-lb figure{margin:0;max-width:min(96vw,1000px);display:grid;gap:10px;justify-items:center}
+.jr-lb figure img{max-width:100%;max-height:76vh;object-fit:contain;border-radius:8px;display:block}
+.jr-lb figcaption{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:center;color:#fff;font-size:.92rem;text-align:center}
+.jr-lb figcaption small{color:#b9c7be}.jr-lb figcaption a{display:inline-flex;gap:4px;align-items:center;color:var(--y);font-weight:700;text-decoration:none}
+.jr-lb-x,.jr-lb-n{position:absolute;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
+.jr-lb-x{top:10px;right:10px}.jr-lb-n{top:50%;transform:translateY(-50%)}.jr-lb-n.prev{left:8px}.jr-lb-n.next{right:8px}
+.jr-lb-x:hover,.jr-lb-n:hover{background:rgba(255,255,255,.28)}
+@media (prefers-reduced-motion:reduce){.jr-tile img{transition:none}}

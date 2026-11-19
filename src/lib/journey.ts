@@ -29,3 +29,8 @@ export function reminder(title: string, ymd: string, details: string, yearly = f
     'BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', `DESCRIPTION:${title}`, 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
   return { google: `https://calendar.google.com/calendar/render?${q.toString()}`, ics: `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}` }
 }
+
+/** Graduation-day gallery: the owner uploads ceremony photos, anyone with the page link can view them. */
+export type Pic = { id: string; photoId: string; caption: string; at?: string }
+export const MAX_PICS = 30
+export const picDownload = (photoId: string) => `https://drive.google.com/uc?export=download&id=${photoId}`
