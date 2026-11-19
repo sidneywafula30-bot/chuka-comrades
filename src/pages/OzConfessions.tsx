@@ -1,22 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { ImagePlus, Link2, Lock, MessageCircle, Play, Send, Trash2, Users, X } from 'lucide-react'
+import { Download, ImagePlus, Link2, Lock, MessageCircle, Play, Send, Trash2, Users, X, Zap } from 'lucide-react'
 import { ago, cleanPhoto, oz, ozLink, pad, prepVideo, waShare, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
 import { Err, ReportButton, useLoad, type OzCtx } from './OzCommon'
+import { canShareFiles, catGradient, confessionImage, downloadBlob } from '../lib/shareCard'
 import './OzConfessions.css'
 
 /* Main Chuka O-Zone WhatsApp group (used when the backend/env has no link set). */
 export const OZONE_WA_GROUP = 'https://chat.whatsapp.com/KGwAsXnEJtPBIDMREfDi88'
 
-/* Each category gets its own NGL-style gradient. */
-const GRAD: Record<string, string> = {
-  spicy: 'linear-gradient(135deg,#ff5a3c,#ff2d75)',
-  heartbreak: 'linear-gradient(135deg,#ff2d75,#a62bd6)',
-  academics: 'linear-gradient(135deg,#3b82f6,#6d4aff)',
-  funny: 'linear-gradient(135deg,#ffb100,#ff6a00)',
-  deep: 'linear-gradient(135deg,#6d4aff,#2b1b8a)',
-  other: 'linear-gradient(135deg,#2dd4bf,#3b82f6)',
-}
-const grad = (c: string) => GRAD[c] || GRAD.other
+/* Each category gets its own NGL-style gradient (same colours as the share picture). */
+const grad = catGradient
+
+/** 254712345678 -> 0712 345 678 */
+const showPhone = (n: string) => { const d = n.replace(/\D/g, '').replace(/^254/, '0'); return d.length === 10 ? `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}` : d || 'the admin' }
 
 /* ------------------------------------------------------------------ */
 /* WhatsApp group button (top of every confessions screen)            */
@@ -46,7 +42,11 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
   const [media, setMedia] = useState<Prepared[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [done, setDone] = useState<{ number: number; deleteCode: string; message: string; support: { message: string; lines: string[] } | null } | null>(null)
+  const fee = cfg?.confessionFee ?? 30
+  const paidOnly = !!cfg?.confessionPaidOnly
+  const [pay, setPay] = useState(paidOnly)
+  const [code, setCode] = useState('')
+  const [done, setDone] = useState<{ number: number; status: string; paid?: boolean; deleteCode: string; message: string; support: { message: string; lines: string[] } | null; cat: string; text: string } | null>(null)
   const file = useRef<HTMLInputElement>(null)
 
   async function addFiles(list: FileList | null) {
@@ -68,20 +68,32 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
     setBusy(true); setErr('')
     try {
       const uploads: Upload[] = media.map((m) => ({ name: m.name, data: m.data }))
-      setDone(await oz('confession_submit', { text, category: cat, replyTo: replyTo || undefined, media: uploads }))
-      setText(''); setMedia([])
+      const r = await oz<NonNullable<typeof done>>('confession_submit', { text, category: cat, replyTo: replyTo || undefined, media: uploads, mpesaCode: pay ? code : undefined })
+      setDone({ ...r, cat, text })
+      setText(''); setMedia([]); setCode('')
       onSent?.()
     } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
   }
 
   if (done) {
+    const live = done.status === 'published'
     return (
       <div className="ng-card ng-done">
-        <div className="ng-head" style={{ background: 'linear-gradient(135deg,#25d366,#128c4a)' }}><span className="ng-av">✅</span><div><b>Sent!</b><small>Waiting for admin review</small></div></div>
+        <div className="ng-head" style={{ background: live ? 'linear-gradient(135deg,#25d366,#128c4a)' : 'linear-gradient(135deg,#ffb100,#ff6a00)' }}>
+          <span className="ng-av">{live ? '🎉' : '✅'}</span><div><b>{live ? 'Live now!' : 'Sent!'}</b><small>{live ? 'Paid · posted instantly' : 'Waiting for admin review'}</small></div>
+        </div>
         <div className="ng-body">
           <p>{done.message}</p>
           <div className="ng-code"><small>Your delete code for #{pad(done.number)}</small><strong>{done.deleteCode}</strong></div>
           {done.support && <div className="ng-support"><b>{done.support.message}</b><ul>{done.support.lines.map((l) => <li key={l}>{l}</li>)}</ul></div>}
+          {live && (
+            <>
+              <button type="button" className="ng-wa-share" onClick={() => void shareCardPicture({ number: done.number, category: done.cat, categoryLabel: cats[done.cat] || '', text: done.text }, ozLink(`thread/${done.number}`), canShareFiles() ? 'share' : 'save')}>
+                <MessageCircle size={17} /> Share it on WhatsApp
+              </button>
+              <a className="ng-send ng-send-soft" href={`#/ozone/thread/${done.number}`}>See it live</a>
+            </>
+          )}
           <button type="button" className="ng-send" onClick={() => setDone(null)}>Send another</button>
         </div>
       </div>
@@ -102,6 +114,10 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
             <button key={k} type="button" role="radio" aria-checked={cat === k} className={cat === k ? 'on' : ''} style={cat === k ? { background: grad(k) } : undefined} onClick={() => setCat(k)}>{l}</button>
           ))}
         </div>
+        <div className="ng-mode" role="radiogroup" aria-label="Posting option">
+            {!paidOnly && <button type="button" role="radio" aria-checked={!pay} className={!pay ? 'on' : ''} onClick={() => setPay(false)}>Free<small>admin reviews first</small></button>}
+            <button type="button" role="radio" aria-checked={pay} className={pay ? 'on pay' : 'pay'} onClick={() => setPay(true)}><Zap size={14} /> Post instantly<small>KSh {fee} · no waiting</small></button>
+        </div>
         <textarea
           className="ng-text" value={text} maxLength={max} rows={5} required
           placeholder={replyTo ? 'say it anonymously…' : 'tell me your confession…'}
@@ -120,14 +136,25 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
             ))}
           </div>
         )}
-        <p className="ng-safe"><Lock size={13} /> anonymous · reviewed by admin before it goes live</p>
+        {pay && (
+          <div className="ng-pay">
+            <p><b>1.</b> Send <strong>KSh {fee}</strong> by M-Pesa to <strong>{showPhone(cfg?.payPhone || '')}</strong></p>
+            <p><b>2.</b> Type the 10-character code from the M-Pesa message</p>
+            <input
+              className="ng-code-in" value={code} maxLength={10} placeholder="e.g. QJK4ABC123" autoCapitalize="characters" autoComplete="off" spellCheck={false}
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} aria-label="M-Pesa code"
+            />
+            <small>Your words go live the moment you send. Photos or videos you upload, and anything sensitive (phone numbers, self-harm, etc.), are checked by the admin first.</small>
+          </div>
+        )}
+        <p className="ng-safe"><Lock size={13} /> anonymous · {pay ? 'goes live instantly' : 'reviewed by admin before it goes live'}</p>
         <Err msg={err || blocked} />
         {user ? (
-          <button type="submit" className="ng-send" disabled={busy || !!blocked || text.trim().length < 10}>{busy ? 'Sending…' : <>Send! <Send size={16} /></>}</button>
+          <button type="submit" className="ng-send" disabled={busy || !!blocked || text.trim().length < 10 || (pay && code.length !== 10)}>{busy ? 'Sending…' : pay ? <>Post instantly <Zap size={16} /></> : <>Send! <Send size={16} /></>}</button>
         ) : (
           <button type="button" className="ng-send" disabled={signing} onClick={signIn}>Sign in with Google to send</button>
         )}
-        <small className="ng-hint">Minimum 10 characters · {lim?.confessionPerDay ?? 3} per day · paste a YouTube, TikTok, Instagram, Facebook or Vimeo link to share a long video</small>
+        <small className="ng-hint">Minimum 10 characters{pay ? '' : ` · ${lim?.confessionPerDay ?? 3} free per day`} · paste a YouTube, TikTok, Instagram, Facebook or Vimeo link to share a long video</small>
       </div>
     </form>
   )
@@ -204,6 +231,25 @@ function VideoEmbed({ v }: { v: Vid }) {
   )
 }
 
+
+/** NGL-style share: the whole confession card goes out as a picture. */
+async function shareCardPicture(p: { number: number; category: string; categoryLabel: string; text: string }, link: string, mode: 'share' | 'save') {
+  const { body, videos } = splitVideos(p.text)
+  const site = window.location.host
+  const blob = await confessionImage(p, body || (videos.length ? '' : p.text), site)
+  const name = `chuka-ozone-confession-${String(p.number).padStart(4, '0')}.png`
+  if (mode === 'save') { downloadBlob(blob, name); return 'saved' as const }
+  const file = new File([blob], name, { type: 'image/png' })
+  try {
+    await navigator.share({ files: [file], text: `Confession #${String(p.number).padStart(4, '0')} on Chuka O-Zone 👀\n${link}` })
+    return 'shared' as const
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') return 'cancelled' as const
+    downloadBlob(blob, name)
+    return 'saved' as const
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Feed bubble                                                         */
 /* ------------------------------------------------------------------ */
@@ -214,6 +260,12 @@ function Bubble({ p, ctx, full, onDeleted }: { p: Post; ctx: OzCtx; full?: boole
   const [copied, setCopied] = useState(false)
   const [err, setErr] = useState('')
   const [gone, setGone] = useState(false)
+  const [making, setMaking] = useState(false)
+
+  async function picture(mode: 'share' | 'save') {
+    setMaking(true); setErr('')
+    try { await shareCardPicture(p, link, mode) } catch (e) { setErr((e as Error).message) } finally { setMaking(false) }
+  }
 
   async function remove() {
     if (!window.confirm(`Delete confession #${pad(p.number)} for everyone? This cannot be undone.`)) return
@@ -238,11 +290,16 @@ function Bubble({ p, ctx, full, onDeleted }: { p: Post; ctx: OzCtx; full?: boole
               : <img key={i} src={m.url} alt="" loading="lazy" referrerPolicy="no-referrer" />)}
           </div>
         )}
-        <a className="ng-wa-share" href={waShare(`Confession #${pad(p.number)} on Chuka O-Zone:\n\n${snippet}\n\n${link}`)} target="_blank" rel="noopener noreferrer">
-          <MessageCircle size={17} /> Share on WhatsApp
+        <a
+          className="ng-wa-share" href={waShare(`Confession #${pad(p.number)} on Chuka O-Zone:\n\n${snippet}\n\n${link}`)} target="_blank" rel="noopener noreferrer"
+          aria-busy={making}
+          onClick={(e) => { if (!canShareFiles()) return; e.preventDefault(); void picture('share') }}
+        >
+          <MessageCircle size={17} /> {making ? 'Making picture…' : 'Share on WhatsApp'}
         </a>
         <footer>
           {!full && <a href={`#/ozone/thread/${p.number}`}><MessageCircle size={14} /> {p.replies > 0 ? `${p.replies} repl${p.replies === 1 ? 'y' : 'ies'}` : 'Reply'}</a>}
+          <button type="button" className="ng-ghost" disabled={making} onClick={() => void picture('save')}><Download size={14} /> Save picture</button>
           <button type="button" className="ng-ghost" onClick={() => { void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}>
             <Link2 size={14} /> {copied ? 'Copied' : 'Copy link'}
           </button>

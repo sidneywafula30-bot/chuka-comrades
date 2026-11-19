@@ -607,6 +607,7 @@ function AspirantTools() {
 const SETTING_LABELS: Record<string, string> = {
   SITE_URL: 'Site URL', ELECTION_MODE: 'Election mode', POSITIONS: 'Positions (JSON list)', STUDENT_EMAIL_DOMAINS: 'Student e-mail domains', BLOCKLIST: 'Extra blocked words', ADMIN_WHATSAPP: 'Admin WhatsApp', WA_GROUP_URL: 'WhatsApp group link (https://chat.whatsapp.com/...)',
   NEWS_RSS_URLS: 'News RSS feed links (https, comma separated)', AUTO_PURGE_DAYS: 'Auto-clean confessions after N days (empty = off)',
+  PAY_PHONE: 'M-Pesa number students pay to (0712345678)', CONFESSION_FEE: 'Instant-confession fee in KSh (default 30)', CONFESSION_PAID_ONLY: 'Require payment for every confession',
 }
 function Settings() {
   const { data, err, loading } = useLoad(() => oz<Record<string, string | boolean>>('admin_settings_get'), [])
@@ -619,8 +620,8 @@ function Settings() {
   return (
     <form className="cpl-form oz-form" onSubmit={(e) => { e.preventDefault(); void save('admin_settings_save', { values: cur }) }}>
       <p className="cpl-sub oz-small">Firebase key: {data?.FIREBASE_CONFIGURED ? 'set' : <b className="oz-over">missing</b>} · Image check (Vision): {data?.VISION_CONFIGURED ? 'on' : 'off'} · GNews key: {data?.NEWS_CONFIGURED ? 'set' : 'not set'}</p>
-      {Object.entries(SETTING_LABELS).map(([k, l]) => k === 'ELECTION_MODE'
-        ? <label key={k} className="cpl-file"><input type="checkbox" checked={cur[k] === 'true'} onChange={(e) => set(k, e.target.checked ? 'true' : 'false')} /> {l} (shows aspirants on faculty pages)</label>
+      {Object.entries(SETTING_LABELS).map(([k, l]) => k === 'ELECTION_MODE' || k === 'CONFESSION_PAID_ONLY'
+        ? <label key={k} className="cpl-file"><input type="checkbox" checked={cur[k] === 'true'} onChange={(e) => set(k, e.target.checked ? 'true' : 'false')} /> {l}{k === 'ELECTION_MODE' ? ' (shows aspirants on faculty pages)' : ' (switches off free posting)'}</label>
         : <label key={k}>{l}<input type="text" value={cur[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></label>)}
       <Msg msg={msg} bad={bad} /><button className="lp-btn">Save settings</button>
     </form>

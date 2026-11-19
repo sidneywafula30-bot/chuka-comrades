@@ -18,6 +18,7 @@ export type Config = {
     vibeMax: number; introNoteMax: number; imageBytes: number; videoBytes: number; maxMedia: number; galleryMax?: number
   }
   studentEmailRequired: boolean; support: Support; youtubeUrl?: string; whatsappGroupUrl?: string; newsEnabled?: boolean
+  confessionFee?: number; confessionPaidOnly?: boolean; payPhone?: string
 }
 export type TrendItem = { key: string; id: number; source: 'youtube' | 'tiktok'; videoId: string; url: string; title: string; author: string; thumb: string; vertical: boolean; pinned: boolean; live: boolean; createdAt: string }
 export type TrendList = { live: TrendItem | null; items: TrendItem[]; next: number | null }
