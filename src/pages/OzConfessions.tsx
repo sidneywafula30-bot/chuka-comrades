@@ -1,31 +1,171 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { CornerDownRight, MessageCircle, PenLine, Trash2 } from 'lucide-react'
-import { ago, oz, pad, snip, type Page, type Post, type Upload } from '../lib/ozone'
-import { CopyButton, Err, Gate, MediaPicker, MediaView, ReportButton, ShareButton, SupportBox, useLoad, type OzCtx } from './OzCommon'
-import type { Support } from '../lib/ozone'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { ImagePlus, Lock, MessageCircle, Send, Trash2, Users, X } from 'lucide-react'
+import { ago, cleanPhoto, oz, pad, prepVideo, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
+import { Err, ReportButton, ShareButton, useLoad, type OzCtx } from './OzCommon'
+import './OzConfessions.css'
 
-function PostCard({ ctx, p, thread }: { ctx: OzCtx; p: Post; thread?: boolean }) {
+/* Main Chuka O-Zone WhatsApp group (used when the backend/env has no link set). */
+export const OZONE_WA_GROUP = 'https://chat.whatsapp.com/KGwAsXnEJtPBIDMREfDi88'
+
+/* Each category gets its own NGL-style gradient. */
+const GRAD: Record<string, string> = {
+  spicy: 'linear-gradient(135deg,#ff5a3c,#ff2d75)',
+  heartbreak: 'linear-gradient(135deg,#ff2d75,#a62bd6)',
+  academics: 'linear-gradient(135deg,#3b82f6,#6d4aff)',
+  funny: 'linear-gradient(135deg,#ffb100,#ff6a00)',
+  deep: 'linear-gradient(135deg,#6d4aff,#2b1b8a)',
+  other: 'linear-gradient(135deg,#2dd4bf,#3b82f6)',
+}
+const grad = (c: string) => GRAD[c] || GRAD.other
+
+/* ------------------------------------------------------------------ */
+/* WhatsApp group button (top of every confessions screen)            */
+/* ------------------------------------------------------------------ */
+function WaTop({ ctx }: { ctx: OzCtx }) {
+  const url = ctx.cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined) || OZONE_WA_GROUP
+  if (!url) return null
   return (
-    <article className="cpl-card oz-post">
-      <header>
-        <strong>#{pad(p.number)}</strong>
-        <span className="oz-pill">{p.categoryLabel}</span>
-        <small>{ago(p.publishedAt)}</small>
+    <a className="ng-wa" href={url} target="_blank" rel="noopener noreferrer">
+      <span className="ng-wa-ic"><MessageCircle size={22} /></span>
+      <span className="ng-wa-t"><strong>Join the O-Zone WhatsApp group</strong><small><Users size={12} /> Campus updates &amp; trending confessions</small></span>
+      <span className="ng-wa-go">Join</span>
+    </a>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* The NGL-style card: header, big prompt box, black Send! button      */
+/* ------------------------------------------------------------------ */
+function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSent?: () => void }) {
+  const { cfg, user, me, signIn, busy: signing } = ctx
+  const cats = cfg?.confessionCategories || {}
+  const lim = cfg?.limits
+  const max = lim?.confessionMax ?? 600
+  const [cat, setCat] = useState('other')
+  const [text, setText] = useState('')
+  const [media, setMedia] = useState<Prepared[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [done, setDone] = useState<{ number: number; deleteCode: string; message: string; support: { message: string; lines: string[] } | null } | null>(null)
+  const file = useRef<HTMLInputElement>(null)
+
+  async function addFiles(list: FileList | null) {
+    if (!list || !lim) return
+    setErr('')
+    try {
+      const out: Prepared[] = []
+      for (const f of Array.from(list)) {
+        if (media.length + out.length >= lim.maxMedia) throw new Error(`Up to ${lim.maxMedia} photos or videos.`)
+        out.push(f.type.startsWith('video/') ? await prepVideo(f, lim.videoBytes) : await cleanPhoto(f, lim.imageBytes))
+      }
+      setMedia((p) => [...p, ...out])
+    } catch (e) { setErr((e as Error).message) }
+    if (file.current) file.current.value = ''
+  }
+
+  async function send(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setErr('')
+    try {
+      const uploads: Upload[] = media.map((m) => ({ name: m.name, data: m.data }))
+      setDone(await oz('confession_submit', { text, category: cat, replyTo: replyTo || undefined, media: uploads }))
+      setText(''); setMedia([])
+      onSent?.()
+    } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
+  }
+
+  if (done) {
+    return (
+      <div className="ng-card ng-done">
+        <div className="ng-head" style={{ background: 'linear-gradient(135deg,#25d366,#128c4a)' }}><span className="ng-av">✅</span><div><b>Sent!</b><small>Waiting for admin review</small></div></div>
+        <div className="ng-body">
+          <p>{done.message}</p>
+          <div className="ng-code"><small>Your delete code for #{pad(done.number)}</small><strong>{done.deleteCode}</strong></div>
+          {done.support && <div className="ng-support"><b>{done.support.message}</b><ul>{done.support.lines.map((l) => <li key={l}>{l}</li>)}</ul></div>}
+          <button type="button" className="ng-send" onClick={() => setDone(null)}>Send another</button>
+        </div>
+      </div>
+    )
+  }
+
+  const blocked = me?.banned ? 'Your account cannot post.' : me && me.studentOk === false ? 'Use your student email to post.' : ''
+
+  return (
+    <form className="ng-card" onSubmit={send}>
+      <div className="ng-head" style={{ background: grad(cat) }}>
+        <span className="ng-av"><img src={`${import.meta.env.BASE_URL}ozone.jfif`} alt="" /></span>
+        <div><b>{replyTo ? `reply to #${pad(replyTo)}` : '@chuka.ozone'}</b><small>{replyTo ? 'anonymous reply' : 'send your confession!'}</small></div>
+      </div>
+      <div className="ng-body">
+        <div className="ng-cats" role="radiogroup" aria-label="Category">
+          {Object.entries(cats).map(([k, l]) => (
+            <button key={k} type="button" role="radio" aria-checked={cat === k} className={cat === k ? 'on' : ''} style={cat === k ? { background: grad(k) } : undefined} onClick={() => setCat(k)}>{l}</button>
+          ))}
+        </div>
+        <textarea
+          className="ng-text" value={text} maxLength={max} rows={5} required
+          placeholder={replyTo ? 'say it anonymously…' : 'tell me your confession…'}
+          onChange={(e) => setText(e.target.value)} aria-label="Your confession"
+        />
+        <div className="ng-meta">
+          <span>{text.length}/{max}</span>
+          <button type="button" className="ng-attach" onClick={() => file.current?.click()}><ImagePlus size={15} /> Photo / video</button>
+          <input ref={file} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
+        </div>
+        {media.length > 0 && (
+          <div className="ng-thumbs">
+            {media.map((m, i) => (
+              <span key={i}>{m.preview ? <img src={m.preview} alt="" /> : <em>🎬</em>}<button type="button" aria-label="Remove" onClick={() => setMedia((p) => p.filter((_, j) => j !== i))}><X size={12} /></button></span>
+            ))}
+          </div>
+        )}
+        <p className="ng-safe"><Lock size={13} /> anonymous · reviewed by admin before it goes live</p>
+        <Err msg={err || blocked} />
+        {user ? (
+          <button type="submit" className="ng-send" disabled={busy || !!blocked || text.trim().length < 10}>{busy ? 'Sending…' : <>Send! <Send size={16} /></>}</button>
+        ) : (
+          <button type="button" className="ng-send" disabled={signing} onClick={signIn}>Sign in with Google to send</button>
+        )}
+        <small className="ng-hint">Minimum 10 characters · {lim?.confessionPerDay ?? 3} per day</small>
+      </div>
+    </form>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Feed bubble                                                         */
+/* ------------------------------------------------------------------ */
+function Bubble({ p, ctx, full }: { p: Post; ctx: OzCtx; full?: boolean }) {
+  return (
+    <article className="ng-post">
+      <header style={{ background: grad(p.category) }}>
+        <span>{p.categoryLabel || '🤫 Confession'}</span>
+        <small>#{pad(p.number)} · {ago(p.publishedAt)}</small>
       </header>
-      {p.replyTo && <a className="oz-replyto" href={`#/ozone/thread/${p.replyTo}`}><CornerDownRight size={13} /> Reply to #{pad(p.replyTo)}</a>}
-      <p className="oz-text">{p.text}</p>
-      <MediaView media={p.media} />
-      <footer>
-        {!thread && <a className="oz-ghost" href={`#/ozone/thread/${p.number}`}><MessageCircle size={14} /> {p.replies ? `${p.replies} repl${p.replies === 1 ? 'y' : 'ies'}` : 'Open'}</a>}
-        <a className="oz-ghost" href={`#/ozone/confess/${p.number}`}><CornerDownRight size={14} /> Reply anonymously</a>
-        <ShareButton text={`Confession #${pad(p.number)} on Chuka O-Zone (${p.categoryLabel}): “${snip(p.text)}”`} path={`thread/${p.number}`} />
-        <ReportButton ctx={ctx} kind="confession" refId={p.number} />
-      </footer>
+      <div className="ng-post-body">
+        <p>{p.text}</p>
+        {p.media.length > 0 && (
+          <div className="ng-media">
+            {p.media.map((m, i) => m.type === 'video'
+              ? <video key={i} src={m.url} poster={m.thumb} controls preload="none" playsInline />
+              : <img key={i} src={m.url} alt="" loading="lazy" referrerPolicy="no-referrer" />)}
+          </div>
+        )}
+        <footer>
+          {!full && <a href={`#/ozone/thread/${p.number}`}><MessageCircle size={14} /> {p.replies > 0 ? `${p.replies} repl${p.replies === 1 ? 'y' : 'ies'}` : 'Reply'}</a>}
+          <ShareButton text={`Confession #${pad(p.number)} on Chuka O-Zone:\n\n${p.text.length > 180 ? `${p.text.slice(0, 179)}…` : p.text}`} path={`thread/${p.number}`} />
+          <ReportButton ctx={ctx} kind="confession" refId={String(p.number)} />
+        </footer>
+      </div>
     </article>
   )
 }
 
+/* ------------------------------------------------------------------ */
+/* Screens used by Ozone.tsx                                           */
+/* ------------------------------------------------------------------ */
 export function Feed({ ctx }: { ctx: OzCtx }) {
+  const cats = ctx.cfg?.confessionCategories || {}
   const [cat, setCat] = useState('')
   const [items, setItems] = useState<Post[]>([])
   const [next, setNext] = useState<number | null>(null)
@@ -33,146 +173,92 @@ export function Feed({ ctx }: { ctx: OzCtx }) {
   const [err, setErr] = useState('')
 
   const load = useCallback(async (before?: number) => {
-    setLoading(true); setErr('')
+    setLoading(true)
     try {
       const r = await oz<Page<Post>>('feed', { category: cat || undefined, before })
-      setItems((cur) => (before ? [...cur, ...r.items] : r.items)); setNext(r.nextBefore)
-    } catch (e) { setErr((e as Error).message) }
-    finally { setLoading(false) }
+      setItems((p) => (before ? [...p, ...r.items.filter((n) => !p.some((x) => x.number === n.number))] : r.items))
+      setNext(r.nextBefore); setErr('')
+    } catch (e) { setErr((e as Error).message) } finally { setLoading(false) }
   }, [cat])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setItems([]); void load() }, [load])
 
-  const cats = ctx.cfg?.confessionCategories ?? {}
   return (
-    <div className="oz-wrap">
-      <div className="oz-title">
-        <div><h2>Confessions</h2><p className="cpl-sub">Anonymous. Posted only after the admin approves.</p></div>
-        <a className="lp-btn" href="#/ozone/confess"><PenLine size={15} /> Confess</a>
+    <div className="ng-wrap">
+      <WaTop ctx={ctx} />
+      <SendCard ctx={ctx} />
+
+      <h3 className="ng-sec">👇 see what comrades confessed</h3>
+      <div className="ng-chips" role="tablist" aria-label="Filter">
+        <button type="button" className={cat === '' ? 'on' : ''} onClick={() => setCat('')}>All</button>
+        {Object.entries(cats).map(([k, l]) => <button key={k} type="button" className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{l}</button>)}
       </div>
-      <div className="cpl-chips oz-left" role="group" aria-label="Category">
-        <button type="button" className={!cat ? 'on' : ''} onClick={() => setCat('')}>All</button>
-        {Object.entries(cats).map(([k, v]) => <button key={k} type="button" className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{v}</button>)}
-      </div>
+
       <Err msg={err} />
-      <div className="oz-list">
-        {items.map((p) => <PostCard key={p.number} ctx={ctx} p={p} />)}
-        {!loading && !items.length && !err && <p className="cpl-empty">Nothing here yet. Be the first to confess.</p>}
-      </div>
-      {loading && <p className="cpl-empty">Loading…</p>}
-      {!loading && next !== null && <button type="button" className="lp-btn lp-btn-soft oz-more" onClick={() => void load(next)}>Load more</button>}
+      <div className="ng-list">{items.map((p) => <Bubble key={p.number} p={p} ctx={ctx} />)}</div>
+      {loading && <p className="ng-empty">Loading…</p>}
+      {!loading && !err && items.length === 0 && <p className="ng-empty">Nothing here yet. Be the first to confess 👆</p>}
+      {next !== null && !loading && <button type="button" className="ng-more" onClick={() => void load(next)}>Load more</button>}
+
       <DeleteBox />
     </div>
   )
 }
 
-export function Thread({ ctx, number }: { ctx: OzCtx; number: string }) {
-  const { data, err, loading } = useLoad(() => oz<{ post: Post; replies: Post[] }>('thread', { number: Number(number) }), [number])
+export function Compose({ ctx, replyTo }: { ctx: OzCtx; replyTo?: string }) {
+  const n = parseInt(replyTo || '', 10) || undefined
   return (
-    <div className="oz-wrap">
-      <a className="cpl-back" href="#/ozone/confessions">← All confessions</a>
+    <div className="ng-wrap">
+      <WaTop ctx={ctx} />
+      <SendCard ctx={ctx} replyTo={n} />
+      <a className="ng-back" href={n ? `#/ozone/thread/${n}` : '#/ozone/confessions'}>← Back to confessions</a>
+    </div>
+  )
+}
+
+export function Thread({ ctx, number }: { ctx: OzCtx; number: string }) {
+  const { data, err, loading } = useLoad(() => oz<{ post: Post; replies: Post[] }>('thread', { number }), [number])
+  return (
+    <div className="ng-wrap">
+      <WaTop ctx={ctx} />
       <Err msg={err} />
-      {loading && <p className="cpl-empty">Loading…</p>}
+      {loading && <p className="ng-empty">Loading…</p>}
       {data && (
         <>
-          <PostCard ctx={ctx} p={data.post} thread />
-          <h3 className="cpl-h3">{data.replies.length} repl{data.replies.length === 1 ? 'y' : 'ies'}</h3>
-          <div className="oz-list">{data.replies.map((r) => <PostCard key={r.number} ctx={ctx} p={r} thread />)}</div>
+          <Bubble p={data.post} ctx={ctx} full />
+          <h3 className="ng-sec">💬 {data.replies.length} {data.replies.length === 1 ? 'reply' : 'replies'}</h3>
+          <div className="ng-list ng-replies">{data.replies.map((r) => <Bubble key={r.number} p={r} ctx={ctx} full />)}</div>
+          <h3 className="ng-sec">Reply anonymously</h3>
+          <SendCard ctx={ctx} replyTo={data.post.number} />
         </>
       )}
+      <a className="ng-back" href="#/ozone/confessions">← Back to confessions</a>
     </div>
   )
 }
 
-export function Compose({ ctx, replyTo }: { ctx: OzCtx; replyTo: string }) {
-  const cfg = ctx.cfg!
-  const [text, setText] = useState('')
-  const [cat, setCat] = useState('other')
-  const [media, setMedia] = useState<Upload[]>([])
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const [done, setDone] = useState<{ number: number; deleteCode: string; message: string; support: Support | null } | null>(null)
-  const [saved, setSaved] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true); setErr('')
-    try {
-      setDone(await oz('confession_submit', { text, category: cat, replyTo: replyTo ? Number(replyTo) : undefined, media: media.length ? media : undefined }))
-    } catch (x) { setErr((x as Error).message) }
-    finally { setBusy(false) }
-  }
-
-  if (done) {
-    return (
-      <div className="oz-wrap">
-        <div className="cpl-card oz-done">
-          <h3>Received, #{pad(done.number)}</h3>
-          <p>{done.message}</p>
-          <div className="oz-code">
-            <span>Your delete code</span>
-            <strong>{done.deleteCode}</strong>
-            <CopyButton text={`Confession #${done.number} delete code: ${done.deleteCode}`} />
-          </div>
-          <label className="cpl-file"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I have saved my code. It is shown only once.</label>
-          <SupportBox support={done.support} />
-          <div className="ef-actions">
-            <a className="lp-btn" href="#/ozone/confessions" aria-disabled={!saved} onClick={(e) => { if (!saved) e.preventDefault() }} style={{ opacity: saved ? 1 : .5 }}>Back to confessions</a>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="oz-wrap">
-      <a className="cpl-back" href="#/ozone/confessions">← All confessions</a>
-      <h2>{replyTo ? `Reply to #${pad(Number(replyTo))}` : 'Confess anonymously'}</h2>
-      <p className="cpl-sub">Nobody sees who you are, not even the admin. Do not name people, share phone numbers or registration numbers.</p>
-      <Gate ctx={ctx} what="post a confession">
-        <form className="cpl-card cpl-form oz-form" onSubmit={submit}>
-          <label>Your confession
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} maxLength={cfg.limits.confessionMax} required minLength={10} />
-            <small>{text.length}/{cfg.limits.confessionMax} · up to {cfg.limits.confessionPerDay} a day</small>
-          </label>
-          {!replyTo && (
-            <label>Category
-              <select value={cat} onChange={(e) => setCat(e.target.value)}>
-                {Object.entries(cfg.confessionCategories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </label>
-          )}
-          <div><span className="oz-lbl">Photo or video (optional)</span><MediaPicker cfg={cfg} allowVideo onChange={setMedia} /></div>
-          <small>Photos have their location data removed here before they are sent. Videos: MP4 or WEBM, under 30 seconds.</small>
-          <Err msg={err} />
-          <button className="lp-btn" disabled={busy || text.trim().length < 10}>{busy ? 'Sending…' : 'Send for review'}</button>
-        </form>
-      </Gate>
-    </div>
-  )
-}
-
-/** Delete with the code shown after posting. Works from any phone and needs no sign-in. */
+/* Delete with the code shown after posting. */
 function DeleteBox() {
   const [open, setOpen] = useState(false)
   const [num, setNum] = useState('')
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState('')
-  const [bad, setBad] = useState(false)
+  const [err, setErr] = useState('')
   async function del(e: FormEvent) {
-    e.preventDefault()
-    try { await oz('confession_delete', { number: Number(num.replace(/\D/g, '')), code }); setMsg('Deleted.'); setBad(false) }
-    catch (x) { setMsg((x as Error).message); setBad(true) }
+    e.preventDefault(); setErr(''); setMsg('')
+    try { await oz('confession_delete', { number: num.replace(/\D/g, ''), code }); setMsg('Deleted.'); setNum(''); setCode('') }
+    catch (x) { setErr((x as Error).message) }
   }
-  if (!open) return <p className="cpl-note"><button type="button" className="cpl-linkbtn" onClick={() => setOpen(true)}><Trash2 size={12} /> Delete one of my confessions</button></p>
   return (
-    <form className="cpl-card cpl-form oz-form" onSubmit={del}>
-      <h3>Delete my confession</h3>
-      <div className="cpl-grid2">
-        <label>Number<input type="text" inputMode="numeric" value={num} onChange={(e) => setNum(e.target.value)} placeholder="e.g. 42" required /></label>
-        <label>Delete code<input type="text" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required /></label>
-      </div>
-      {msg && <p className={`cpl-msg${bad ? ' bad' : ''}`} role="status">{msg}</p>}
-      <button className="lp-btn cpl-danger">Delete</button>
-    </form>
+    <div className="ng-del">
+      <button type="button" onClick={() => setOpen((o) => !o)}><Trash2 size={13} /> Delete my confession</button>
+      {open && (
+        <form onSubmit={del}>
+          <input value={num} onChange={(e) => setNum(e.target.value)} placeholder="Number e.g. 0012" inputMode="numeric" required />
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Delete code" autoCapitalize="characters" required />
+          <button type="submit">Delete</button>
+          <Err msg={err} />{msg && <p className="ng-ok">{msg}</p>}
+        </form>
+      )}
+    </div>
   )
 }

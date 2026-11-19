@@ -4,7 +4,7 @@ import { ArrowLeft, Clapperboard, Flame, Megaphone, Newspaper, ShieldCheck, Life
 import { auth, googleProvider } from '../lib/firebase'
 import { oz, ozReady, type Config, type Me } from '../lib/ozone'
 import { ShareButton, type OzCtx } from './OzCommon'
-import { Compose, Feed, Thread } from './OzConfessions'
+import { Compose, Feed, Thread, OZONE_WA_GROUP } from './OzConfessions'
 import { AspirantPage, Elections, Faculties, FacultyPage, IssueDetail, Issues, Polls, Promises, ReportIssue } from './OzSauti'
 import Hookup from './OzHookup'
 import Trends from './OzTrends'
@@ -84,14 +84,22 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
 
 function Home({ ctx }: { ctx: OzCtx }) {
   const { me, user, cfg } = ctx
-  const waUrl = cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined) || ''
+  const waUrl = cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined) || OZONE_WA_GROUP
   return (
     <div className="cpl-home oz-home">
-      <div className="ef-mark oz-mark"><img src={`${import.meta.env.BASE_URL}ozone-logo.svg`} alt="Chuka O-Zone logo" /></div>
+      <div className="ef-mark oz-mark"><img src={`${import.meta.env.BASE_URL}ozone.jfif`} alt="Chuka O-Zone logo" /></div>
       <h1>Chuka O-Zone</h1>
       <p>Say it anonymously, speak up for your faculty, and meet people on campus.</p>
 
       <div className="oz-live"><span className="oz-live-dot" /> O-Zone community is live <span className="oz-live-note">Anonymous · moderated · campus-focused</span></div>
+
+      {waUrl && (
+        <a className="oz-wa" href={waUrl} target="_blank" rel="noopener noreferrer">
+          <span className="oz-wa-ic"><MessageCircle size={26} /></span>
+          <span className="oz-wa-t"><strong>Join the Chuka O-Zone WhatsApp group</strong><small><Users size={13} /> Campus updates, trends and announcements. Tap to join.</small></span>
+          <span className="oz-wa-go">Join</span>
+        </a>
+      )}
 
       <div className="oz-tiles">
         <a className="oz-tile oz-feature" href="#/ozone/confessions">
@@ -121,13 +129,6 @@ function Home({ ctx }: { ctx: OzCtx }) {
         </a>
       </div>
 
-      {waUrl && (
-        <a className="oz-wa" href={waUrl} target="_blank" rel="noopener noreferrer">
-          <span className="oz-wa-ic"><MessageCircle size={26} /></span>
-          <span className="oz-wa-t"><strong>Join the Chuka O-Zone WhatsApp group</strong><small><Users size={13} /> Campus updates, trends and announcements. Tap to join.</small></span>
-          <span className="oz-wa-go">Join</span>
-        </a>
-      )}
 
       <div className="oz-quick">
         <a href="#/ozone/confess">➕ Confess</a>

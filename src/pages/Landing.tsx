@@ -239,7 +239,11 @@ export default function Landing({ user }: { user: User | null }) {
                     : title === 'Chuka O Zone'
                     ? (
                       <span className="lp-card-icon has-logo">
-                        <img src={`${BASE}ozone-logo.svg`} alt="Chuka O-Zone logo" />
+                        <img
+                          src={`${BASE}ozone.jfif`}
+                          alt="Chuka O-Zone logo"
+                          onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith('ozone-logo.svg')) i.src = `${BASE}ozone-logo.svg` }}
+                        />
                       </span>
                     )
                     : title === 'Hostels & Roommates'
