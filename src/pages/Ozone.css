@@ -155,8 +155,11 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-profiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .oz-profile { border: 1px solid var(--line); border-radius: 18px; background: #fff; overflow: hidden; display: grid; box-shadow: 0 6px 20px #173d2508; }
 .oz-mine .oz-profile { max-width: 320px; margin-bottom: 12px; }
-.oz-ph { aspect-ratio: 4/3; background: linear-gradient(135deg, #fde8ea, #e9f2ec); display: grid; place-items: center; color: #9b6b73; overflow: hidden; }
-.oz-ph img { width: 100%; height: 100%; object-fit: cover; }
+.oz-ph { aspect-ratio: 5/4; background: linear-gradient(135deg, #fde8ea, #e9f2ec); display: grid; place-items: center; color: #9b6b73; overflow: hidden; }
+.oz-ph img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+.oz-wa { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: #25d366; color: #063d1d; font: 800 13px 'Manrope', sans-serif; text-decoration: none; }
+.oz-wa:active { transform: scale(.98); }
+.oz-wa[aria-busy="true"] { opacity: .75; }
 .oz-pbody { padding: 14px 16px 16px; display: grid; gap: 8px; justify-items: start; }
 .oz-pbody header { display: flex; justify-content: space-between; width: 100%; align-items: baseline; }
 .oz-pbody header small { color: var(--muted); }
