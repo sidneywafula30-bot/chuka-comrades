@@ -77,7 +77,7 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
         <a className="cpl-back" href={back}><ArrowLeft size={16} /> {page ? 'O-Zone home' : 'Student services'}</a>
         <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
       </header>
-      <main className="cpl-main">{body}</main>
+      <main className={`cpl-main${['confessions', 'confess', 'thread'].includes(page) ? ' oz-bleed' : ''}`}>{body}</main>
     </div>
   )
 }

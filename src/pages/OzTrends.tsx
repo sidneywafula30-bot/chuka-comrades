@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { ExternalLink, Play, Plus } from 'lucide-react'
-import { oz, type TrendItem, type TrendList } from '../lib/ozone'
+import { ArrowLeft, ExternalLink, MessageCircle, Play, Plus, Volume2, VolumeX, X } from 'lucide-react'
+import { oz, waShare, type TrendItem, type TrendList } from '../lib/ozone'
 import { Err, Gate, ShareButton, type OzCtx } from './OzCommon'
+import './OzTrends.css'
 
 const siteName = (t: TrendItem) => (t.source === 'tiktok' ? 'TikTok' : 'YouTube')
 
@@ -89,15 +90,15 @@ function Suggest({ ctx }: { ctx: OzCtx }) {
   )
 }
 
-export default function Trends({ ctx }: { ctx: OzCtx }) {
+/* ------------------------------------------------------------------ */
+/* Shared data loading                                                 */
+/* ------------------------------------------------------------------ */
+function useTrendFeed() {
   const [items, setItems] = useState<TrendItem[]>([])
   const [live, setLive] = useState<TrendItem | null>(null)
   const [next, setNext] = useState<number | null>(0)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [playing, setPlaying] = useState('')
-  const [adding, setAdding] = useState(false)
-  const endRef = useRef<HTMLDivElement>(null)
   const busyRef = useRef(false)
 
   const load = useCallback(async (offset: number) => {
@@ -113,6 +114,180 @@ export default function Trends({ ctx }: { ctx: OzCtx }) {
   }, [])
   useEffect(() => { void load(0) }, [load])
 
+  const all = live ? [{ ...live, key: `live:${live.videoId}`, live: true }, ...items] : items
+  return { all, next, loading, err, load }
+}
+
+function useIsPhone() {
+  const q = '(max-width: 700px)'
+  const [m, setM] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(q)
+    const f = () => setM(mq.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  return m
+}
+
+/* ------------------------------------------------------------------ */
+/* Phone: full-screen, swipe-up, autoplaying videos (TikTok style)     */
+/* ------------------------------------------------------------------ */
+type Cmd = 'play' | 'pause' | 'mute' | 'unMute'
+
+function reelSrc(t: TrendItem, sound: boolean) {
+  if (t.source === 'tiktok') {
+    return `https://www.tiktok.com/player/v1/${encodeURIComponent(t.videoId)}?autoplay=1&loop=1&controls=0&play_button=0&progress_bar=0&volume_control=0&fullscreen_button=0&timestamp=0&music_info=0&description=0&rel=0&native_context_menu=0`
+  }
+  const id = encodeURIComponent(t.videoId)
+  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=${sound ? 0 : 1}&controls=0&loop=1&playlist=${id}&playsinline=1&rel=0&modestbranding=1&disablekb=1&fs=0&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+}
+
+/** Mounted only for the reel on screen, so only one video ever loads. */
+function ReelPlayer({ t, sound }: { t: TrendItem; sound: boolean }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [src] = useState(() => reelSrc(t, sound))   // fixed for this mount: changing it would reload the video
+  const [playing, setPlaying] = useState(true)
+
+  const send = useCallback((cmd: Cmd) => {
+    const w = frame.current?.contentWindow
+    if (!w) return
+    if (t.source === 'tiktok') w.postMessage({ type: cmd, 'x-tiktok-player': true }, '*')
+    else w.postMessage(JSON.stringify({ event: 'command', func: { play: 'playVideo', pause: 'pauseVideo', mute: 'mute', unMute: 'unMute' }[cmd], args: [] }), '*')
+  }, [t.source])
+
+  // Keep our play/pause icon in step with what the player reports.
+  useEffect(() => {
+    const h = (e: MessageEvent) => {
+      if (e.source !== frame.current?.contentWindow) return
+      let d: unknown = e.data
+      if (typeof d === 'string') { try { d = JSON.parse(d) } catch { return } }
+      if (!d || typeof d !== 'object') return
+      const o = d as Record<string, unknown>
+      if (o['x-tiktok-player'] && o.type === 'onStateChange') setPlaying(o.value === 1 || o.value === 3)
+      else if (o.event === 'onStateChange' && typeof o.info === 'number') setPlaying(o.info === 1 || o.info === 3)
+    }
+    window.addEventListener('message', h)
+    return () => window.removeEventListener('message', h)
+  }, [])
+
+  useEffect(() => { send(sound ? 'unMute' : 'mute') }, [sound, send])
+  const onLoad = () => {
+    if (t.source === 'youtube') frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*')
+    send(sound ? 'unMute' : 'mute')
+  }
+  const toggle = () => { send(playing ? 'pause' : 'play'); setPlaying(!playing) }
+
+  return (
+    <>
+      <iframe ref={frame} className="tt-frame" title={t.title} src={src} onLoad={onLoad} allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" />
+      {/* Transparent layer: swipes scroll the feed, a tap pauses or plays. */}
+      <button type="button" className="tt-tap" onClick={toggle} aria-label={playing ? 'Pause video' : 'Play video'}>
+        {!playing && <span className="tt-paused"><Play size={44} fill="currentColor" /></span>}
+      </button>
+    </>
+  )
+}
+
+function Reel({ t, active, sound, onSound }: { t: TrendItem; active: boolean; sound: boolean; onSound: () => void }) {
+  const [bad, setBad] = useState(false)
+  const note = `${t.title} (Chuka Trends)`
+  return (
+    <section className="tt-item" data-k={t.key}>
+      {t.thumb && !bad && <div className="tt-bg" style={{ backgroundImage: `url("${t.thumb}")` }} />}
+      <div className={`tt-stage${t.vertical ? ' v' : ''}`}>
+        {active ? <ReelPlayer t={t} sound={sound} /> : (
+          <div className="tt-poster">
+            {t.thumb && !bad ? <img src={t.thumb} alt="" referrerPolicy="no-referrer" onError={() => setBad(true)} /> : <span>{siteName(t)}</span>}
+            <span className="tt-spin" />
+          </div>
+        )}
+      </div>
+      <div className="tt-shade" />
+      {t.live && <span className="tt-live">● LIVE</span>}
+      <div className="tt-info">
+        <b>{t.author ? (t.author.startsWith('@') ? t.author : `@${t.author}`) : siteName(t)}</b>
+        <p>{t.title}</p>
+      </div>
+      <div className="tt-rail">
+        {active && <button type="button" onClick={onSound} aria-label={sound ? 'Mute' : 'Turn sound on'}>{sound ? <Volume2 size={26} /> : <VolumeX size={26} />}<small>{sound ? 'Sound' : 'Muted'}</small></button>}
+        <a className="wa" href={waShare(`${note}\n\n${t.url}`)} target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><MessageCircle size={26} /><small>Share</small></a>
+        <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${siteName(t)}`}><ExternalLink size={24} /><small>{siteName(t)}</small></a>
+      </div>
+    </section>
+  )
+}
+
+function Reels({ ctx }: { ctx: OzCtx }) {
+  const { all, next, loading, err, load } = useTrendFeed()
+  const [active, setActive] = useState('')
+  const [sound, setSound] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const scroller = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+
+  // The page itself must not scroll behind the full-screen feed.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  // The reel that fills the screen is the one that plays.
+  useEffect(() => {
+    const root = scroller.current
+    if (!root) return
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting && e.intersectionRatio >= 0.6) setActive((e.target as HTMLElement).dataset.k || '')
+    }, { root, threshold: [0.6] })
+    root.querySelectorAll('[data-k]').forEach((n) => io.observe(n))
+    return () => io.disconnect()
+  }, [all.length])
+
+  // Load more when the viewer gets near the last reel.
+  useEffect(() => {
+    const el = endRef.current, root = scroller.current
+    if (!el || !root || next === null) return
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) void load(next) }, { root, rootMargin: '0px 0px 160% 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [next, load, all.length])
+
+  return (
+    <div className="tt" ref={scroller}>
+      <header className="tt-top">
+        <a href="#/ozone" aria-label="Back to O-Zone"><ArrowLeft size={22} /></a>
+        <b>Chuka Trends</b>
+        <button type="button" onClick={() => setAdding(true)}><Plus size={16} /> Suggest</button>
+      </header>
+      {all.map((t) => <Reel key={t.key} t={t} active={active === t.key} sound={sound} onSound={() => setSound((s) => !s)} />)}
+      {loading && !all.length && <section className="tt-item tt-msg"><span className="tt-spin big" /></section>}
+      {!loading && !err && !all.length && <section className="tt-item tt-msg"><p>No videos yet. Check back soon.</p></section>}
+      {err && <section className="tt-item tt-msg"><p>{err}</p><button type="button" onClick={() => void load(0)}>Try again</button></section>}
+      <div ref={endRef} aria-hidden="true" style={{ height: 1 }} />
+      {all.length > 0 && !sound && active === all[0]?.key && <div className="tt-hint">Tap 🔇 for sound · swipe up for more</div>}
+      {adding && (
+        <div className="tt-sheet" role="dialog" aria-label="Suggest a video">
+          <div className="tt-sheet-card">
+            <button type="button" className="tt-sheet-x" onClick={() => setAdding(false)} aria-label="Close"><X size={20} /></button>
+            <h3>Suggest a video</h3>
+            <Suggest ctx={ctx} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Desktop / tablet: the original card feed                            */
+/* ------------------------------------------------------------------ */
+function CardFeed({ ctx }: { ctx: OzCtx }) {
+  const { all, next, loading, err, load } = useTrendFeed()
+  const [playing, setPlaying] = useState('')
+  const [adding, setAdding] = useState(false)
+  const endRef = useRef<HTMLDivElement>(null)
+
   // Load the next batch when the end of the list comes near.
   useEffect(() => {
     const el = endRef.current
@@ -120,10 +295,9 @@ export default function Trends({ ctx }: { ctx: OzCtx }) {
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) void load(next) }, { rootMargin: '700px 0px' })
     io.observe(el)
     return () => io.disconnect()
-  }, [next, load, items.length])
+  }, [next, load, all.length])
 
   const stop = useCallback(() => setPlaying(''), [])
-  const all = live ? [{ ...live, key: `live:${live.videoId}`, live: true }, ...items] : items
 
   return (
     <div className="oz-wrap">
@@ -144,4 +318,9 @@ export default function Trends({ ctx }: { ctx: OzCtx }) {
       </div>
     </div>
   )
+}
+
+export default function Trends({ ctx }: { ctx: OzCtx }) {
+  const phone = useIsPhone()
+  return phone ? <Reels ctx={ctx} /> : <CardFeed ctx={ctx} />
 }

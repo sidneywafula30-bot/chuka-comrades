@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { ImagePlus, Lock, MessageCircle, Send, Trash2, Users, X } from 'lucide-react'
-import { ago, cleanPhoto, oz, pad, prepVideo, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
-import { Err, ReportButton, ShareButton, useLoad, type OzCtx } from './OzCommon'
+import { ImagePlus, Link2, Lock, MessageCircle, Play, Send, Trash2, Users, X } from 'lucide-react'
+import { ago, cleanPhoto, oz, ozLink, pad, prepVideo, waShare, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
+import { Err, ReportButton, useLoad, type OzCtx } from './OzCommon'
 import './OzConfessions.css'
 
 /* Main Chuka O-Zone WhatsApp group (used when the backend/env has no link set). */
@@ -107,6 +107,7 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
           placeholder={replyTo ? 'say it anonymously…' : 'tell me your confession…'}
           onChange={(e) => setText(e.target.value)} aria-label="Your confession"
         />
+        {splitVideos(text).videos.length > 0 && <p className="ng-vidhint">🎬 Video link found. It will play as a video once approved.</p>}
         <div className="ng-meta">
           <span>{text.length}/{max}</span>
           <button type="button" className="ng-attach" onClick={() => file.current?.click()}><ImagePlus size={15} /> Photo / video</button>
@@ -126,16 +127,101 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
         ) : (
           <button type="button" className="ng-send" disabled={signing} onClick={signIn}>Sign in with Google to send</button>
         )}
-        <small className="ng-hint">Minimum 10 characters · {lim?.confessionPerDay ?? 3} per day</small>
+        <small className="ng-hint">Minimum 10 characters · {lim?.confessionPerDay ?? 3} per day · paste a YouTube, TikTok, Instagram, Facebook or Vimeo link to share a long video</small>
       </div>
     </form>
+  )
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Video links: a pasted YouTube / TikTok / Vimeo / Instagram / Facebook */
+/* / .mp4 link is shown as a video player instead of a bare link.      */
+/* ------------------------------------------------------------------ */
+type Vid = { src: string; label: string; thumb: string; vertical: boolean; file: boolean; url: string }
+const URL_RE = /https?:\/\/[^\s<>"']+/gi
+
+function videoFromUrl(raw: string): Vid | null {
+  const url = raw.replace(/[.,!?;:)\]]+$/, '')
+  let u: URL
+  try { u = new URL(url) } catch { return null }
+  const host = u.hostname.replace(/^(www|m|mobile|web)\./, '')
+  const path = u.pathname
+  if (/\.(mp4|webm)$/i.test(path)) return { src: url, label: 'Video', thumb: '', vertical: false, file: true, url }
+  if (host === 'youtu.be' || host === 'youtube.com' || host === 'music.youtube.com') {
+    const id = host === 'youtu.be' ? path.slice(1, 12) : u.searchParams.get('v') || /^\/(?:shorts|live|embed)\/([\w-]{11})/.exec(path)?.[1] || ''
+    if (!/^[\w-]{11}$/.test(id)) return null
+    return { src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`, label: 'YouTube', thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, vertical: path.startsWith('/shorts/'), file: false, url }
+  }
+  if (host === 'tiktok.com') {
+    const id = /\/video\/(\d{8,25})/.exec(path)?.[1]
+    if (!id) return null
+    return { src: `https://www.tiktok.com/player/v1/${id}?autoplay=1&loop=0`, label: 'TikTok', thumb: '', vertical: true, file: false, url }
+  }
+  if (host === 'vimeo.com') {
+    const id = /^\/(\d{5,12})/.exec(path)?.[1]
+    return id ? { src: `https://player.vimeo.com/video/${id}?autoplay=1`, label: 'Vimeo', thumb: '', vertical: false, file: false, url } : null
+  }
+  if (host === 'instagram.com') {
+    const m = /^\/(reel|reels|p|tv)\/([\w-]+)/.exec(path)
+    return m ? { src: `https://www.instagram.com/${m[1] === 'reels' ? 'reel' : m[1]}/${m[2]}/embed`, label: 'Instagram', thumb: '', vertical: true, file: false, url } : null
+  }
+  if (host === 'facebook.com' || host === 'fb.watch') {
+    if (host === 'facebook.com' && !/(\/videos?\/|\/reel\/|\/watch)/.test(path)) return null
+    return { src: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&autoplay=1`, label: 'Facebook', thumb: '', vertical: false, file: false, url }
+  }
+  return null
+}
+
+/** Splits a confession into its words and any video links (max 2). */
+export function splitVideos(text: string): { body: string; videos: Vid[] } {
+  const videos: Vid[] = []
+  const body = text.replace(URL_RE, (m) => {
+    const v = videos.length < 2 ? videoFromUrl(m) : null
+    if (!v || videos.some((x) => x.src === v.src)) return m
+    videos.push(v)
+    return ''
+  }).replace(/ {2,}/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+  return { body, videos }
+}
+
+function VideoEmbed({ v }: { v: Vid }) {
+  const [on, setOn] = useState(false)
+  const [bad, setBad] = useState(false)
+  return (
+    <div className={`ng-vid${v.vertical ? ' v' : ''}`}>
+      {v.file ? <video src={v.src} controls playsInline preload="metadata" />
+        : on ? <iframe title={`${v.label} video`} src={v.src} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
+        : (
+          <button type="button" className="ng-vid-go" onClick={() => setOn(true)} aria-label={`Play ${v.label} video`}>
+            {v.thumb && !bad && <img src={v.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />}
+            <span className="ng-vid-play"><Play size={26} fill="currentColor" /></span>
+            <span className="ng-vid-tag">{v.label}</span>
+          </button>
+        )}
+      {!v.file && <a className="ng-vid-open" href={v.url} target="_blank" rel="noopener noreferrer">Open on {v.label} ↗</a>}
+    </div>
   )
 }
 
 /* ------------------------------------------------------------------ */
 /* Feed bubble                                                         */
 /* ------------------------------------------------------------------ */
-function Bubble({ p, ctx, full }: { p: Post; ctx: OzCtx; full?: boolean }) {
+function Bubble({ p, ctx, full, onDeleted }: { p: Post; ctx: OzCtx; full?: boolean; onDeleted?: (n: number) => void }) {
+  const { body, videos } = splitVideos(p.text)
+  const link = ozLink(`thread/${p.number}`)
+  const snippet = p.text.length > 300 ? `${p.text.slice(0, 299)}…` : p.text
+  const [copied, setCopied] = useState(false)
+  const [err, setErr] = useState('')
+  const [gone, setGone] = useState(false)
+
+  async function remove() {
+    if (!window.confirm(`Delete confession #${pad(p.number)} for everyone? This cannot be undone.`)) return
+    try { await oz('admin_confession_delete', { number: p.number }); setGone(true); onDeleted?.(p.number) }
+    catch (e) { setErr((e as Error).message) }
+  }
+  if (gone) return <article className="ng-post ng-gone"><p>Confession #{pad(p.number)} deleted.</p></article>
+
   return (
     <article className="ng-post">
       <header style={{ background: grad(p.category) }}>
@@ -143,7 +229,8 @@ function Bubble({ p, ctx, full }: { p: Post; ctx: OzCtx; full?: boolean }) {
         <small>#{pad(p.number)} · {ago(p.publishedAt)}</small>
       </header>
       <div className="ng-post-body">
-        <p>{p.text}</p>
+        {body && <p>{body}</p>}
+        {videos.map((v) => <VideoEmbed key={v.src} v={v} />)}
         {p.media.length > 0 && (
           <div className="ng-media">
             {p.media.map((m, i) => m.type === 'video'
@@ -151,11 +238,18 @@ function Bubble({ p, ctx, full }: { p: Post; ctx: OzCtx; full?: boolean }) {
               : <img key={i} src={m.url} alt="" loading="lazy" referrerPolicy="no-referrer" />)}
           </div>
         )}
+        <a className="ng-wa-share" href={waShare(`Confession #${pad(p.number)} on Chuka O-Zone:\n\n${snippet}\n\n${link}`)} target="_blank" rel="noopener noreferrer">
+          <MessageCircle size={17} /> Share on WhatsApp
+        </a>
         <footer>
           {!full && <a href={`#/ozone/thread/${p.number}`}><MessageCircle size={14} /> {p.replies > 0 ? `${p.replies} repl${p.replies === 1 ? 'y' : 'ies'}` : 'Reply'}</a>}
-          <ShareButton text={`Confession #${pad(p.number)} on Chuka O-Zone:\n\n${p.text.length > 180 ? `${p.text.slice(0, 179)}…` : p.text}`} path={`thread/${p.number}`} />
+          <button type="button" className="ng-ghost" onClick={() => { void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}>
+            <Link2 size={14} /> {copied ? 'Copied' : 'Copy link'}
+          </button>
           <ReportButton ctx={ctx} kind="confession" refId={String(p.number)} />
+          {ctx.me?.isAdmin && <button type="button" className="ng-ghost ng-danger" onClick={() => void remove()}><Trash2 size={14} /> Delete</button>}
         </footer>
+        <Err msg={err} />
       </div>
     </article>
   )
@@ -194,7 +288,7 @@ export function Feed({ ctx }: { ctx: OzCtx }) {
       </div>
 
       <Err msg={err} />
-      <div className="ng-list">{items.map((p) => <Bubble key={p.number} p={p} ctx={ctx} />)}</div>
+      <div className="ng-list">{items.map((p) => <Bubble key={p.number} p={p} ctx={ctx} onDeleted={(n) => setItems((prev) => prev.filter((x) => x.number !== n))} />)}</div>
       {loading && <p className="ng-empty">Loading…</p>}
       {!loading && !err && items.length === 0 && <p className="ng-empty">Nothing here yet. Be the first to confess 👆</p>}
       {next !== null && !loading && <button type="button" className="ng-more" onClick={() => void load(next)}>Load more</button>}

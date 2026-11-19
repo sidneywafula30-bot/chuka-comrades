@@ -1,0 +1,51 @@
+/* Chuka Trends on a smartphone: one video per screen, swipe up, autoplay (TikTok style). */
+.tt { position: fixed; inset: 0; z-index: 2000; background: #000; color: #fff; overflow-y: scroll; scroll-snap-type: y mandatory; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tt::-webkit-scrollbar { display: none; }
+.tt-item { position: relative; height: 100vh; height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; display: grid; place-items: center; background: #000; }
+
+/* blurred copy of the thumbnail fills the sides of wide videos */
+.tt-bg { position: absolute; inset: -30px; background-size: cover; background-position: center; filter: blur(34px) brightness(.55); }
+.tt-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+.tt-stage.v { height: 100%; aspect-ratio: auto; }
+.tt-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.tt-poster { position: absolute; inset: 0; display: grid; place-items: center; }
+.tt-poster img { width: 100%; height: 100%; object-fit: cover; }
+.tt-poster > span:first-child { font: 800 22px 'Manrope', sans-serif; }
+.tt-tap { position: absolute; inset: 0; z-index: 2; width: 100%; border: 0; padding: 0; background: transparent; touch-action: pan-y; cursor: pointer; display: grid; place-items: center; color: #fff; -webkit-tap-highlight-color: transparent; }
+.tt-paused { width: 86px; height: 86px; border-radius: 50%; display: grid; place-items: center; background: #0007; }
+.tt-paused svg { margin-left: 4px; }
+
+.tt-shade { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(to top, #000c 0%, #0000 38%), linear-gradient(to bottom, #0009 0%, #0000 18%); }
+.tt-top { position: fixed; top: 0; left: 0; right: 0; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: max(12px, env(safe-area-inset-top)) 14px 10px; pointer-events: none; }
+.tt-top > * { pointer-events: auto; }
+.tt-top a { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #0008; color: #fff; }
+.tt-top b { font: 800 16px 'Manrope', sans-serif; text-shadow: 0 1px 6px #000a; }
+.tt-top button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 999px; padding: 9px 14px; background: #fff; color: #111; font: 800 13px 'Manrope', sans-serif; cursor: pointer; }
+
+.tt-info { position: absolute; z-index: 4; left: 14px; right: 84px; bottom: max(22px, env(safe-area-inset-bottom)); display: grid; gap: 4px; pointer-events: none; text-shadow: 0 1px 8px #000c; }
+.tt-info b { font: 800 16px 'Manrope', sans-serif; }
+.tt-info p { margin: 0; font: 600 14.5px/1.35 'Manrope', sans-serif; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tt-live { position: absolute; z-index: 5; top: calc(max(12px, env(safe-area-inset-top)) + 54px); left: 14px; padding: 4px 11px; border-radius: 999px; background: #d93025; font: 800 12px 'Manrope', sans-serif; }
+
+.tt-rail { position: absolute; z-index: 5; right: 8px; bottom: max(30px, env(safe-area-inset-bottom)); display: grid; gap: 18px; justify-items: center; }
+.tt-rail a, .tt-rail button { display: grid; justify-items: center; gap: 3px; width: 56px; border: 0; background: transparent; color: #fff; text-decoration: none; cursor: pointer; text-shadow: 0 1px 6px #000a; }
+.tt-rail a > svg, .tt-rail button > svg { width: 46px; height: 46px; padding: 10px; box-sizing: border-box; border-radius: 50%; background: #0006; }
+.tt-rail .wa > svg { background: #25d366; color: #063d1d; }
+.tt-rail small { font: 700 11px 'Manrope', sans-serif; }
+
+.tt-hint { position: fixed; z-index: 6; left: 50%; top: 22%; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: #000a; font: 700 13px 'Manrope', sans-serif; pointer-events: none; animation: tt-fade 5s forwards; white-space: nowrap; }
+@keyframes tt-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+.tt-msg { text-align: center; padding: 24px; }
+.tt-msg button { margin-top: 12px; border: 0; border-radius: 999px; padding: 10px 20px; background: #fff; color: #111; font-weight: 800; }
+.tt-spin { position: absolute; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff4; border-top-color: #fff; animation: tt-rot .8s linear infinite; }
+.tt-spin.big { position: static; width: 38px; height: 38px; }
+@keyframes tt-rot { to { transform: rotate(360deg); } }
+
+/* suggest sheet */
+.tt-sheet { position: fixed; inset: 0; z-index: 10; background: #0009; display: grid; align-items: end; }
+.tt-sheet-card { position: relative; background: #fff; color: #12301f; border-radius: 24px 24px 0 0; padding: 20px 16px max(22px, env(safe-area-inset-bottom)); max-height: 85dvh; overflow-y: auto; }
+.tt-sheet-card h3 { margin: 0 0 8px; font: 800 18px 'Manrope', sans-serif; }
+.tt-sheet-x { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #eef1ee; color: #333; display: grid; place-items: center; }
+
+@media (prefers-reduced-motion: reduce) { .tt-hint { animation: none; } .tt-spin { animation-duration: 2s; } }
