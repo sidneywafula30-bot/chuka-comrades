@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Share2 } from 'lucide-react'
-import { drawCard, shareCard, type CardSpec } from '../lib/shareCard'
+import { drawCard, shareCard, type CardSpec } from '../lib/efCard'
 
 /** Builds a card picture on tap and opens the share sheet (WhatsApp, Status, ...) or downloads it. */
 export default function ShareCardButton({ build, filename, text, label = 'Share card', className = 'lp-btn' }: {
