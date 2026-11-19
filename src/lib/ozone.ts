@@ -22,7 +22,7 @@ export type Config = {
 }
 export type TrendItem = { key: string; id: number; source: 'youtube' | 'tiktok'; videoId: string; url: string; title: string; author: string; thumb: string; vertical: boolean; pinned: boolean; live: boolean; createdAt: string }
 export type TrendList = { live: TrendItem | null; items: TrendItem[]; next: number | null }
-export type Me = { signedIn: boolean; isAdmin?: boolean; email?: string; banned?: boolean; studentOk?: boolean; profile?: { code: string; status: string } | null }
+export type Me = { signedIn: boolean; isAdmin?: boolean; email?: string; banned?: boolean; activated?: boolean; studentOk?: boolean; profile?: { code: string; status: string } | null }
 
 export type Post = { number: number; category: string; categoryLabel: string; text: string; media: Media[]; replyTo: number | null; replies: number; publishedAt: string }
 export type Page<T> = { items: T[]; nextBefore: number | null }

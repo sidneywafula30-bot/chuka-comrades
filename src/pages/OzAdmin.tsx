@@ -313,6 +313,7 @@ function Content() {
       <Section title="Promises"><PromiseForm /></Section>
       <Section title="Leaders"><LeaderForm /></Section>
       <Section title="Aspirant answers & status"><AspirantTools /></Section>
+      <Section title="Activations (KSh 30, one time)"><ActivationTools /></Section>
       <Section title="Settings"><Settings /></Section>
     </div>
   )
@@ -604,10 +605,48 @@ function AspirantTools() {
   )
 }
 
+type Act = { email: string; amount: string; mpesaCode: string; note: string; createdAt: string }
+function ActivationTools() {
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [q, setQ] = useState('')
+  const list = useLoad(() => oz<{ total: number; items: Act[] }>('admin_activations_list', { q }), [q])
+  const { msg, bad, save } = useSave()
+  async function go(e: FormEvent) {
+    e.preventDefault()
+    if (await save('admin_activate', { email, mpesaCode: code }, 'Activated. They can post instantly now.')) { setEmail(''); setCode(''); list.reload() }
+  }
+  async function revoke(em: string) {
+    if (!confirm(`Remove activation for ${em}?`)) return
+    if (await save('admin_deactivate', { email: em }, 'Activation removed.')) list.reload()
+  }
+  return (
+    <div className="oz-form">
+      <form className="cpl-form" onSubmit={go}>
+        <p className="cpl-sub oz-small">After a student pays KSh 30 to the pay-to number and messages you on WhatsApp, enter the Google email they sign in with. Activation is permanent.</p>
+        <div className="cpl-grid2">
+          <label>Student sign-in email<input type="email" value={email} required onChange={(e) => setEmail(e.target.value)} /></label>
+          <label>M-Pesa code (optional)<input type="text" value={code} maxLength={10} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} /></label>
+        </div>
+        <Msg msg={msg} bad={bad} /><button className="lp-btn">Activate account</button>
+      </form>
+      <label>Find an activated email<input type="text" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+      <Err msg={list.err} />
+      {list.data && <p className="cpl-sub oz-small">{list.data.total} activated in total</p>}
+      {list.data?.items.map((a) => (
+        <div className="cpl-card" key={a.email}>
+          <small>{a.email}{a.mpesaCode ? ` · ${a.mpesaCode}` : ''} · {stamp(a.createdAt)}</small>
+          <div className="oz-actions"><button type="button" className="oz-ghost" onClick={() => void revoke(a.email)}><X size={13} /> Remove</button></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const SETTING_LABELS: Record<string, string> = {
   SITE_URL: 'Site URL', ELECTION_MODE: 'Election mode', POSITIONS: 'Positions (JSON list)', STUDENT_EMAIL_DOMAINS: 'Student e-mail domains', BLOCKLIST: 'Extra blocked words', ADMIN_WHATSAPP: 'Admin WhatsApp', WA_GROUP_URL: 'WhatsApp group link (https://chat.whatsapp.com/...)',
   NEWS_RSS_URLS: 'News RSS feed links (https, comma separated)', AUTO_PURGE_DAYS: 'Auto-clean confessions after N days (empty = off)',
-  PAY_PHONE: 'M-Pesa number students pay to (0712345678)', CONFESSION_FEE: 'Instant-confession fee in KSh (default 30)', CONFESSION_PAID_ONLY: 'Require payment for every confession',
+  PAY_PHONE: 'M-Pesa number students pay to activate (254184198432)', CONFESSION_FEE: 'One-time activation fee in KSh (default 30)', CONFESSION_PAID_ONLY: 'Only activated accounts can post',
 }
 function Settings() {
   const { data, err, loading } = useLoad(() => oz<Record<string, string | boolean>>('admin_settings_get'), [])

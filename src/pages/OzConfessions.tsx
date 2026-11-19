@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Download, ImagePlus, Link2, Lock, MessageCircle, Play, Send, Trash2, Users, X, Zap } from 'lucide-react'
-import { ago, cleanPhoto, oz, ozLink, pad, prepVideo, waShare, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
+import { ago, cleanPhoto, oz, ozLink, pad, prepVideo, waLink, waShare, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
 import { Err, ReportButton, useLoad, type OzCtx } from './OzCommon'
 import { canShareFiles, catGradient, confessionImage, downloadBlob } from '../lib/shareCard'
 import './OzConfessions.css'
@@ -44,8 +44,10 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
   const [err, setErr] = useState('')
   const fee = cfg?.confessionFee ?? 30
   const paidOnly = !!cfg?.confessionPaidOnly
-  const [pay, setPay] = useState(paidOnly)
-  const [code, setCode] = useState('')
+  const activated = !!me?.activated
+  const payNo = showPhone(cfg?.payPhone || '')
+  const adminNo = cfg?.adminWhatsapp || cfg?.payPhone || '254184198432'
+  const [showAct, setShowAct] = useState(paidOnly)
   const [done, setDone] = useState<{ number: number; status: string; paid?: boolean; deleteCode: string; message: string; support: { message: string; lines: string[] } | null; cat: string; text: string } | null>(null)
   const file = useRef<HTMLInputElement>(null)
 
@@ -68,9 +70,9 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
     setBusy(true); setErr('')
     try {
       const uploads: Upload[] = media.map((m) => ({ name: m.name, data: m.data }))
-      const r = await oz<NonNullable<typeof done>>('confession_submit', { text, category: cat, replyTo: replyTo || undefined, media: uploads, mpesaCode: pay ? code : undefined })
+      const r = await oz<NonNullable<typeof done>>('confession_submit', { text, category: cat, replyTo: replyTo || undefined, media: uploads })
       setDone({ ...r, cat, text })
-      setText(''); setMedia([]); setCode('')
+      setText(''); setMedia([])
       onSent?.()
     } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
   }
@@ -80,7 +82,7 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
     return (
       <div className="ng-card ng-done">
         <div className="ng-head" style={{ background: live ? 'linear-gradient(135deg,#25d366,#128c4a)' : 'linear-gradient(135deg,#ffb100,#ff6a00)' }}>
-          <span className="ng-av">{live ? '🎉' : '✅'}</span><div><b>{live ? 'Live now!' : 'Sent!'}</b><small>{live ? 'Paid · posted instantly' : 'Waiting for admin review'}</small></div>
+          <span className="ng-av">{live ? '🎉' : '✅'}</span><div><b>{live ? 'Live now!' : 'Sent!'}</b><small>{live ? 'Activated · posted instantly' : 'Waiting for admin review'}</small></div>
         </div>
         <div className="ng-body">
           <p>{done.message}</p>
@@ -114,10 +116,14 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
             <button key={k} type="button" role="radio" aria-checked={cat === k} className={cat === k ? 'on' : ''} style={cat === k ? { background: grad(k) } : undefined} onClick={() => setCat(k)}>{l}</button>
           ))}
         </div>
-        <div className="ng-mode" role="radiogroup" aria-label="Posting option">
-            {!paidOnly && <button type="button" role="radio" aria-checked={!pay} className={!pay ? 'on' : ''} onClick={() => setPay(false)}>Free<small>admin reviews first</small></button>}
-            <button type="button" role="radio" aria-checked={pay} className={pay ? 'on pay' : 'pay'} onClick={() => setPay(true)}><Zap size={14} /> Post instantly<small>KSh {fee} · no waiting</small></button>
-        </div>
+        {activated ? (
+          <p className="ng-active"><Zap size={14} /> Account activated · post whatever you like, it goes live instantly</p>
+        ) : (
+          <div className="ng-mode" role="radiogroup" aria-label="Posting option">
+            {!paidOnly && <button type="button" role="radio" aria-checked={!showAct} className={!showAct ? 'on' : ''} onClick={() => setShowAct(false)}>Free<small>admin reviews first</small></button>}
+            <button type="button" role="radio" aria-checked={showAct} className={showAct ? 'on pay' : 'pay'} onClick={() => setShowAct(true)}><Zap size={14} /> Activate<small>KSh {fee} once · post freely</small></button>
+          </div>
+        )}
         <textarea
           className="ng-text" value={text} maxLength={max} rows={5} required
           placeholder={replyTo ? 'say it anonymously…' : 'tell me your confession…'}
@@ -136,25 +142,26 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
             ))}
           </div>
         )}
-        {pay && (
+        {!activated && showAct && (
           <div className="ng-pay">
-            <p><b>1.</b> Send <strong>KSh {fee}</strong> by M-Pesa to <strong>{showPhone(cfg?.payPhone || '')}</strong></p>
-            <p><b>2.</b> Type the 10-character code from the M-Pesa message</p>
-            <input
-              className="ng-code-in" value={code} maxLength={10} placeholder="e.g. QJK4ABC123" autoCapitalize="characters" autoComplete="off" spellCheck={false}
-              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} aria-label="M-Pesa code"
-            />
-            <small>Your words go live the moment you send. Photos or videos you upload, and anything sensitive (phone numbers, self-harm, etc.), are checked by the admin first.</small>
+            <p><b>One-time KSh {fee} activation.</b> Pay once, then post whenever and however you want. No code per post.</p>
+            <p><b>1.</b> Send <strong>KSh {fee}</strong> by M-Pesa to <strong>{payNo}</strong></p>
+            <p><b>2.</b> Chat the admin on WhatsApp with your M-Pesa code and the email you sign in with. You get activated right after.</p>
+            <a className="ng-wa-share" target="_blank" rel="noopener noreferrer"
+              href={waLink(adminNo, `Hi admin, I paid KSh ${fee} to ${payNo} for Chuka O-Zone activation. M-Pesa code: ____ . My sign-in email: ${user?.email || '____'}`)}>
+              <MessageCircle size={17} /> Chat admin on WhatsApp · {payNo}
+            </a>
+            <small>Activated accounts go live the moment they send. Photos or videos, and anything sensitive (phone numbers, self-harm, etc.), are still checked by the admin first.</small>
           </div>
         )}
-        <p className="ng-safe"><Lock size={13} /> anonymous · {pay ? 'goes live instantly' : 'reviewed by admin before it goes live'}</p>
+        <p className="ng-safe"><Lock size={13} /> anonymous · {activated ? 'goes live instantly' : 'reviewed by admin before it goes live'}</p>
         <Err msg={err || blocked} />
         {user ? (
-          <button type="submit" className="ng-send" disabled={busy || !!blocked || text.trim().length < 10 || (pay && code.length !== 10)}>{busy ? 'Sending…' : pay ? <>Post instantly <Zap size={16} /></> : <>Send! <Send size={16} /></>}</button>
+          <button type="submit" className="ng-send" disabled={busy || !!blocked || text.trim().length < 10 || (paidOnly && !activated)}>{busy ? 'Sending…' : activated ? <>Post instantly <Zap size={16} /></> : <>Send! <Send size={16} /></>}</button>
         ) : (
           <button type="button" className="ng-send" disabled={signing} onClick={signIn}>Sign in with Google to send</button>
         )}
-        <small className="ng-hint">Minimum 10 characters{pay ? '' : ` · ${lim?.confessionPerDay ?? 3} free per day`} · paste a YouTube, TikTok, Instagram, Facebook or Vimeo link to share a long video</small>
+        <small className="ng-hint">Minimum 10 characters{activated ? '' : ` · ${lim?.confessionPerDay ?? 3} free per day`} · paste a YouTube, TikTok, Instagram, Facebook or Vimeo link to share a long video</small>
       </div>
     </form>
   )

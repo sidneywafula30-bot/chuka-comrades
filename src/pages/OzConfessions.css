@@ -129,6 +129,8 @@
 .ng-mode button svg { vertical-align: -2px; }
 .ng-pay { display: grid; gap: 8px; padding: 12px 14px; border-radius: 16px; background: #fff8e5; border: 1px solid #ffd978; }
 .ng-pay p { margin: 0; font: 600 14px/1.4 'Manrope', sans-serif; color: #4a3600; }
+.ng-active { margin: 0; padding: 10px 14px; border-radius: 16px; background: #e9fbef; border: 1px solid #9be3b3; color: #0f5b2a; font: 700 13px/1.4 'Manrope', sans-serif; }
+.ng-active svg { vertical-align: -2px; }
 .ng-pay small { color: #7a6420; font-size: 12px; line-height: 1.4; }
 .ng-code-in { width: 100%; box-sizing: border-box; border: 0; border-radius: 12px; padding: 13px 14px; background: #fff; font: 800 20px ui-monospace, monospace; letter-spacing: .14em; text-align: center; color: #111; }
 .ng-code-in:focus { outline: 3px solid #ffb10066; }
