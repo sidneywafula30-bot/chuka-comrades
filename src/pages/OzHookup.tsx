@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { EyeOff, Heart, MessageCircle, ShieldCheck, Trash2, UserRound } from 'lucide-react'
-import { blurredCopy, cleanPhoto, day, oz, type HookupCard, type IntroRow, type MyProfile, type Prepared } from '../lib/ozone'
+import { avatarFor, blurredCopy, cleanPhoto, day, oz, type HookupCard, type IntroRow, type MyProfile, type Prepared } from '../lib/ozone'
 import { Err, Gate, Pill, ReportButton, ShareButton, useLoad, type OzCtx } from './OzCommon'
 
 type Tab = 'browse' | 'mine' | 'intros'
@@ -45,7 +45,7 @@ export default function Hookup({ ctx }: { ctx: OzCtx }) {
 function Card({ p, children }: { p: HookupCard; children?: React.ReactNode }) {
   return (
     <article className="oz-profile">
-      <div className="oz-ph">{p.photo ? <img src={p.photo} alt="Blurred profile photo" loading="lazy" /> : <UserRound size={44} />}</div>
+      <div className="oz-ph">{p.photo ? <img src={p.photo} alt="Blurred profile photo" loading="lazy" /> : <img src={avatarFor(p.gender, p.code)} alt="Profile avatar" loading="lazy" />}</div>
       <div className="oz-pbody">
         <header><strong>{p.code}</strong><small>{p.gender} · {p.ageBand}</small></header>
         <Pill tone="gold">{p.lookingFor}</Pill>

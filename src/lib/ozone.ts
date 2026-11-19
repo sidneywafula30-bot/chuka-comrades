@@ -49,6 +49,13 @@ export type Question = { id: number; facultyCode: string; position: string; ques
 export type Promise_ = { id: number; office: string; promise: string; sourceUrl: string; due: string; status: 'pending' | 'delivered' | 'missed' }
 export type Poll = { id: number; question: string; options: string[]; open: boolean; closesAt: string; counts: number[] | null; total: number | null; myVote: number | null }
 
+export function avatarFor(gender: string, code: string): string {
+  const pool = gender === 'Female' ? 'female' : gender === 'Male' ? 'male' : 'male'
+  let n = 0
+  for (let i = 0; i < code.length; i++) n = (n * 31 + code.charCodeAt(i)) >>> 0
+  return `${import.meta.env.BASE_URL}ozone/avatars/${pool}/A${String((n % 12) + 1).padStart(2, '0')}.svg`
+}
+
 export type HookupCard = { code: string; gender: string; ageBand: string; lookingFor: string; vibe: string; tags: string[]; photo: string; publishedAt: string }
 export type MyProfile = { profile: HookupCard | null; status?: string; realName?: string; phone?: string }
 export type IntroRow = { id: number; targetCode: string; status: string; label: string; createdAt: string }

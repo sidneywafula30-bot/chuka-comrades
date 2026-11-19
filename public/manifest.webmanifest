@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Chuka Comrades",
-  "short_name": "Comrades",
-  "description": "Your campus hub for hostels, soko, CPL, study labs and more.",
+  "name": "Chuka O-Zone · Comrades",
+  "short_name": "O-Zone",
+  "description": "Chuka campus community for confessions, student issues, trends, polls, news and more.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

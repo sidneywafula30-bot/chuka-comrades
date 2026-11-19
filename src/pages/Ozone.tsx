@@ -91,18 +91,20 @@ function Home({ ctx }: { ctx: OzCtx }) {
       <h1>Chuka O-Zone</h1>
       <p>Say it anonymously, speak up for your faculty, and meet people on campus.</p>
 
+      <div className="oz-live"><span className="oz-live-dot" /> O-Zone community is live <span className="oz-live-note">Anonymous · moderated · campus-focused</span></div>
+
       <div className="oz-tiles">
-        <a className="oz-tile" href="#/ozone/confessions">
+        <a className="oz-tile oz-feature" href="#/ozone/confessions">
           <span className="oz-ic a"><Flame size={24} /></span>
           <strong>Confessions</strong>
-          <small>Anonymous posts, approved by the admin before they go live.</small>
+          <small>Anonymous posts, replies and sharing. Read what comrades are saying.</small>
         </a>
-        <a className="oz-tile" href="#/ozone/sauti">
+        <a className="oz-tile oz-feature" href="#/ozone/sauti">
           <span className="oz-ic b"><Megaphone size={24} /></span>
           <strong>Sauti ya Comrades</strong>
-          <small>Report issues, track faculty responses, polls and elections.</small>
+          <small>Report campus problems and follow the journey from review to response.</small>
         </a>
-        <a className="oz-tile" href="#/ozone/trends">
+        <a className="oz-tile oz-feature" href="#/ozone/trends">
           <span className="oz-ic d"><Clapperboard size={24} /></span>
           <strong>Chuka Trends</strong>
           <small>Videos and live streams from campus. Scroll and watch.</small>
@@ -126,6 +128,13 @@ function Home({ ctx }: { ctx: OzCtx }) {
           <span className="oz-wa-go">Join</span>
         </a>
       )}
+
+      <div className="oz-quick">
+        <a href="#/ozone/confess">➕ Confess</a>
+        <a href="#/ozone/report">📢 Report issue</a>
+        <a href="#/ozone/polls">🗳️ Polls</a>
+        <a href="#/ozone/aspirants">🏛️ Elections</a>
+      </div>
 
       <nav className="cpl-links" aria-label="O-Zone links">
         <a className="cpl-link" href="#/ozone/news">News</a>

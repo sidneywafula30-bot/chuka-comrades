@@ -63,12 +63,13 @@ export default function News({ ctx }: { ctx: OzCtx }) {
         <button type="button" className={topic === '' ? 'on' : ''} onClick={() => setTopic('')}>Latest</button>
         <button type="button" className={topic === 'politics' ? 'on' : ''} onClick={() => setTopic('politics')}>Politics</button>
       </nav>
-      <Err msg={err} />
+      <Err msg={err ? `News could not load: ${err}` : ''} />
       <div className="oz-list">
         {items.map((n) => <Story key={n.id} n={n} admin={Boolean(ctx.me?.isAdmin)} onHide={() => void hide(n.id)} />)}
         {!loading && !err && !items.length && <p className="cpl-empty">No stories right now. Check back soon.</p>}
       </div>
       {loading && <p className="cpl-empty">Loading…</p>}
+      {!loading && err && <button type="button" className="lp-btn lp-btn-soft oz-more" onClick={() => void load(0)}>Retry</button>}
       {!loading && next !== null && <button type="button" className="lp-btn lp-btn-soft oz-more" onClick={() => void load(next)}>Load more</button>}
       <p className="cpl-note nw-note">{note}{fetchedAt && ` Updated ${ago(fetchedAt)}.`} Stories are shown as published by their sources; O-Zone does not endorse them.</p>
     </div>

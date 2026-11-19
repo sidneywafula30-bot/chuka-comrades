@@ -235,3 +235,16 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-aspissue { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
 .oz-inbox { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .oz-banner { padding: 10px 14px; border-radius: 12px; background: var(--green-soft); color: #12301f; font-size: 14px; }
+
+
+/* O-Zone home refresh */
+.oz-home { max-width: 760px; margin-inline: auto; }
+.oz-home > h1 { letter-spacing: -.03em; }
+.oz-live { width: min(100%, 620px); margin: 14px auto 18px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#214b33; box-shadow: 0 5px 18px #173d2508; }
+.oz-live-dot { width:8px; height:8px; border-radius:50%; background:#16a34a; box-shadow:0 0 0 4px #dcfce7; flex:0 0 auto; }
+.oz-live-note { margin-left:auto; color:var(--muted); font-weight:500; }
+.oz-feature { min-height: 142px; }
+.oz-quick { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin: 18px 0 8px; }
+.oz-quick a { text-decoration:none; border:1px solid var(--line); background:#fff; padding:9px 13px; border-radius:999px; font-size:12px; font-weight:700; }
+.oz-quick a:hover { border-color:var(--green); transform:translateY(-1px); }
+@media (max-width:520px){ .oz-live { border-radius:16px; align-items:flex-start; } .oz-live-note { margin-left:0; } .oz-feature { min-height:unset; } }
