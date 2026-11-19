@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Clock, ExternalLink } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
-import { countdown, ef, fmtStamp, fplJoinLink, type FplBoard, type FplRow, type Me } from '../lib/efootball'
+import ShareCardButton from '../components/ShareCardButton'
+import { cardDate, type CardSpec } from '../lib/shareCard'
+import { countdown, ef, fmtStamp, fplJoinLink, type FplBoard, type FplOwn, type FplRow, type Me } from '../lib/efootball'
 import { useTick } from '../lib/efHooks'
 import { Live, ManagerModal, Matches, Overview, PlayerStats, PlTable } from './EfFplData'
 
 type Section = 'overview' | 'matches' | 'table' | 'live' | 'players' | 'chuka'
-type Tab = 'overall' | 'gw' | 'winners' | 'courses'
+type Tab = 'overall' | 'gw' | 'winners' | 'courses' | 'picks'
 
 const SECTIONS: [Section, string][] = [['overview', 'Overview'], ['matches', 'Fixtures & results'], ['table', 'EPL table'], ['live', 'Live points'], ['players', 'Players'], ['chuka', 'Chuka league']]
 
@@ -48,6 +50,58 @@ export default function EfFpl({ me, signedIn, onSignIn, reload }: { me: Me | nul
   )
 }
 
+/** Rank movement since the last gameweek. */
+function Move({ n }: { n?: number | null }) {
+  if (n === null || n === undefined) return <span className="ef-move" aria-label="no change data">·</span>
+  if (n === 0) return <span className="ef-move" aria-label="no change">–</span>
+  return <span className={`ef-move ${n > 0 ? 'up' : 'down'}`} aria-label={n > 0 ? `up ${n}` : `down ${-n}`}>{n > 0 ? '▲' : '▼'}{Math.abs(n)}</span>
+}
+
+/** Share card: the Chuka FPL board (top 10), my line, and the latest gameweek winner. */
+async function fplCard(b: FplBoard): Promise<CardSpec> {
+  const m = b.mine
+  const win = b.winners[0]
+  const top = b.rows.slice(0, 10)
+  const rows = top.map((r) => ({ cells: [String(r.rank), r.username, r.move ? (r.move > 0 ? '▲' : '▼') + Math.abs(r.move) : '–', String(r.gwPts), String(r.total)], hot: r.uid === m?.uid }))
+  if (m && !top.some((r) => r.uid === m.uid)) rows.push({ cells: [String(m.rank), m.username, m.move ? (m.move > 0 ? '▲' : '▼') + Math.abs(m.move) : '–', String(m.gwPts), String(m.total)], hot: true })
+  return {
+    theme: 'purple',
+    eyebrow: `Chuka FPL · ${cardDate()}`,
+    title: 'Chuka Fantasy League',
+    subtitle: `${b.gw ? b.gw.name : 'Gameweek'}${b.gw?.finished ? ' · finished' : b.gw?.started ? ' · live' : ''} · ${b.rows.length} managers`,
+    stats: m
+      ? [{ value: `#${m.rank}`, label: 'My Chuka rank' }, { value: String(m.gwPts), label: 'GW points' }, { value: String(m.total), label: 'Total points' }]
+      : win ? [{ value: win.w.map((x) => x.u).join(', '), label: `GW${win.gw} winner · ${win.pts} pts` }, { value: String(b.rows.length), label: 'Managers' }] : undefined,
+    head: ['#', 'Manager', '', 'GW', 'Total'],
+    rows,
+    note: b.courses[0]?.ranked ? `Top course: ${b.courses[0].course} (${b.courses[0].avg} avg of top ${b.courses[0].counted ?? 5})` : '',
+    footer: `${window.location.host}${window.location.pathname}#/efootball/fpl`,
+  }
+}
+
+function Picks({ b }: { b: FplBoard }) {
+  const c = b.captains
+  if (!c) return <div className="cpl-card"><p className="cpl-empty" style={{ margin: 0 }}>Picks appear after the gameweek deadline, once Chuka managers' teams are public.</p></div>
+  const list = (items: FplOwn[] | undefined, empty: string, differential = false) => !items || !items.length ? <p className="cpl-empty" style={{ margin: 0, textAlign: 'left' }}>{empty}</p> : (
+    <ol className="ef-mini">
+      {items.map((x, i) => <li key={x.name}><b>{i + 1}</b><span><strong>{x.name}</strong><small>{differential ? `${x.all}% of all FPL managers own him` : `Chuka ${x.pct}% · all FPL ${x.all}%`}</small></span><em>{x.n} of {c.got}</em></li>)}
+    </ol>
+  )
+  return (
+    <>
+      <div className="cpl-card"><h3>Most captained in Chuka</h3>
+        <ol className="ef-mini">{c.list.map((x, i) => <li key={x.name}><b>{i + 1}</b><span><strong>{x.name}</strong></span><em>{x.n} of {c.got}</em></li>)}</ol>
+      </div>
+      <div className="cpl-card"><h3>Most owned in Chuka</h3>{list(c.own, 'Ownership will show after the next refresh (within 30 minutes).')}</div>
+      <div className="cpl-card"><h3>Chuka differentials</h3>
+        <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Players owned by 2 or more Chuka managers but by under 10% of all FPL managers.</p>
+        {list(c.diff, 'No differentials this week.', true)}
+      </div>
+      <p className="cpl-note" style={{ textAlign: 'left' }}>Based on {c.got} of {c.total} linked managers' teams for {b.gw?.name ?? 'this gameweek'}.</p>
+    </>
+  )
+}
+
 function ChukaLeague({ b, err, me, signedIn, onSignIn, reload, load, skew }: { b: FplBoard | null; err: string; me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void>; load: () => Promise<void>; skew: number }) {
   const [tab, setTab] = useState<Tab>('overall')
   const [manager, setManager] = useState('')
@@ -77,10 +131,19 @@ function ChukaLeague({ b, err, me, signedIn, onSignIn, reload, load, skew }: { b
         )}
       </section>
 
+      {b.rows.length > 0 && (
+        <div className="ef-actions" style={{ margin: '0 0 14px' }}>
+          <ShareCardButton label="Share FPL card" filename="chuka-fpl.png" text="Chuka Fantasy Premier League board" build={() => fplCard(b)} className="lp-btn ef-fpl-share" />
+        </div>
+      )}
+      {(b.unlinked ?? 0) > 0 && b.status !== 'linked' && (
+        <p className="ef-unlinked" role="status"><b>{b.unlinked}</b> more manager{b.unlinked === 1 ? ' is' : 's are'} in the Chuka FPL league but not on this board yet. Link your team below to join them.</p>
+      )}
+
       <LinkCard b={b} me={me} signedIn={signedIn} onSignIn={onSignIn} joinUrl={joinUrl} done={async () => { await reload(); await load() }} />
 
       <div className="ef-tabs" role="tablist">
-        {([['overall', 'Overall'], ['gw', 'This gameweek'], ['winners', 'GW winners'], ['courses', 'Courses']] as [Tab, string][]).map(([id, label]) => (
+        {([['overall', 'Overall'], ['gw', 'This gameweek'], ['winners', 'GW winners'], ['picks', 'Chuka picks'], ['courses', 'Courses']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
@@ -96,12 +159,13 @@ function ChukaLeague({ b, err, me, signedIn, onSignIn, reload, load, skew }: { b
           )}
         </div>
       )}
+      {tab === 'picks' && <Picks b={b} />}
       {tab === 'courses' && (
         <div className="cpl-card ef-scroll">
-          <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by average points per manager, so size does not decide it. A course needs 3 managers to be ranked.</p>
+          <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by the average total of their best 5 managers, so a big course is not held back by casual managers and one star cannot win alone. A course needs 3 managers to be ranked.</p>
           {!b.courses.length ? <p className="cpl-empty">No managers linked yet.</p> : (
             <table className="ef-table">
-              <thead><tr><th>#</th><th>Course</th><th>Managers</th><th>GW avg</th><th>Avg total</th></tr></thead>
+              <thead><tr><th>#</th><th>Course</th><th>Managers</th><th>GW avg</th><th>Top-5 avg</th></tr></thead>
               <tbody>{b.courses.map((c, i) => (
                 <tr key={c.course} style={c.course === me?.profile?.course ? { background: '#f3f8f4' } : c.ranked ? undefined : { opacity: 0.8 }}>
                   <td>{c.ranked ? i + 1 : '–'}</td><td>{c.course}</td><td>{c.managers}</td><td>{c.gwAvg}</td><td><strong>{c.avg}</strong></td>
@@ -127,7 +191,7 @@ function Board({ rows, by, me, note, open }: { rows: FplRow[]; by: 'total' | 'gw
           <thead><tr><th>#</th><th>Manager</th><th>{by === 'gw' ? 'Total' : 'GW'}</th><th>{by === 'gw' ? 'GW pts' : 'Total'}</th></tr></thead>
           <tbody>{rows.slice(0, shown).map((r) => (
             <tr key={r.uid} className={r.entry ? 'ef-click' : ''} onClick={() => r.entry && open(r.entry)} style={r.uid === me ? { background: '#fff9e3' } : undefined}>
-              <td>{by === 'gw' ? r.gwRank : r.rank}</td>
+              <td>{by === 'gw' ? r.gwRank : <>{r.rank} <Move n={r.move} /></>}</td>
               <td><strong>{r.username}</strong><small>{r.team ? `${r.team} · ` : ''}{r.course}</small></td>
               <td>{by === 'gw' ? r.total : r.gwPts}</td><td><strong>{by === 'gw' ? r.gwPts : r.total}</strong></td>
             </tr>

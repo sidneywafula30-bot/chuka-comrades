@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Clock, Link2, MessageCircle, Share2 } from 'lucide-react'
+import DriveImage from '../components/DriveImage'
+import ShareCardButton from '../components/ShareCardButton'
+import { cardDate, type CardSpec } from '../lib/shareCard'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import ImagePicker from '../components/ImagePicker'
 import { PayBox, PendingPay, usePayCfg } from '../components/EfPay'
-import { ef, fmtTime, ksh, leagueInviteLink, sharedSlots, waLink, type League, type MatchView, type Me } from '../lib/efootball'
+import { courseLogoData, ef, fmtTime, ksh, leagueInviteLink, sharedSlots, waLink, type League, type MatchView, type Me } from '../lib/efootball'
 
 type Tab = 'table' | 'courses' | 'mine' | 'recent'
 type Props = { me: Me | null; reload: () => Promise<void>; signedIn: boolean; onSignIn: () => void; joinCourse: string; joining: boolean }
@@ -33,7 +36,7 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
       <h2>Chuka League</h2>
       <p className="cpl-sub">
         {lg ? `Fixtures are made at 00:00 on ${lg.fixtureDays.join(', ')}. Send your score before ${lg.closeHour}:00 the same day. ` : ''}
-        A win is 3 points, a draw 1. Results are settled automatically at {lg?.closeHour ?? 21}:00.
+        A win is 3 points, a draw 1. Results are settled automatically at {lg?.closeHour ?? 21}:00. If nobody reports a fixture, it counts as a 0-0 draw (1 point each).
       </p>
       {lg && <JoinCard lg={lg} me={me} signedIn={signedIn} onSignIn={onSignIn} reload={both} inviteCourse={joinCourse} />}
       <div className="ef-tabs" role="tablist">
@@ -45,6 +48,11 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
       {tab === 'mine' ? <Mine me={me} signedIn={signedIn} reload={both} skew={skew} /> : !lg ? <p className="cpl-empty">Loading…</p>
         : tab === 'table' ? (
           <div className="cpl-card ef-scroll">
+            {lg.table.length > 0 && (
+              <div className="ef-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+                <ShareCardButton label="Share league card" filename="chuka-league.png" text="Chuka eFootball league table" build={() => leagueCard(lg, me?.profile?.course || '')} />
+              </div>
+            )}
             {!lg.table.length ? <p className="cpl-empty">No one has joined yet. Be the first: tap Join above.</p> : (
               <table className="ef-table">
                 <thead><tr><th>#</th><th>Player</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
@@ -63,6 +71,53 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, joinCourse, j
             ))}
           </div>
         )}
+    </div>
+  )
+}
+
+/** Share card: a course league (logo, standing, top players) or, with no course, the whole player table. */
+async function leagueCard(lg: League, course: string): Promise<CardSpec> {
+  const c = lg.courses.find((x) => x.course === course)
+  const players = course && c ? lg.table.filter((r) => r.course === course) : lg.table
+  const rank = c ? lg.courses.filter((x) => x.ranked).findIndex((x) => x.course === c.course) + 1 : 0
+  const logo = c?.logoId ? await courseLogoData(c.course) : ''
+  return {
+    theme: 'green', logo,
+    eyebrow: `Chuka League · ${cardDate()}`,
+    title: c ? c.course : 'Chuka eFootball League',
+    subtitle: c ? `${c.players} player${c.players === 1 ? '' : 's'}${c.fee ? ` · entry ${ksh(c.fee)}` : ' · free entry'}` : `${lg.registered} players in the league`,
+    stats: c ? [
+      { value: c.ranked && rank ? `#${rank}` : '–', label: 'Course rank' },
+      { value: String(c.avg), label: 'Avg pts / player' },
+      { value: String(c.pts), label: 'Total points' },
+      { value: c.pool ? ksh(c.pool) : '–', label: 'Prize pool' },
+    ] : undefined,
+    head: ['#', 'Player', 'P', 'W', 'D', 'L', 'GD', 'Pts'],
+    rows: players.slice(0, 10).map((r, i) => ({ cells: [String(i + 1), r.username, String(r.p), String(r.w), String(r.d), String(r.l), String(r.gd), String(r.pts)] })),
+    note: players.length > 10 ? `+ ${players.length - 10} more players` : '',
+    footer: `${window.location.host}${window.location.pathname}#/efootball/league`,
+  }
+}
+
+/** Any member can set the logo of their class league. */
+function LogoCard({ me, lg, reload }: { me: Me; lg: League; reload: () => Promise<void> }) {
+  const p = me.profile!
+  const row = lg.courses.find((c) => c.course === p.course)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  async function send(v: { data: string; removed: boolean }) {
+    setBusy(true); setMsg(null)
+    try { await ef('setLeagueLogo', v.removed ? { remove: true } : { logo: v.data }); await reload(); setMsg({ ok: true, text: v.removed ? 'Logo removed.' : 'League logo updated for everyone in your course.' }) }
+    catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div style={{ marginTop: 14 }}>
+      <p className="cpl-note" style={{ textAlign: 'left', margin: '0 0 8px' }}>Your class league logo. Any member of {p.course} can change it.</p>
+      <div style={{ opacity: busy ? 0.6 : 1, pointerEvents: busy ? 'none' : 'auto' }}>
+        <ImagePicker key={row?.logoId || 'none'} current={row?.logoId ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(row.logoId)}&sz=w300` : ''} fallback={<span style={{ fontSize: 11 }}>Logo</span>} label="league logo" max={320} onChange={(v) => void send(v)} />
+      </div>
+      {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 8 }}>{msg.text}</p>}
     </div>
   )
 }
@@ -93,8 +148,10 @@ function JoinCard({ lg, me, signedIn, onSignIn, reload, inviteCourse }: { lg: Le
         : <p className="cpl-note" style={{ textAlign: 'left', marginTop: 4 }}>{lg.fixtureToday ? `Today is a fixture day: check My fixtures and report before ${lg.closeHour}:00.` : `Next fixtures come at 00:00 on ${lg.fixtureDays.join(', ')}.`}{(p.freeTimes.length > 0) && ' Only days you marked free get a fixture.'}</p>}
       <div className="ef-actions">
         <a className="lp-btn" href={invite(p.course)} target="_blank" rel="noopener noreferrer"><Share2 size={14} /> Invite classmates</a>
+        <ShareCardButton label="Share league card" filename="chuka-course-league.png" text={`${p.course} in the Chuka eFootball league`} build={() => leagueCard(lg, p.course)} />
         <button className="lp-btn cpl-danger" disabled={busy} onClick={() => act('leaveLeague', 'You left the league.')}>Leave league</button>
       </div>
+      {me && <LogoCard me={me} lg={lg} reload={reload} />}
     </>
   )
   else if (!p.leagueOpen) body = <ListMyCourse course={p.course} me={me} reload={reload} />
@@ -123,12 +180,13 @@ function CourseTable({ lg, me, reload, highlight, signedIn, onSignIn }: { lg: Le
             <thead><tr><th>#</th><th>Course</th><th>Players</th><th>Points</th><th>Avg</th><th>Entry</th><th>Pool</th><th /></tr></thead>
             <tbody>{lg.courses.map((c, i) => (
               <tr key={c.course} style={c.course === highlight ? { background: '#fff9e3' } : c.course === p?.course ? { background: '#f3f8f4' } : c.ranked ? undefined : { opacity: 0.8 }}>
-                <td>{c.ranked ? i + 1 : '–'}</td><td>{c.course}{c.founder && <small>Set up by {c.founder}</small>}</td><td>{c.players}</td><td>{c.pts}</td><td><strong>{c.avg}</strong></td>
+                <td>{c.ranked ? i + 1 : '–'}</td><td><span className="ef-cname">{c.logoId && <span className="ef-clogo"><DriveImage id={c.logoId} w={80} /></span>}<span>{c.course}{c.founder && <small>Set up by {c.founder}</small>}</span></span></td><td>{c.players}</td><td>{c.pts}</td><td><strong>{c.avg}</strong></td>
                 <td>{c.fee ? ksh(c.fee) : c.players ? 'Free' : 'Not set'}</td><td>{c.pool ? ksh(c.pool) : '–'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {p && p.course === c.course && !p.inLeague
                     ? <button className="lp-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Join</button>
                     : <button type="button" className="cpl-link" onClick={() => copy(c.course)} aria-label={`Copy invite link for ${c.course}`}><Link2 size={13} /> {copied === c.course ? 'Copied' : 'Invite'}</button>}
+                  <ShareCardButton className="cpl-link" label="Card" filename="chuka-course-league.png" text={`${c.course} in the Chuka eFootball league`} build={() => leagueCard(lg, c.course)} />
                 </td>
               </tr>
             ))}</tbody>

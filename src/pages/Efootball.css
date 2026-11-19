@@ -103,9 +103,10 @@
 
 /* ---------- polish: home hero, tiles, cards, tables, tabs ---------- */
 .ef .cpl-home { text-align: left; align-items: stretch; }
-.ef-hero { display: flex; align-items: center; gap: 28px; width: 100%; padding: 28px; border-radius: 24px; background: radial-gradient(120% 140% at 0% 0%, #1f5a38 0%, #0f1d16 62%); color: #fff; box-shadow: 0 24px 50px #0f1d1633; margin-bottom: 18px; }
-.ef-hero-logo { width: 150px; height: 150px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 10px 24px #0008); }
-.ef-hero-text { display: grid; gap: 8px; min-width: 0; }
+.ef-hero { display: flex; flex-direction: column; align-items: stretch; gap: 22px; width: 100%; padding: 0 0 28px; overflow: hidden; border-radius: 24px; background: radial-gradient(120% 140% at 0% 0%, #1f5a38 0%, #0f1d16 62%); color: #fff; box-shadow: 0 24px 50px #0f1d1633; margin-bottom: 18px; }
+/* the logo covers the whole width of the hero, edge to edge */
+.ef-hero-logo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 7; max-height: 380px; object-fit: cover; object-position: 50% 28%; flex-shrink: 0; }
+.ef-hero-text { display: grid; gap: 8px; min-width: 0; padding: 0 28px; }
 .ef-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #8fd6a8; }
 .ef-hero h1 { margin: 0; font: 800 clamp(28px, 5vw, 42px)/1.05 'Manrope', sans-serif; letter-spacing: -1px; color: #fff; text-align: left; }
 .ef-hero p { margin: 0; color: #cfe8d8; font-size: 15px; line-height: 1.5; max-width: 46ch; text-align: left; }
@@ -132,8 +133,9 @@
 .ef-pcard:hover { transform: translateY(-2px); box-shadow: 0 12px 28px #173d2518; }
 .ef-pcard strong { font: 800 16px 'Manrope', sans-serif; color: #12301f; }
 @media (max-width: 640px) {
-  .ef-hero { flex-direction: column; align-items: flex-start; padding: 22px 20px; gap: 14px; }
-  .ef-hero-logo { width: 96px; height: 96px; }
+  .ef-hero { gap: 16px; padding-bottom: 22px; }
+  .ef-hero-logo { aspect-ratio: 4 / 3; max-height: 300px; object-position: 50% 22%; }
+  .ef-hero-text { padding: 0 20px; }
   .ef-tiles { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -259,3 +261,25 @@ a.ef-wa-admin:hover { filter: brightness(1.06); }
 .fpl .ef-sel, .fpl .cpl-search { border-color: #d9c3e2; }
 .fpl .cpl-msg { color: var(--fpl-purple); }
 .fpl .ef-stale { background: #fff2fb; color: var(--fpl-pink); }
+
+
+/* knockout countdown */
+.ef-clock { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 18px 16px; margin: 0 0 16px; border-radius: 18px; background: radial-gradient(120% 140% at 0% 0%, #1f5a38 0%, #0f1d16 70%); color: #fff; }
+.ef-clock small { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #e8b923; }
+.ef-clock-grid { display: grid; grid-template-columns: repeat(4, minmax(56px, 84px)); gap: 10px; }
+.ef-clock-grid div { display: grid; gap: 2px; padding: 10px 4px; border-radius: 14px; background: #ffffff14; }
+.ef-clock-grid b { font: 800 clamp(26px, 7vw, 38px)/1 'Manrope', sans-serif; font-variant-numeric: tabular-nums; }
+.ef-clock-grid span { font-size: 11px; color: #cfe8d8; text-transform: uppercase; letter-spacing: .06em; }
+.ef-clock p { margin: 0; font-size: 13px; color: #cfe8d8; }
+
+/* course league logo + share */
+.ef-cname { display: inline-flex; align-items: center; gap: 10px; }
+.ef-cname > span:last-child { display: grid; }
+.ef-clogo { width: 34px; height: 34px; border-radius: 9px; overflow: hidden; background: var(--green-soft); flex-shrink: 0; display: block; }
+.ef-clogo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* FPL movement, unlinked note */
+.ef-move { font-size: 11px; font-weight: 700; margin-left: 4px; color: var(--muted); }
+.ef-move.up { color: #0a8f4a; }
+.ef-move.down { color: #c0392b; }
+.ef-unlinked { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: #f5e9fa; color: #38003c; font-size: 14px; }

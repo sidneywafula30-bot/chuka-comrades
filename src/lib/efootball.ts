@@ -17,7 +17,7 @@ export type PublicPlayer = { uid: string; username: string; name: string; course
 export type Profile = Omit<PublicPlayer, 'whatsapp'> & {
   fullName: string; whatsapp: string; status: string; email: string; showWhatsapp: boolean; paused: boolean; strikes: number; leagueOpen?: boolean; fplId?: string; fplTeam?: string
   /** Class-league money: the fee the first member set, who that is ('me' | 'other' | '' = nobody yet), and whether my payment waits for the admin. */
-  leagueFee?: number; leagueFounder?: '' | 'me' | 'other'; leaguePending?: boolean
+  leagueFee?: number; leagueFounder?: '' | 'me' | 'other'; leaguePending?: boolean; leagueLogoId?: string
 }
 export type ProfileInput = {
   username: string; fullName: string; course: string; year: number; platform: string; strength: number
@@ -47,7 +47,7 @@ export type Tournament = {
 export type Champion = { name: string; date: string; username: string; course: string; squadId: string }
 
 export type LeagueRow = { uid: string; username: string; course: string; platform: string; strength: number; squadId: string; p: number; w: number; d: number; l: number; gf: number; ga: number; gd: number; pts: number }
-export type CourseRow = { course: string; players: number; pts: number; avg: number; ranked: boolean; fee?: number; paid?: number; pool?: number; founder?: string }
+export type CourseRow = { course: string; players: number; pts: number; avg: number; ranked: boolean; fee?: number; paid?: number; pool?: number; founder?: string; logoId?: string }
 export type League = {
   table: LeagueRow[]; courses: CourseRow[]; recent: { id: string; p1: string; p2: string; s1: number; s2: number; at: string }[]; registered: number; week: string
   openCourses: string[]; today: string; fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number; serverNow: number
@@ -133,17 +133,20 @@ export function countdown(iso: string, skew = 0): string {
   return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m ${String(s % 60).padStart(2, '0')}s` : `${m}m ${String(s % 60).padStart(2, '0')}s`
 }
 
-export type FplRow = { uid: string; entry?: string; username: string; course: string; team: string; total: number; gwPts: number; rank: number; gwRank: number }
+/** `move`: places gained (+) or lost (-) since the last gameweek; null = nothing to compare with. */
+export type FplRow = { uid: string; entry?: string; username: string; course: string; team: string; total: number; gwPts: number; rank: number; gwRank: number; move?: number | null }
 export type FplBoard = {
-  configured: boolean; ready: boolean; leagueId: string; leagueCode: string; at: string; error: string; size: number; serverNow: number
+  configured: boolean; ready: boolean; leagueId: string; leagueCode: string; at: string; error: string; size: number; unlinked?: number; serverNow: number
   gw: { id: number; name: string; finished: boolean; started: boolean } | null
   next: { id: number; name: string; at: string } | null
   rows: FplRow[]
-  courses: { course: string; managers: number; avg: number; gwAvg: number; ranked: boolean }[]
+  courses: { course: string; managers: number; counted?: number; avg: number; gwAvg: number; ranked: boolean }[]
   winners: { gw: number; name: string; pts: number; w: { u: string; c: string }[] }[]
-  captains: { gw: number; got: number; total: number; list: { name: string; n: number }[] } | null
+  captains: { gw: number; got: number; total: number; list: { name: string; n: number }[]; own?: FplOwn[]; diff?: FplOwn[] } | null
   status: 'anon' | 'unregistered' | 'unlinked' | 'linked' | 'outside'; fplId: string; mine: FplRow | null
 }
+/** A player owned by Chuka managers: n managers (pct of those checked); `all` = % of all FPL managers who own him. */
+export type FplOwn = { name: string; n: number; pct: number; all: number }
 export type FplAdminInfo = { leagueId: string; leagueCode: string; at: string; error: string; members: number; linked: number; inLeague: number; gw: number }
 export const fplJoinLink = (code: string) => (code ? `https://fantasy.premierleague.com/leagues/auto-join/${encodeURIComponent(code)}` : '')
 
@@ -202,3 +205,8 @@ export type FplManager = {
   teamNote: string
 }
 export const isoOf = (ms: number) => (ms ? new Date(ms).toISOString() : '')
+
+/** A course league logo as a data URL (needed so a share-card canvas can be saved). Empty string when the course has no logo. */
+export async function courseLogoData(course: string): Promise<string> {
+  try { return (await ef<{ data: string }>('courseLogo', { course })).data || '' } catch { return '' }
+}

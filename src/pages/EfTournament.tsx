@@ -16,6 +16,37 @@ function useCountdown(iso: string, skew: number) {
   return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m ${String(s % 60).padStart(2, '0')}s` : `${m}m ${String(s % 60).padStart(2, '0')}s`
 }
 
+/** Days / hours / minutes / seconds left to an ISO time, by the SERVER clock (skew). null once it has passed. */
+function useParts(iso: string, skew: number) {
+  const [, tick] = useState(0)
+  useEffect(() => { const i = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(i) }, [])
+  const ms = Date.parse(iso) - (Date.now() + skew)
+  if (!iso || !(ms > 0)) return null
+  const s = Math.floor(ms / 1000)
+  return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 }
+}
+
+/** The big knockout countdown: registration closing, the next round starting, or the round in play ending. */
+function KnockoutClock({ t, skew }: { t: Tournament; skew: number }) {
+  const w = t.status === 'running' ? stageWindow(t, t.round) : t.windows[0]
+  const reg = useParts(t.status === 'open' ? t.regClose : '', skew)
+  const start = useParts(t.status !== 'done' ? w[0] : '', skew)
+  const end = useParts(t.status === 'running' ? w[1] : '', skew)
+  let label = '', parts = null as ReturnType<typeof useParts>, sub = ''
+  if (t.status === 'open' && reg) { label = 'Registration closes in'; parts = reg; sub = `${t.count} of ${t.cap} players joined` }
+  else if (t.status !== 'done' && start) { label = t.status === 'running' ? `${stageName(t.round, t.stages)} starts in` : 'Round 1 starts in'; parts = start; sub = fmtStamp(w[0]) }
+  else if (t.status === 'running' && end) { label = `${stageName(t.round, t.stages)} is on · ends in`; parts = end; sub = `Report your pool's winner before ${fmtTime(w[1])}` }
+  if (!parts) return null
+  const box = (n: number, l: string) => <div><b>{String(n).padStart(2, '0')}</b><span>{l}</span></div>
+  return (
+    <section className="ef-clock" aria-label="Knockout countdown" role="timer">
+      <small>{label}</small>
+      <div className="ef-clock-grid">{box(parts.d, 'days')}{box(parts.h, 'hours')}{box(parts.m, 'mins')}{box(parts.s, 'secs')}</div>
+      {sub && <p>{sub}</p>}
+    </section>
+  )
+}
+
 export default function EfTournament({ token, me, signedIn, onSignIn, reload }: Props) {
   const [t, setT] = useState<Tournament | null | undefined>(undefined)
   const [skew, setSkew] = useState(0)
@@ -82,6 +113,8 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
           <p>{t.status === 'open' ? 'Registration open' : t.status === 'running' ? `${stageName(t.round, t.stages)} in progress` : 'Finished'} · {fmtDay(t.windows[0][0])}</p>
         </div>
       </div>
+
+      <KnockoutClock t={t} skew={skew} />
 
       {t.status === 'done' && t.champion && (
         <div className="cpl-card"><h3><Crown size={16} /> Champion</h3><div className="ef-members"><Member m={t.champion} win /></div></div>
