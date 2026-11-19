@@ -50,6 +50,7 @@ const LIVE_LINKS: Record<string, string> = {
   'Study Labs': '#/labs',
   'Chuka Earning & Gigs': '#/gigs',
   'Chuka Skills': '#/skills',
+  'The Long Campus Journey': '#/journey',
 }
 
 const POBOX = 'P.O. Box 109 – 60400 Chuka, Kenya'
@@ -84,6 +85,7 @@ const SERVICES = [
   { title: 'Chuka Soko', text: 'Buy and sell within the campus marketplace.', icon: ShoppingBag },
   { title: 'Chuka Music & Movies', text: 'Tracks, films and entertainment for comrades.', icon: Clapperboard },
   { title: 'Chuka Earning & Gigs', text: 'Side hustles, gigs and ways to earn on campus.', icon: Wallet },
+  { title: 'The Long Campus Journey', text: 'Your graduation memory page and QR code. Class of 2026.', icon: GraduationCap },
   { title: 'Chuka Skills', text: 'Learn a skill, join a class or teach what you know.', icon: GraduationCap },
   { title: 'Cyber Services', text: 'Printing, typing, internet and online application help.', icon: Monitor },
 ]
@@ -239,11 +241,7 @@ export default function Landing({ user }: { user: User | null }) {
                     : title === 'Chuka O Zone'
                     ? (
                       <span className="lp-card-icon has-logo">
-                        <img
-                          src={`${BASE}ozone.jfif`}
-                          alt="Chuka O-Zone logo"
-                          onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith('ozone-logo.svg')) i.src = `${BASE}ozone-logo.svg` }}
-                        />
+                        <img src={`${BASE}ozone-logo.svg`} alt="Chuka O-Zone logo" />
                       </span>
                     )
                     : title === 'Hostels & Roommates'
@@ -280,6 +278,12 @@ export default function Landing({ user }: { user: User | null }) {
                     ? (
                       <span className="lp-card-icon has-logo">
                         <img src={`${BASE}gigs-logo.svg`} alt="Chuka Earning & Gigs logo" />
+                      </span>
+                    )
+                    : title === 'The Long Campus Journey'
+                    ? (
+                      <span className="lp-card-icon has-logo">
+                        <img src={`${BASE}journey-logo.svg`} alt="The Long Campus Journey logo" />
                       </span>
                     )
                     : title === 'Chuka Skills'

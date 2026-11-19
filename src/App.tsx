@@ -17,6 +17,7 @@ import Soko from './pages/Soko'
 import StudyLabs from './pages/StudyLabs'
 import Gigs from './pages/Gigs'
 import Skills from './pages/Skills'
+import Journey from './pages/Journey'
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash)
@@ -44,6 +45,7 @@ export default function App() {
   const inLabs = hash.startsWith('#/labs')
   const inGigs = hash.startsWith('#/gigs')
   const inSkills = hash.startsWith('#/skills')
+  const inJourney = hash.startsWith('#/journey')
 
   // Firebase = who is signed in.
   useEffect(() => {
@@ -66,10 +68,10 @@ export default function App() {
 
   // Landing remounts when leaving CPL, so scroll to the target section ourselves (e.g. #services).
   useEffect(() => {
-    if (inCpl || inHostel || inMedia || inEf || inOz || inCy || inSoko || inLabs || inGigs || inSkills) { window.scrollTo(0, 0); return }
+    if (inCpl || inHostel || inMedia || inEf || inOz || inCy || inSoko || inLabs || inGigs || inSkills || inJourney) { window.scrollTo(0, 0); return }
     const id = hash.slice(1)
     if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView())
-  }, [hash, inCpl, inHostel, inMedia, inEf, inOz, inCy, inSoko, inLabs, inGigs, inSkills])
+  }, [hash, inCpl, inHostel, inMedia, inEf, inOz, inCy, inSoko, inLabs, inGigs, inSkills, inJourney])
 
   const signIn = useCallback(() => {
     if (auth) void signInWithPopup(auth, googleProvider).catch(() => {})
@@ -79,7 +81,7 @@ export default function App() {
 
   return (
     <>
-      {inCy ? <Cyber user={user} route={hash} /> : inGigs ? <Gigs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSkills ? <Skills user={user} onSignIn={signIn} onBack={leaveSoko} /> : inLabs ? <StudyLabs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSoko ? <Soko user={user} onSignIn={signIn} onBack={leaveSoko} /> : inCpl ? <Cpl user={user} route={hash} /> : inOz ? <Ozone user={user} route={hash} /> : inEf ? <Efootball user={user} route={hash} /> : inHostel ? <Hostel user={user} /> : inMedia ? <Media /> : <Landing user={user} />}
+      {inJourney ? <Journey user={user} route={hash} onSignIn={signIn} onBack={leaveSoko} /> : inCy ? <Cyber user={user} route={hash} /> : inGigs ? <Gigs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSkills ? <Skills user={user} onSignIn={signIn} onBack={leaveSoko} /> : inLabs ? <StudyLabs user={user} onSignIn={signIn} onBack={leaveSoko} /> : inSoko ? <Soko user={user} onSignIn={signIn} onBack={leaveSoko} /> : inCpl ? <Cpl user={user} route={hash} /> : inOz ? <Ozone user={user} route={hash} /> : inEf ? <Efootball user={user} route={hash} /> : inHostel ? <Hostel user={user} /> : inMedia ? <Media /> : <Landing user={user} />}
       {!showPreloader && <SessionNotice lostSession={lostSession && !user} onSignIn={signIn} onDismissLost={() => { markSignedOut(); setLostSession(false) }} />}
       {!showPreloader && <InstallPopup />}
       {showPreloader && <Preloader ready={authChecked} onDone={done} />}
