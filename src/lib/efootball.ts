@@ -17,7 +17,9 @@ export type PublicPlayer = { uid: string; username: string; name: string; course
 export type Profile = Omit<PublicPlayer, 'whatsapp'> & {
   fullName: string; whatsapp: string; status: string; email: string; showWhatsapp: boolean; paused: boolean; strikes: number; leagueOpen?: boolean; fplId?: string; fplTeam?: string
   /** Class-league money: the fee the first member set, who that is ('me' | 'other' | '' = nobody yet), and whether my payment waits for the admin. */
-  leagueFee?: number; leagueFounder?: '' | 'me' | 'other'; leaguePending?: boolean; leagueLogoId?: string
+  leagueFee?: number; leaguePending?: boolean; leagueLogoId?: string
+  /** 3 days free after joining, then a one-time activation: none | trial | active | expired. `trialEnds` is when the free days end. */
+  leagueState?: 'none' | 'trial' | 'active' | 'expired'; trialEnds?: string
 }
 export type ProfileInput = {
   username: string; fullName: string; course: string; year: number; platform: string; strength: number
@@ -152,8 +154,8 @@ export const fplJoinLink = (code: string) => (code ? `https://fantasy.premierlea
 
 /* ---------------- money: M-Pesa to the admin, the admin verifies ---------------- */
 export type PayKind = 'course' | 'league' | 'knockout' | 'listing'
-export type PayCfg = { adminWa: string; payPhone: string; fees: { course: number; knockout: number; listing: number }; cutPct: number; maxLeagueFee: number }
-export const DEFAULT_PAY: PayCfg = { adminWa: '254184198432', payPhone: '254184198432', fees: { course: 10, knockout: 20, listing: 20 }, cutPct: 10, maxLeagueFee: 1000 }
+export type PayCfg = { adminWa: string; payPhone: string; fees: { course: number; knockout: number; listing: number; activation?: number }; cutPct: number; maxLeagueFee: number }
+export const DEFAULT_PAY: PayCfg = { adminWa: '254184198432', payPhone: '254184198432', fees: { course: 10, knockout: 20, listing: 20, activation: 20 }, cutPct: 10, maxLeagueFee: 1000 }
 export type PayView = { id: string; kind: PayKind; ref: string; label: string; amount: number; status: 'pending' | 'verified' | 'rejected'; createdAt: string; note: string; mpesa: string }
 export type Listing = {
   id: string; type: 'sell' | 'buy'; title: string; platform: string; strength: number; price: number; details: string; imageId: string

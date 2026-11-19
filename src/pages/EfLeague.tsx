@@ -85,12 +85,12 @@ async function leagueCard(lg: League, course: string): Promise<CardSpec> {
     theme: 'green', logo,
     eyebrow: `Chuka League · ${cardDate()}`,
     title: c ? c.course : 'Chuka eFootball League',
-    subtitle: c ? `${c.players} player${c.players === 1 ? '' : 's'}${c.fee ? ` · entry ${ksh(c.fee)}` : ' · free entry'}` : `${lg.registered} players in the league`,
+    subtitle: c ? `${c.players} player${c.players === 1 ? '' : 's'} · 3 days free to join` : `${lg.registered} players in the league`,
     stats: c ? [
       { value: c.ranked && rank ? `#${rank}` : '–', label: 'Course rank' },
       { value: String(c.avg), label: 'Avg pts / player' },
       { value: String(c.pts), label: 'Total points' },
-      { value: c.pool ? ksh(c.pool) : '–', label: 'Prize pool' },
+      { value: String(c.players), label: 'Players' },
     ] : undefined,
     head: ['#', 'Player', 'P', 'W', 'D', 'L', 'GD', 'Pts'],
     rows: players.slice(0, 10).map((r, i) => ({ cells: [String(i + 1), r.username, String(r.p), String(r.w), String(r.d), String(r.l), String(r.gd), String(r.pts)] })),
@@ -141,7 +141,8 @@ function JoinCard({ lg, me, signedIn, onSignIn, reload, inviteCourse }: { lg: Le
   else if (!p) body = <><p className="cpl-sub" style={{ margin: '0 0 12px' }}>Register your player profile first, then come back and tap Join.</p><a className="lp-btn" href="#/efootball/profile">Register as a player</a></>
   else if (p.inLeague) body = (
     <>
-      <p className="cpl-msg"><span className={`ef-pill${p.paused ? ' red' : ''}`}>{p.paused ? 'Paused' : 'In the league'}</span> {p.course}</p>
+      <p className="cpl-msg"><span className={`ef-pill${p.paused || p.leagueState === 'expired' ? ' red' : ''}`}>{p.leagueState === 'expired' ? 'Trial ended' : p.paused ? 'Paused' : p.leagueState === 'trial' ? 'Free trial' : 'In the league'}</span> {p.course}</p>
+      <Activation me={me} lg={lg} reload={reload} />
       {p.paused
         ? <><p className="cpl-note" style={{ textAlign: 'left' }}>You missed {p.strikes} fixtures in a row, so you are not getting new ones. Tap Resume when you are ready to play again.</p>
           <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={() => act('resumeLeague', 'You are back in. Your next fixture comes on the next fixture day.')}>Resume</button></div></>
@@ -174,14 +175,13 @@ function CourseTable({ lg, me, reload, highlight, signedIn, onSignIn }: { lg: Le
   return (
     <>
       <div className="cpl-card ef-scroll">
-        <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by average points per player, so big courses do not win just by size. A course needs 3 players to be ranked. The first member of a course sets its entry fee; the admin keeps 10% of each entry and the rest builds the course prize pool.</p>
+        <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Courses are ranked by average points per player, so big courses do not win just by size. A course needs 3 players to be ranked.</p>
         {!lg.courses.length ? <p className="cpl-empty">No course is open for the league yet.</p> : (
           <table className="ef-table">
-            <thead><tr><th>#</th><th>Course</th><th>Players</th><th>Points</th><th>Avg</th><th>Entry</th><th>Pool</th><th /></tr></thead>
+            <thead><tr><th>#</th><th>Course</th><th>Players</th><th>Points</th><th>Avg</th><th /></tr></thead>
             <tbody>{lg.courses.map((c, i) => (
               <tr key={c.course} style={c.course === highlight ? { background: '#fff9e3' } : c.course === p?.course ? { background: '#f3f8f4' } : c.ranked ? undefined : { opacity: 0.8 }}>
                 <td>{c.ranked ? i + 1 : '–'}</td><td><span className="ef-cname">{c.logoId && <span className="ef-clogo"><DriveImage id={c.logoId} w={80} /></span>}<span>{c.course}{c.founder && <small>Set up by {c.founder}</small>}</span></span></td><td>{c.players}</td><td>{c.pts}</td><td><strong>{c.avg}</strong></td>
-                <td>{c.fee ? ksh(c.fee) : c.players ? 'Free' : 'Not set'}</td><td>{c.pool ? ksh(c.pool) : '–'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {p && p.course === c.course && !p.inLeague
                     ? <button className="lp-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Join</button>
@@ -258,49 +258,62 @@ function ListMyCourse({ course, me, reload }: { course: string; me: Me | null; r
   )
 }
 
-/** Join the class league of my course. The first member sets the entry fee; the admin keeps 10% of every entry. */
+/** Join the class league of my course: 3 days free, then a one-time activation. */
 function JoinPaid({ lg, me, reload }: { lg: League; me: Me | null; reload: () => Promise<void> }) {
   const cfg = usePayCfg()
   const p = me!.profile!
-  const row = lg.courses.find((c) => c.course === p.course)
-  const first = !p.leagueFounder && !row?.players            // nobody joined this course yet: I decide the fee
-  const [fee, setFee] = useState(String(p.leagueFee ?? 0))
-  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [edit, setEdit] = useState(false)
-  const amount = first || edit ? Math.max(0, Math.round(Number(fee) || 0)) : p.leagueFee ?? row?.fee ?? 0
-  const cut = Math.round(amount * cfg.cutPct) / 100
-  const canSetFee = first || (p.leagueFounder === 'me' && !p.leaguePending)
-
+  const expired = p.leagueState === 'expired'
   async function join() {
     setBusy(true); setMsg(null)
-    try {
-      if (edit && !first) await ef('setLeagueFee', { fee: amount })
-      const r = await ef<{ pendingPayment?: boolean }>('joinLeague', { fee: first ? amount : undefined, mpesa: amount > 0 ? code : undefined })
-      await reload(); setEdit(false)
-      setMsg({ ok: true, text: r.pendingPayment ? 'Payment code received. Chat the admin on WhatsApp: you join the league as soon as it is verified.' : 'You are in. ' + (lg.fixtureToday ? 'If a fixture is available you will see it under My fixtures.' : 'Your first fixture comes on the next fixture day.') })
-    } catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    try { await ef('joinLeague'); await reload(); setMsg({ ok: true, text: 'You are in. ' + (lg.fixtureToday ? 'If a fixture is available you will see it under My fixtures.' : 'Your first fixture comes on the next fixture day.') }) }
+    catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
     finally { setBusy(false) }
   }
-  if (p.leaguePending) return <PendingPay label={`League entry: ${p.course}`} amount={p.leagueFee ?? amount} />
   return (
     <>
       <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Join to play one match on every fixture day against a player of similar strength, and earn points for <strong>{p.course}</strong>.</p>
-      {first && <p className="cpl-msg">You are the first member of {p.course}, so you decide the entry fee for your class. Everyone after you pays the same.</p>}
-      {p.leagueFounder === 'other' && <p className="cpl-note" style={{ textAlign: 'left', marginTop: 0 }}>Entry fee set by the first member of your course{row?.founder ? ` (${row.founder})` : ''}.</p>}
-      {(first || edit) && (
-        <label className="ef-feebox">Entry fee per member (KSh, 0 = free, max {cfg.maxLeagueFee})
-          <input className="ef-sel" type="number" inputMode="numeric" min={0} max={cfg.maxLeagueFee} value={fee} onChange={(e) => setFee(e.target.value)} />
-        </label>
-      )}
-      <p className="ef-deadline" style={{ color: 'var(--green)' }}>{amount > 0 ? `Entry: ${ksh(amount)} · admin keeps ${cfg.cutPct}% (${ksh(cut)}), ${ksh(amount - cut)} goes to the course prize pool` : 'Entry is free for this course.'}</p>
-      {amount > 0
-        ? <PayBox amount={amount} label={`League entry: ${p.course}`} code={code} onCode={setCode} onSubmit={join} busy={busy} button="Send code and join" />
-        : <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={join}>{busy ? 'Joining…' : 'Join the league'}</button></div>}
-      {canSetFee && !first && !edit && <button type="button" className="cpl-link" style={{ marginTop: 10 }} onClick={() => setEdit(true)}>Change the entry fee (until somebody pays)</button>}
+      <p className="ef-deadline" style={{ color: 'var(--green)' }}>{expired ? `Your 3 free days are over. Activate for ${ksh(cfg.fees.activation ?? 20)} to keep playing.` : `Free for 3 days. After that, activate once for ${ksh(cfg.fees.activation ?? 20)} to keep automatic fixtures and saved results.`}</p>
+      <div className="ef-actions"><button className="lp-btn" disabled={busy} onClick={join}>{busy ? 'Joining…' : expired ? 'Rejoin the league' : 'Join free for 3 days'}</button></div>
       {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 10 }}>{msg.text}</p>}
     </>
+  )
+}
+
+/** Free-trial countdown and the one-time activation (M-Pesa code, then chat the admin). */
+function Activation({ me, lg, reload }: { me: Me; lg: League; reload: () => Promise<void> }) {
+  const cfg = usePayCfg()
+  const p = me.profile!
+  const amount = cfg.fees.activation ?? 20
+  const [skew] = useState(lg.serverNow - Date.now())
+  const left = useCountdown(p.trialEnds ?? '', skew)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [open, setOpen] = useState(false)
+  async function send() {
+    setBusy(true); setMsg(null)
+    try { await ef('activateLeague', { mpesa: code }); await reload(); setCode(''); setMsg({ ok: true, text: 'Payment code received. Chat the admin on WhatsApp to get activated.' }) }
+    catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
+    finally { setBusy(false) }
+  }
+  const st = p.leagueState
+  if (st === 'active') return <p className="cpl-note" style={{ textAlign: 'left', margin: '0 0 8px' }}><span className="ef-pill gold">Activated</span> Automatic fixtures and saved results are on.</p>
+  if (st !== 'trial' && st !== 'expired') return null
+  const label = `League activation: ${p.course}`
+  const box = p.leaguePending ? <PendingPay label={label} amount={amount} />
+    : <PayBox amount={amount} label={label} code={code} onCode={setCode} onSubmit={send} busy={busy} button="Send code to activate" />
+  return (
+    <div style={{ marginBottom: 10 }}>
+      {st === 'trial'
+        ? <p className="ef-deadline"><Clock size={14} /> Free trial: {left ? `${left} left` : 'ending now'}</p>
+        : <p className="cpl-msg bad">Your 3 free days are over. You are not getting new fixtures and you are hidden from the tables. Your results are saved and come back when you activate for {ksh(amount)}.</p>}
+      {st === 'trial' && !open && !p.leaguePending
+        ? <button type="button" className="cpl-link" onClick={() => setOpen(true)}>Activate now for {ksh(amount)}</button>
+        : (st === 'expired' || open || p.leaguePending) && box}
+      {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status" style={{ marginTop: 8 }}>{msg.text}</p>}
+    </div>
   )
 }
 
