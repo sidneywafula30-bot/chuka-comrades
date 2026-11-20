@@ -97,6 +97,8 @@ function Home({ ctx }: { ctx: OzCtx }) {
       <h1>Chuka O-Zone</h1>
       <p>Say it anonymously, speak up for your faculty, and meet people on campus.</p>
 
+      <AdminCard />
+
       <div className="oz-quick">
         <a href="#/ozone/confess">➕ Confess</a>
         <a href="#/ozone/report">📢 Report issue</a>
