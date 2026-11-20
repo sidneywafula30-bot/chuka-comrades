@@ -251,3 +251,10 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-quick a { text-decoration:none; border:1px solid var(--line); background:#fff; padding:9px 13px; border-radius:999px; font-size:12px; font-weight:700; }
 .oz-quick a:hover { border-color:var(--green); transform:translateY(-1px); }
 @media (max-width:520px){ .oz-live { border-radius:16px; align-items:flex-start; } .oz-live-note { margin-left:0; } .oz-feature { min-height:unset; } }
+
+/* Admin WhatsApp chat */
+.oz-wa-admin { margin: 12px 0 18px; background: #fff; border-color: #25d366; }
+.oz-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 999px; background: #25d366; color: #063d1d; font: 800 14px 'Manrope', sans-serif; text-decoration: none; box-shadow: 0 8px 24px #0f5a2e55; transition: transform .2s, box-shadow .2s; }
+.oz-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px #0f5a2e66; }
+.oz-fab:active { transform: scale(.97); }
+@media (max-width: 520px) { .oz-fab span { display: none; } .oz-fab { padding: 13px; } }

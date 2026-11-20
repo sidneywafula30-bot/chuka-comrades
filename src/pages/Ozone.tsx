@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
+import { WhatsAppLogo } from '../components/BrandLogos'
 import { ArrowLeft, Clapperboard, Flame, Megaphone, Newspaper, ShieldCheck, LifeBuoy, MessageCircle, Users } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { oz, ozReady, type Config, type Me } from '../lib/ozone'
@@ -13,6 +14,10 @@ import Admin from './OzAdmin'
 import './Cpl.css'
 import './Efootball.css'
 import './Ozone.css'
+
+/** O-Zone admin WhatsApp (international format, no +). */
+const OZONE_ADMIN_WA = '254707245180'
+const adminWaUrl = (text = 'Hi O-Zone admin, ') => `https://wa.me/${OZONE_ADMIN_WA}?text=${encodeURIComponent(text)}`
 
 const SAUTI = ['sauti', 'issue', 'report', 'faculties', 'faculty', 'polls', 'poll', 'promises', 'aspirants', 'aspirant']
 
@@ -78,6 +83,9 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
         <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
       </header>
       <main className={`cpl-main${['confessions', 'confess', 'thread'].includes(page) ? ' oz-bleed' : ''}`}>{body}</main>
+      <a className="oz-fab" href={adminWaUrl()} target="_blank" rel="noopener noreferrer" aria-label="Chat with the O-Zone admin on WhatsApp">
+        <WhatsAppLogo size={26} /><span>Chat admin</span>
+      </a>
     </div>
   )
 }
@@ -100,6 +108,12 @@ function Home({ ctx }: { ctx: OzCtx }) {
           <span className="oz-wa-go">Join</span>
         </a>
       )}
+
+      <a className="oz-wa oz-wa-admin" href={adminWaUrl()} target="_blank" rel="noopener noreferrer">
+        <span className="oz-wa-ic"><WhatsAppLogo size={26} /></span>
+        <span className="oz-wa-t"><strong>Chat the O-Zone admin</strong><small>Questions, tips, adverts or a problem? Message +254 707 245 180.</small></span>
+        <span className="oz-wa-go">Chat</span>
+      </a>
 
       <div className="oz-tiles">
         <a className="oz-tile oz-feature" href="#/ozone/confessions">
