@@ -1,32 +1,28 @@
-import { useState } from 'react'
 import { ArrowRight, Clapperboard, Megaphone, Newspaper, Mail, TrendingUp, Vote, Play, ThumbsUp } from 'lucide-react'
 import { WhatsAppLogo } from '../components/BrandLogos'
+import { ADMIN_NAME, AdminAvatar, OZONE_ADMIN_WA, adminWaUrl } from '../components/AdminChat'
 import { ago, oz, snip, type Issue, type NewsList, type Page, type Poll, type Post, type TrendList } from '../lib/ozone'
 import { useLoad, type OzCtx } from './OzCommon'
 import { Bubble } from './OzConfessions'
 
-/** Admin contact. Photo lives in /public/sherif.jpeg. Email comes from VITE_OZONE_ADMIN_EMAIL. */
-export const OZONE_ADMIN_WA = '254707245180'
+/** Admin contact (name, photo and number live in components/AdminChat). Email comes from VITE_OZONE_ADMIN_EMAIL. */
+export { OZONE_ADMIN_WA, adminWaUrl }
 const ADMIN_EMAIL = (import.meta.env.VITE_OZONE_ADMIN_EMAIL as string | undefined) || ''
-export const adminWaUrl = (text = 'Hi O-Zone admin, ') => `https://wa.me/${OZONE_ADMIN_WA}?text=${encodeURIComponent(text)}`
 
 export function AdminCard() {
-  const [noPhoto, setNoPhoto] = useState(false)
   return (
     <section className="oz-admin" aria-label="Contact the O-Zone admin">
       <div className="oz-admin-who">
-        {noPhoto
-          ? <span className="oz-admin-ph oz-admin-init" aria-hidden>SH</span>
-          : <img className="oz-admin-ph" src={`${import.meta.env.BASE_URL}sherif.jpeg`} alt="Sherif, O-Zone admin" onError={() => setNoPhoto(true)} />}
+        <AdminAvatar />
         <div>
           <span className="oz-admin-tag">Your admin</span>
-          <strong>Sherif</strong>
+          <strong>{ADMIN_NAME}</strong>
           <small>Runs Chuka O-Zone &amp; Chuka Soko</small>
         </div>
       </div>
       <p className="oz-admin-msg">Got a tip, a problem, an advert, or need help? Message me directly.</p>
       <div className="oz-admin-btns">
-        <a className="oz-btn-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={20} /> Chat on WhatsApp</a>
+        <a className="oz-btn-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={20} /> Chat {ADMIN_NAME} on WhatsApp</a>
         {ADMIN_EMAIL && <a className="oz-btn-mail" href={`mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent('Chuka O-Zone')}`}><Mail size={18} /> Email</a>}
       </div>
       <small className="oz-admin-num">+254 707 245 180</small>

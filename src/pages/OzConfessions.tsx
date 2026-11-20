@@ -3,6 +3,7 @@ import { Download, ImagePlus, Link2, Lock, MessageCircle, Play, Send, Trash2, Us
 import { ago, cleanPhoto, oz, ozLink, pad, prepVideo, waLink, waShare, type Page, type Post, type Prepared, type Upload } from '../lib/ozone'
 import { Err, ReportButton, useLoad, type OzCtx } from './OzCommon'
 import { canShareFiles, catGradient, confessionImage, downloadBlob } from '../lib/shareCard'
+import { ADMIN_NAME, AdminAvatar } from '../components/AdminChat'
 import './OzConfessions.css'
 
 /* Main Chuka O-Zone WhatsApp group (used when the backend/env has no link set). */
@@ -149,7 +150,7 @@ function SendCard({ ctx, replyTo, onSent }: { ctx: OzCtx; replyTo?: number; onSe
             <p><b>2.</b> Chat the admin on WhatsApp with your M-Pesa code and the email you sign in with. You get activated right after.</p>
             <a className="ng-wa-share" target="_blank" rel="noopener noreferrer"
               href={waLink(adminNo, `Hi admin, I paid KSh ${fee} to ${payNo} for Chuka O-Zone activation. M-Pesa code: ____ . My sign-in email: ${user?.email || '____'}`)}>
-              <MessageCircle size={17} /> Chat admin on WhatsApp · {payNo}
+              <AdminAvatar className="ng-wa-ph" /> Chat {ADMIN_NAME} on WhatsApp · {payNo}
             </a>
             <small>Activated accounts go live the moment they send. Photos or videos, and anything sensitive (phone numbers, self-harm, etc.), are still checked by the admin first.</small>
           </div>

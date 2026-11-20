@@ -138,3 +138,6 @@
 .ng-ghost:disabled { opacity: .5; }
 .ng-wa-share[aria-busy="true"] { opacity: .75; }
 button.ng-wa-share { border: 0; cursor: pointer; width: 100%; }
+
+/* Admin photo on the "Chat admin on WhatsApp" activation button */
+.ng-wa-share .ng-wa-ph { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; background: #1d4a30; display: inline-grid; place-items: center; font: 800 11px 'Manrope', sans-serif; color: #eafaf1; flex-shrink: 0; }

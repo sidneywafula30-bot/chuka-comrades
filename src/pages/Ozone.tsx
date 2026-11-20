@@ -11,7 +11,8 @@ import Hookup from './OzHookup'
 import Trends from './OzTrends'
 import News from './OzNews'
 import Admin from './OzAdmin'
-import { AdminCard, TrendingNow, adminWaUrl } from './OzHomeExtras'
+import { AdminCard, TrendingNow } from './OzHomeExtras'
+import { ADMIN_NAME, AdminAvatar, adminWaUrl } from '../components/AdminChat'
 import './Cpl.css'
 import './Efootball.css'
 import './Ozone.css'
@@ -80,8 +81,8 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
         <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
       </header>
       <main className={`cpl-main${['confessions', 'confess', 'thread'].includes(page) ? ' oz-bleed' : ''}`}>{body}</main>
-      <a className="oz-fab" href={adminWaUrl()} target="_blank" rel="noopener noreferrer" aria-label="Chat with the O-Zone admin on WhatsApp">
-        <WhatsAppLogo size={26} /><span>Chat admin</span>
+      <a className="oz-fab" href={adminWaUrl()} target="_blank" rel="noopener noreferrer" aria-label={`Chat with ${ADMIN_NAME}, the O-Zone admin, on WhatsApp`}>
+        <AdminAvatar className="oz-fab-ph" /><span>Chat {ADMIN_NAME}</span><WhatsAppLogo size={20} className="oz-fab-wa" />
       </a>
     </div>
   )
@@ -101,7 +102,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
         <a href="#/ozone/report">📢 Report issue</a>
         <a href="#/ozone/polls">🗳️ Polls</a>
         <a href="#/ozone/aspirants">🏛️ Elections</a>
-        <a className="oz-quick-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Chat admin</a>
+        <a className="oz-quick-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><AdminAvatar className="oz-quick-ph" /> Chat {ADMIN_NAME}</a>
       </div>
 
       <div className="oz-live"><span className="oz-live-dot" /> O-Zone community is live <span className="oz-live-note">Anonymous · moderated · campus-focused</span></div>
