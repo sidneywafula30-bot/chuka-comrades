@@ -10,6 +10,7 @@ import "./Soko.css";
 /* Config & API                                                        */
 /* ------------------------------------------------------------------ */
 const API_URL = (import.meta.env.VITE_SOKO_API_URL as string | undefined) || "";
+const SOKO_ADMIN_WHATSAPP = "254707245180";
 
 type StoreView = { individual?: boolean; id: string; slug: string; name: string; description: string; logoUrl: string; location: string; whatsapp: string; phone: string; featured: boolean; serviceStore?: boolean; productCount?: number; products?: ProductView[] };
 type ProductView = { id: string; storeId: string; title: string; category: string; description: string; price: number; condition: string; quantity: number; availability: string; status: string; featured: boolean; images: string[]; store?: StoreView; listingType?: string; listingKind?: string; priceUnit?: string; turnaround?: string; serviceArea?: string; serviceHours?: string; serviceDelivery?: string; commissionAmount?: number; commissionStatus?: string };
@@ -377,7 +378,7 @@ function IndividualPanel({ user, me, categories, reload }: { user: User; me: Me;
   const { config, listings } = me;
   const percent = config.commissionPercent;
   const limitReached = listings.length >= config.maxIndividualListings;
-  const adminChat = (p: ProductView) => config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Sherrif, I listed "${p.title}" (${money(p.price)}). I am paying the ${percent}% commission of ${money(p.commissionAmount || 0)}. M-Pesa code: `) : "";
+  const adminChat = (p: ProductView) => SOKO_ADMIN_WHATSAPP ? waLink(SOKO_ADMIN_WHATSAPP, `Hello Sherrif, I listed "${p.title}" (${money(p.price)}). I am paying the ${percent}% commission of ${money(p.commissionAmount || 0)}. M-Pesa code: `) : "";
   const setQty = (p: ProductView, q: number | { delta: number }) => void run(() => post(user, "setQuantity", { productId: p.id, ...(typeof q === "number" ? { quantity: q } : q) }), "Stock updated.");
   return (
     <div>
@@ -421,7 +422,7 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
   if (!me) return <div className="soko-loading"><LoaderCircle className="spin" /> Loading your store…</div>;
   const { store, config } = me;
   const effectiveFee = store?.storeFee ?? config.storeFee;
-  const adminChat = config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Sherrif, I have requested a store${store ? ` ("${store.name}")` : ""} and want to confirm the KSh ${effectiveFee} opening fee.`) : "";
+  const adminChat = SOKO_ADMIN_WHATSAPP ? waLink(SOKO_ADMIN_WHATSAPP, `Hello Sherrif, I have requested a store${store ? ` ("${store.name}")` : ""} and want to confirm the KSh ${effectiveFee} opening fee.`) : "";
 
   const group = <GroupCard url={config.sellersGroupUrl} />;
   if (!store || store.status === "rejected") return (
@@ -493,7 +494,7 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
 /* Admin dashboard                                                     */
 /* ------------------------------------------------------------------ */
 function SettingsPanel({ user, config, onSaved }: { user: User; config: Config; onSaved: () => Promise<unknown> }) {
-  const [form, setForm] = useState({ storeFee: String(config.storeFee), commissionPercent: String(config.commissionPercent), maxProductsPerStore: String(config.maxProductsPerStore), maxIndividualListings: String(config.maxIndividualListings), adminWhatsApp: config.adminWhatsApp, sellersGroupUrl: config.sellersGroupUrl });
+  const [form, setForm] = useState({ storeFee: String(config.storeFee), commissionPercent: String(config.commissionPercent), maxProductsPerStore: String(config.maxProductsPerStore), maxIndividualListings: String(config.maxIndividualListings), adminWhatsApp: SOKO_ADMIN_WHATSAPP, sellersGroupUrl: config.sellersGroupUrl });
   const { busy, msg, run } = useRunner(onSaved);
   const set = (k: keyof typeof form, v: string) => setForm((old) => ({ ...old, [k]: v }));
   return <section className="soko-admin-card"><h2><ShieldCheck size={19} /> Marketplace settings</h2><p>Changes apply to new requests and listings. A store may have its own fee override in the Stores tab.</p><Msg msg={msg} />
@@ -689,7 +690,7 @@ export default function ChukaSoko({ user, onSignIn, onBack }: Props) {
 
       {view === "market" && <>
         <div className="soko-hero"><div><span className="soko-kicker">BUY • SELL • CONNECT</span><h1>Find what you need.<br /><em>Open your own store.</em></h1><p>Shop from student-run stores around Chuka. Sell a single item with a one-time {config.commissionPercent}% commission, or open your own store for KSh {config.storeFee}. Buyers and sellers chat on WhatsApp and arrange payment and delivery directly.</p>
-          <div className="soko-support-links"><button onClick={goSeller}>Start selling</button>{config.adminWhatsApp && <a href={waLink(config.adminWhatsApp, "Hello Sherrif, I need help with Chuka Soko.")} target="_blank" rel="noreferrer"><img className="soko-support-avatar" src={`${import.meta.env.BASE_URL}sherif.jpeg`} alt="Sherrif" /> Chat Sherrif on WhatsApp</a>}{config.sellersGroupUrl && <a href={config.sellersGroupUrl} target="_blank" rel="noreferrer">Join sellers' group</a>}</div></div>
+          <div className="soko-support-links"><button onClick={goSeller}>Start selling</button>{SOKO_ADMIN_WHATSAPP && <a href={waLink(SOKO_ADMIN_WHATSAPP, "Hello Sherrif, I need help with Chuka Soko.")} target="_blank" rel="noreferrer"><img className="soko-support-avatar" src={`${import.meta.env.BASE_URL}sherif.jpeg`} alt="Sherrif" /> Chat Sherrif on WhatsApp</a>}{config.sellersGroupUrl && <a href={config.sellersGroupUrl} target="_blank" rel="noreferrer">Join sellers' group</a>}</div></div>
           <div className="soko-hero-art"><ShoppingBag size={74} /><span>Chuka community marketplace</span></div></div>
         <div className="soko-market-tools">
           <label className="soko-search"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products, stores or location" /></label>

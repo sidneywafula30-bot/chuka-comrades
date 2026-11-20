@@ -63,7 +63,7 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
   else if (page === 'poll') body = <Polls ctx={ctx} only={arg} />
   else if (page === 'aspirant') body = <AspirantPage id={arg} ctx={ctx} />
   else if (page === 'promises') body = <Promises />
-  else if (page === 'aspirants') body = <Elections ctx={ctx} />
+  else if (page === 'aspirants') body = <Elections key={arg} ctx={ctx} initialMode={arg === 'apply' ? 'apply' : ''} />
   else if (page === 'hookup') body = <Hookup ctx={ctx} />
   else if (page === 'trends') body = <Trends ctx={ctx} />
   else if (page === 'news') body = <News ctx={ctx} />

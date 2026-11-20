@@ -18,7 +18,7 @@ const showPhone = (n: string) => { const d = n.replace(/\D/g, '').replace(/^254/
 /* ------------------------------------------------------------------ */
 /* WhatsApp group button (top of every confessions screen)            */
 /* ------------------------------------------------------------------ */
-function WaTop({ ctx }: { ctx: OzCtx }) {
+function WaTop() {
   const url = OZONE_WA_GROUP
   if (!url) return null
   return (
@@ -343,7 +343,7 @@ export function Feed({ ctx }: { ctx: OzCtx }) {
 
   return (
     <div className="ng-wrap">
-      <WaTop ctx={ctx} />
+      <WaTop />
       <SendCard ctx={ctx} />
 
       <h3 className="ng-sec">👇 see what comrades confessed</h3>
@@ -367,7 +367,7 @@ export function Compose({ ctx, replyTo }: { ctx: OzCtx; replyTo?: string }) {
   const n = parseInt(replyTo || '', 10) || undefined
   return (
     <div className="ng-wrap">
-      <WaTop ctx={ctx} />
+      <WaTop />
       <SendCard ctx={ctx} replyTo={n} />
       <a className="ng-back" href={n ? `#/ozone/thread/${n}` : '#/ozone/confessions'}>← Back to confessions</a>
     </div>
@@ -378,7 +378,7 @@ export function Thread({ ctx, number }: { ctx: OzCtx; number: string }) {
   const { data, err, loading } = useLoad(() => oz<{ post: Post; replies: Post[] }>('thread', { number }), [number])
   return (
     <div className="ng-wrap">
-      <WaTop ctx={ctx} />
+      <WaTop />
       <Err msg={err} />
       {loading && <p className="ng-empty">Loading…</p>}
       {data && (

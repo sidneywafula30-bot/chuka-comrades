@@ -20,11 +20,15 @@ export default function Admin() {
   const stats = useLoad(() => oz<Stats>('admin_stats'), [])
   const reloadStats = stats.reload
   return (
-    <div className="oz-wrap oz-admin">
-      <h2>O-Zone admin desk</h2>
+    <div className="oz-wrap oz-admin-desk">
+      <div className="oz-admin-heading">
+        <span className="oz-admin-eyebrow">O-ZONE CONTROL ROOM</span>
+        <h2>Admin dashboard</h2>
+        <p>Review submissions, manage campus conversations and keep the community safe.</p>
+      </div>
       <Err msg={stats.err} />
       {stats.data && (
-        <p className="cpl-sub">
+        <p className="cpl-sub oz-admin-stats">
           Live: {stats.data.published.confessions} confessions · {stats.data.published.issues} issues · {stats.data.published.profiles} profiles · {stats.data.bans} blocked
           {stats.data.replyOverdue > 0 && <> · <b className="oz-over">{stats.data.replyOverdue} right-of-reply window(s) passed</b></>}
         </p>

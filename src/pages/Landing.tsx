@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { signInWithPopup, signOut, type User } from 'firebase/auth'
 import {
-  BookOpen, Building2, ChevronRight, Clapperboard, ExternalLink, Gamepad2, GraduationCap, Download, Mail, MapPin, MessageCircle, Monitor, Phone, ShieldAlert, ShoppingBag, Stethoscope, Trophy, Wallet,
+  BookOpen, Building2, ChevronRight, Clapperboard, ExternalLink, Gamepad2, GraduationCap, Download, Mail, MapPin, MessageCircle, Monitor, Phone, ShieldAlert, ShoppingBag, Stethoscope, Trophy, Vote, Wallet,
 } from 'lucide-react'
 import { auth, firebaseReady, googleProvider } from '../lib/firebase'
 import { markSignedOut } from '../lib/session'
@@ -207,6 +207,18 @@ export default function Landing({ user }: { user: User | null }) {
               <span>{f.label}</span>
             </div>
           ))}
+        </section>
+
+        <section className="lp-aspirant-wrap" aria-label="Chuka University elections">
+          <div className="lp-aspirant-banner">
+            <span className="lp-aspirant-icon"><Vote size={27} /></span>
+            <div className="lp-aspirant-copy">
+              <span className="lp-aspirant-kicker">CHUKA UNIVERSITY ELECTIONS</span>
+              <h2>Planning to lead? Let comrades know.</h2>
+              <p>Create your aspirant profile, share your manifesto and give students a place to ask you questions.</p>
+            </div>
+            <a className="lp-aspirant-cta" href="#/ozone/aspirants/apply">I am an aspirant <ChevronRight size={17} /></a>
+          </div>
         </section>
 
         <section className="lp-section" id="services">

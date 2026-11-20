@@ -174,7 +174,7 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-intro small { color: var(--muted); margin-left: auto; }
 
 /* Admin */
-.oz-admin .ef-tabs button { white-space: nowrap; }
+.oz-admin-desk .ef-tabs button { white-space: nowrap; }
 .oz-q { display: grid; gap: 4px; }
 .oz-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
 .oz-admedia { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
@@ -329,3 +329,44 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-quick a.oz-quick-wa { padding-left: 6px; }
 .oz-quick-ph { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #fff; background: #1d4a30; display: inline-grid; place-items: center; font: 800 9px 'Manrope', sans-serif; color: #eafaf1; flex-shrink: 0; }
 .oz-fab span.oz-fab-ph { display: grid; }
+
+
+/* O-Zone admin dashboard: distinct from the public admin contact card (.oz-admin). */
+.oz-admin-desk {
+  width: min(100%, 1120px);
+  margin: 18px auto 28px;
+  padding: clamp(16px, 3vw, 30px);
+  border: 1px solid #dce8df;
+  border-radius: 26px;
+  background: linear-gradient(180deg, #f5faf6 0%, #ffffff 240px);
+  color: #183b28;
+  box-shadow: 0 18px 48px #173d2510;
+  display: grid;
+  gap: 16px;
+  box-sizing: border-box;
+}
+.oz-admin-heading { padding: 4px 2px 10px; }
+.oz-admin-eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #17804a; font-size: 10px; font-weight: 900; letter-spacing: 1.5px; }
+.oz-admin-heading h2 { margin: 8px 0 5px; font: 800 clamp(25px, 4vw, 34px)/1.1 'Manrope', sans-serif; letter-spacing: -1px; color: #12301f; }
+.oz-admin-heading p { margin: 0; max-width: 660px; color: #68786d; font-size: 14px; line-height: 1.55; }
+.oz-admin-stats { margin: 0 !important; padding: 12px 15px; border: 1px solid #dce9df; border-radius: 14px; background: #fff; color: #506457 !important; font-size: 13px !important; }
+.oz-admin-desk .ef-tabs { gap: 7px; margin: 0; padding: 8px; border: 1px solid #e0e9e2; border-radius: 16px; background: #edf5ef; }
+.oz-admin-desk .ef-tabs button { border-color: transparent; background: transparent; color: #52685a; padding: 9px 13px; font-size: 12px; }
+.oz-admin-desk .ef-tabs button:hover { border-color: #c9ddcf; background: #fff; color: #145c35; }
+.oz-admin-desk .ef-tabs button.on { border-color: #176b3d; background: #176b3d; color: #fff; box-shadow: 0 5px 12px #176b3d26; }
+.oz-admin-desk .oz-list { gap: 13px; margin-top: 0; }
+.oz-admin-desk .oz-q { padding: 18px; border: 1px solid #e1eae3; border-radius: 18px; background: #fff; box-shadow: 0 6px 18px #173d2508; transition: border-color .18s, box-shadow .18s, transform .18s; }
+.oz-admin-desk .oz-q:hover { border-color: #c3d9ca; box-shadow: 0 12px 26px #173d2510; }
+.oz-admin-desk .oz-hd { padding-bottom: 9px; border-bottom: 1px solid #edf2ee; }
+.oz-admin-desk .oz-edit, .oz-admin-desk .oz-note, .oz-admin-desk .ef-sel { border-color: #d9e5dc; background: #fbfdfb; }
+.oz-admin-desk .oz-edit:focus, .oz-admin-desk .oz-note:focus { border-color: #23834e; box-shadow: 0 0 0 3px #23834e18; }
+.oz-admin-desk .oz-actions { gap: 9px; }
+.oz-admin-desk .lp-btn { min-height: 39px; border-radius: 10px; padding-inline: 14px; }
+.oz-admin-desk .cpl-empty { padding: 28px 18px; border: 1px dashed #cbdccd; border-radius: 16px; background: #fff; color: #66786b; text-align: center; }
+@media (max-width: 600px) {
+  .oz-admin-desk { margin: 8px auto 20px; padding: 14px; border-radius: 18px; }
+  .oz-admin-desk .oz-q { padding: 14px; border-radius: 15px; }
+  .oz-admin-desk .ef-tabs { margin-inline: -2px; padding: 6px; }
+  .oz-admin-desk .ef-tabs button { padding: 8px 11px; }
+  .oz-admin-desk .oz-actions > * { max-width: 100%; }
+}

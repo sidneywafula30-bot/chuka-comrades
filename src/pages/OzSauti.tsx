@@ -432,13 +432,13 @@ export function AspirantPage({ id, ctx }: { id: string; ctx: OzCtx }) {
   )
 }
 
-export function Elections({ ctx }: { ctx: OzCtx }) {
+export function Elections({ ctx, initialMode = '' }: { ctx: OzCtx; initialMode?: '' | 'apply' | 'ask' }) {
   const cfg = ctx.cfg!
   const facs = useLoad(() => oz<{ faculties: Faculty[] }>('faculties'), [])
   const [fac, setFac] = useState('')
   const asp = useLoad(() => oz<AspirantGroup[]>('aspirants_list', { facultyCode: fac || undefined }), [fac])
   const qs = useLoad(() => oz<Question[]>('questions_list', { facultyCode: fac || undefined }), [fac, ctx.user?.uid])
-  const [mode, setMode] = useState<'' | 'ask' | 'apply'>('')
+  const [mode, setMode] = useState<'' | 'ask' | 'apply'>(initialMode)
   const [msg, setMsg] = useState('')
 
   async function vote(id: number) {
