@@ -7,7 +7,7 @@ import { ADMIN_NAME, AdminAvatar } from '../components/AdminChat'
 import './OzConfessions.css'
 
 /* Main Chuka O-Zone WhatsApp group (used when the backend/env has no link set). */
-export const OZONE_WA_GROUP = 'https://chat.whatsapp.com/KGwAsXnEJtPBIDMREfDi88'
+export const OZONE_WA_GROUP = 'https://chat.whatsapp.com/GW4iGcXLpUi0ZYF4K3wqOS'
 
 /* Each category gets its own NGL-style gradient (same colours as the share picture). */
 const grad = catGradient
@@ -19,12 +19,12 @@ const showPhone = (n: string) => { const d = n.replace(/\D/g, '').replace(/^254/
 /* WhatsApp group button (top of every confessions screen)            */
 /* ------------------------------------------------------------------ */
 function WaTop({ ctx }: { ctx: OzCtx }) {
-  const url = ctx.cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined) || OZONE_WA_GROUP
+  const url = OZONE_WA_GROUP
   if (!url) return null
   return (
     <a className="ng-wa" href={url} target="_blank" rel="noopener noreferrer">
       <span className="ng-wa-ic"><MessageCircle size={22} /></span>
-      <span className="ng-wa-t"><strong>Join the O-Zone WhatsApp group</strong><small><Users size={12} /> Campus updates &amp; trending confessions</small></span>
+      <span className="ng-wa-t"><strong>Join the Chuka Community WhatsApp group</strong><small><Users size={12} /> Campus updates &amp; trending confessions</small></span>
       <span className="ng-wa-go">Join</span>
     </a>
   )

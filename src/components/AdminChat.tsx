@@ -6,7 +6,7 @@ import { useState } from 'react'
  * name always match the Admin profile card at the bottom of the O-Zone page.
  * Photo lives in /public/sherif.jpeg.
  */
-export const ADMIN_NAME = 'Sherif'
+export const ADMIN_NAME = 'Sherrif'
 export const ADMIN_INITIALS = 'SH'
 export const OZONE_ADMIN_WA = '254707245180'
 export const adminWaUrl = (text = 'Hi O-Zone admin, ') => `https://wa.me/${OZONE_ADMIN_WA}?text=${encodeURIComponent(text)}`

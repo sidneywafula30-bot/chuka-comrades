@@ -146,3 +146,7 @@ a.soko-buy span{min-width:0}
   .soko-store-actions{flex-direction:column}
   .soko-store-actions .soko-visit{width:100%}
 }
+
+.soko-service-meta{font-size:.82rem;color:var(--muted,#667085);line-height:1.5;margin:.45rem 0}
+
+.soko-support-avatar{width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:.35rem}

@@ -90,7 +90,7 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
 
 function Home({ ctx }: { ctx: OzCtx }) {
   const { me, user, cfg } = ctx
-  const waUrl = cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined) || OZONE_WA_GROUP
+  const waUrl = OZONE_WA_GROUP || cfg?.whatsappGroupUrl || (import.meta.env.VITE_OZONE_WA_GROUP_URL as string | undefined)
   return (
     <div className="cpl-home oz-home">
       <div className="ef-mark oz-mark"><img src={`${import.meta.env.BASE_URL}ozone.jfif`} alt="Chuka O-Zone logo" /></div>
@@ -112,7 +112,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
       {waUrl && (
         <a className="oz-wa" href={waUrl} target="_blank" rel="noopener noreferrer">
           <span className="oz-wa-ic"><MessageCircle size={26} /></span>
-          <span className="oz-wa-t"><strong>Join the Chuka O-Zone WhatsApp group</strong><small><Users size={13} /> Campus updates, trends and announcements. Tap to join.</small></span>
+          <span className="oz-wa-t"><strong>Join the Chuka Community WhatsApp group</strong><small><Users size={13} /> Campus updates, trends and announcements. Tap to join.</small></span>
           <span className="oz-wa-go">Join</span>
         </a>
       )}

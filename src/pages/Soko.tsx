@@ -11,14 +11,14 @@ import "./Soko.css";
 /* ------------------------------------------------------------------ */
 const API_URL = (import.meta.env.VITE_SOKO_API_URL as string | undefined) || "";
 
-type StoreView = { individual?: boolean; id: string; slug: string; name: string; description: string; logoUrl: string; location: string; whatsapp: string; phone: string; featured: boolean; productCount?: number; products?: ProductView[] };
-type ProductView = { id: string; storeId: string; title: string; category: string; description: string; price: number; condition: string; quantity: number; availability: string; status: string; featured: boolean; images: string[]; store?: StoreView; listingType?: string; commissionAmount?: number; commissionStatus?: string };
-type MyStore = { id: string; slug: string; name: string; description: string; logoUrl: string; whatsapp: string; phone: string; showPhone: boolean; location: string; status: string; statusReason: string };
+type StoreView = { individual?: boolean; id: string; slug: string; name: string; description: string; logoUrl: string; location: string; whatsapp: string; phone: string; featured: boolean; serviceStore?: boolean; productCount?: number; products?: ProductView[] };
+type ProductView = { id: string; storeId: string; title: string; category: string; description: string; price: number; condition: string; quantity: number; availability: string; status: string; featured: boolean; images: string[]; store?: StoreView; listingType?: string; listingKind?: string; priceUnit?: string; turnaround?: string; serviceArea?: string; serviceHours?: string; serviceDelivery?: string; commissionAmount?: number; commissionStatus?: string };
+type MyStore = { id: string; slug: string; name: string; description: string; logoUrl: string; whatsapp: string; phone: string; showPhone: boolean; location: string; status: string; statusReason: string; serviceStore?: boolean; storeFee?: number | null };
 type Me = { isAdmin: boolean; store: MyStore | null; products: ProductView[]; listings: ProductView[]; stats: { total: number; inStock: number; lowStock: number; soldOut: number; paused: number }; config: { storeFee: number; adminWhatsApp: string; sellersGroupUrl: string; maxProductsPerStore: number; commissionPercent: number; maxIndividualListings: number } };
 type Category = { id: string; name: string };
 type Config = { storeFee: number; adminWhatsApp: string; sellersGroupUrl: string; maxProductsPerStore: number; commissionPercent: number; maxIndividualListings: number };
-type AStore = { logoUrl?: string; storeId: string; ownerEmail: string; name: string; whatsapp: string | number; location: string; status: string; statusReason?: string; featured?: boolean | string };
-type AProduct = { productId: string; storeId: string; title: string; price: number; quantity: number; status: string; featured: boolean; image?: string; listingType: "store" | "individual"; sellerName?: string; sellerWhatsapp?: string; sellerEmail?: string; sellerLocation?: string; commissionAmount: number; commissionStatus: string };
+type AStore = { logoUrl?: string; storeId: string; ownerEmail: string; name: string; whatsapp: string | number; location: string; status: string; statusReason?: string; featured?: boolean | string; storeFee?: number | null; serviceStore?: boolean };
+type AProduct = { productId: string; storeId: string; title: string; price: number; quantity: number; status: string; featured: boolean; image?: string; listingType: "store" | "individual"; listingKind?: string; sellerName?: string; sellerWhatsapp?: string; sellerEmail?: string; sellerLocation?: string; commissionAmount: number; commissionStatus: string };
 type APayment = { kind?: string; paymentId: string; storeName: string; amount: number; mpesaReference: string; paidOn: string; note?: string };
 type AReport = { reportId: string; productId?: string; storeId?: string; reason: string; details?: string; status: string };
 type AdminData = { stores: AStore[]; products: AProduct[]; payments: APayment[]; reports: AReport[]; totals: { collected: number; pendingStores: number; pendingCommissions: number; commissionCollected: number } };
@@ -77,9 +77,7 @@ function shareProductUrl(p: ProductView, s?: StoreView) {
   const where = s?.location ? `\n📍 ${s.location}` : "";
   return waLink("", `🛍️ *${p.title}* — ${money(p.price)}${where}\nSee photos and chat with the seller on Chuka Soko:\n${productLink(p.id)}`);
 }
-function buyProductUrl(p: ProductView, s: StoreView) {
-  return waLink(s.whatsapp, `Hi ${s.name}, I want to buy "${p.title}" (${money(p.price)}) listed on Chuka Soko. Is it still available?\n${productLink(p.id)}`);
-}
+
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Please try again.");
 
 /** Google Drive photos: try the stored thumbnail URL first, then two other public Drive URL forms, then show a placeholder. */
@@ -118,7 +116,8 @@ function Msg({ msg }: { msg: { type: "ok" | "err"; text: string } | null }) {
 /* ------------------------------------------------------------------ */
 function ProductCard({ p, store, onStore, onReport, onOpen }: { p: ProductView; store?: StoreView; onStore?: (slug: string) => void; onReport: (p: ProductView) => void; onOpen: (p: ProductView) => void }) {
   const s = p.store || store;
-  const out = p.quantity <= 0;
+  const service = p.listingKind === 'service';
+  const out = !service && p.quantity <= 0;
   return (
     <article className={`soko-product-card${out ? " is-out" : ""}`}>
       <div className="soko-product-image" role="button" tabIndex={0} onClick={() => onOpen(p)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(p); }} aria-label={`View photos of ${p.title}`}>
@@ -130,14 +129,15 @@ function ProductCard({ p, store, onStore, onReport, onOpen }: { p: ProductView; 
       <div className="soko-product-copy">
         <span className="soko-product-category">{p.category}</span>
         <h3 role="button" tabIndex={0} onClick={() => onOpen(p)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(p); }}>{p.title}</h3>
-        <strong className="soko-price">{money(p.price)}</strong>
+        <strong className="soko-price">{p.price === 0 ? 'Free / Contact' : money(p.price)}{service && p.priceUnit ? ` / ${p.priceUnit}` : ''}</strong>
         <p>{p.description}</p>
-        <div className="soko-product-meta"><span>{p.condition}</span>{s && <span>{s.location}</span>}</div>
-        <span className={`soko-badge ${out ? "out" : p.availability === "Low stock" ? "low" : "ok"}`}>
-          {out ? "Sold out" : p.availability === "Low stock" ? `Only ${p.quantity} left` : "In stock"}
+        {service && <p className="soko-service-meta">{[p.serviceArea, p.turnaround, p.serviceHours, p.serviceDelivery].filter(Boolean).join(' · ')}</p>}
+        <div className="soko-product-meta">{service ? <span>Service</span> : <span>{p.condition}</span>}{s && <span>{s.location}</span>}</div>
+        <span className={`soko-badge ${out ? "out" : !service && p.availability === "Low stock" ? "low" : "ok"}`}>
+          {service ? 'Available service' : out ? "Sold out" : p.availability === "Low stock" ? `Only ${p.quantity} left` : "In stock"}
         </span>
         {s && onStore && s.slug ? <button className="soko-store-link" onClick={() => onStore(s.slug)}><StoreIcon size={13} /> {s.name}</button> : s?.individual ? <span className="soko-store-link static"><Users size={13} /> {s.name}</span> : null}
-        {s && <a className="soko-buy" href={buyProductUrl(p, s)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> <span>{out ? "Ask about restock" : "Chat on WhatsApp to buy"}</span></a>}
+        {s && <a className="soko-buy" href={waLink(s.whatsapp, service ? `Hi ${s.name}, I am interested in your service \"${p.title}\" on Chuka Soko. Please share availability and how to book.` : `Hi ${s.name}, I want to buy \"${p.title}\" (${money(p.price)}). Is it still available?`)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> <span>{service ? 'Ask about / book service' : out ? "Ask about restock" : "Chat on WhatsApp to buy"}</span></a>}
         <div className="soko-contact-actions">
           <a className="soko-share" href={shareProductUrl(p, s)} target="_blank" rel="noreferrer"><Share2 size={13} /> Share</a>
           {s?.phone && !out && <a className="soko-call" href={`tel:+${s.phone}`}>Call</a>}
@@ -152,7 +152,8 @@ function ProductCard({ p, store, onStore, onReport, onOpen }: { p: ProductView; 
 function ProductModal({ p, onClose, onStore, onReport }: { p: ProductView; onClose: () => void; onStore: (slug: string) => void; onReport: (p: ProductView) => void }) {
   const [idx, setIdx] = useState(0);
   const s = p.store;
-  const out = p.quantity <= 0;
+  const service = p.listingKind === 'service';
+  const out = !service && p.quantity <= 0;
   const n = p.images.length;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); if (e.key === "ArrowRight" && n > 1) setIdx((i) => (i + 1) % n); if (e.key === "ArrowLeft" && n > 1) setIdx((i) => (i - 1 + n) % n); };
@@ -173,11 +174,12 @@ function ProductModal({ p, onClose, onStore, onReport }: { p: ProductView; onClo
         <div className="soko-modal-info">
           <span className="soko-product-category">{p.category}</span>
           <h2>{p.title}</h2>
-          <strong className="soko-price big">{money(p.price)}</strong>
-          <div className="soko-product-meta"><span>{p.condition}</span>{s && <span>{s.location}</span>}<span className={`soko-badge ${out ? "out" : p.availability === "Low stock" ? "low" : "ok"}`}>{out ? "Sold out" : p.availability === "Low stock" ? `Only ${p.quantity} left` : "In stock"}</span></div>
+          <strong className="soko-price big">{p.price === 0 ? 'Free / Contact' : money(p.price)}{service && p.priceUnit ? ` / ${p.priceUnit}` : ''}</strong>
+          <div className="soko-product-meta">{service ? <span>Service</span> : <span>{p.condition}</span>}{s && <span>{s.location}</span>}<span className={`soko-badge ${out ? "out" : !service && p.availability === "Low stock" ? "low" : "ok"}`}>{service ? 'Available service' : out ? "Sold out" : p.availability === "Low stock" ? `Only ${p.quantity} left` : "In stock"}</span></div>
           <p className="soko-modal-desc">{p.description}</p>
+          {service && <p className="soko-service-meta">{[p.serviceArea, p.turnaround, p.serviceHours, p.serviceDelivery].filter(Boolean).join(' · ')}</p>}
           {s && (s.slug ? <button className="soko-store-link" onClick={() => { onClose(); onStore(s.slug); }}><StoreIcon size={13} /> Sold by {s.name}</button> : <span className="soko-store-link static"><Users size={13} /> Sold by {s.name}</span>)}
-          {s && <a className="soko-buy" href={buyProductUrl(p, s)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> {out ? "Ask about restock on WhatsApp" : "Chat on WhatsApp to buy"}</a>}
+          {s && <a className="soko-buy" href={waLink(s.whatsapp, service ? `Hi ${s.name}, I am interested in your service \"${p.title}\" on Chuka Soko. Please share availability and booking details.` : `Hi ${s.name}, I want to buy \"${p.title}\" (${money(p.price)}). Is it available?`)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> {service ? 'Ask about / book service' : out ? "Ask about restock on WhatsApp" : "Chat on WhatsApp to buy"}</a>}
           <div className="soko-contact-actions">
             <a className="soko-share" href={shareProductUrl(p, s)} target="_blank" rel="noreferrer"><Share2 size={13} /> Share on WhatsApp</a>
             {s?.phone && !out && <a href={`tel:+${s.phone}`}>Call</a>}
@@ -197,7 +199,7 @@ function StoreCard({ s, onOpen }: { s: StoreView; onOpen: (slug: string) => void
         <span className="soko-store-logo"><SokoImg src={s.logoUrl} fallback={<StoreIcon size={26} />} /></span>
         <span className="soko-store-info">
           <strong>{s.name}{s.featured && <Star size={12} fill="currentColor" />}</strong>
-          <small>{s.location} · {s.productCount ?? 0} product{s.productCount === 1 ? "" : "s"}</small>
+          <small>{s.location} · {s.serviceStore ? "Service provider" : `${s.productCount ?? 0} products`}</small>
           {s.description && <em>{s.description}</em>}
         </span>
       </button>
@@ -241,7 +243,7 @@ function PhotoPicker({ user, urls, setUrls, max, setError }: { user: User; urls:
 }
 
 function StoreForm({ user, store, fee, resubmit, onDone }: { user: User; store: MyStore | null; fee: number; resubmit?: boolean; onDone: () => Promise<unknown> }) {
-  const [form, setForm] = useState({ name: store?.name || "", description: store?.description || "", whatsapp: store?.whatsapp || "", phone: store?.phone || "", showPhone: store?.showPhone || false, location: store?.location || "" });
+  const [form, setForm] = useState({ name: store?.name || "", description: store?.description || "", whatsapp: store?.whatsapp || "", phone: store?.phone || "", showPhone: store?.showPhone || false, location: store?.location || "", serviceStore: store?.serviceStore || false });
   const [logo, setLogo] = useState<string[]>(store?.logoUrl ? [store.logoUrl] : []);
   const [photoError, setPhotoError] = useState("");
   const { busy, msg, run } = useRunner(onDone);
@@ -263,6 +265,7 @@ function StoreForm({ user, store, fee, resubmit, onDone }: { user: User; store: 
       </div>
       <div className="soko-consent-row"><label><input type="checkbox" checked={form.showPhone} onChange={(e) => set("showPhone", e.target.checked)} /> Show a "Call" button to buyers</label></div>
       <label>Location<input required value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="e.g. Chuka town, Gate B" /></label>
+      <div className="soko-consent-row"><label><input type="checkbox" checked={form.serviceStore} onChange={(e) => set("serviceStore", e.target.checked)} /> This is a service business (not a goods shop)</label></div>
       <label>Store logo (optional)</label>
       <PhotoPicker user={user} urls={logo} setUrls={setLogo} max={1} setError={setPhotoError} />
       <button className="soko-primary" disabled={busy}>{busy ? "Saving…" : store && !resubmit ? "Save changes" : "Submit store request"}</button>
@@ -270,32 +273,33 @@ function StoreForm({ user, store, fee, resubmit, onDone }: { user: User; store: 
   );
 }
 
-function ProductForm({ user, categories, product, onDone, onCancel }: { user: User; categories: Category[]; product?: ProductView; onDone: () => Promise<unknown>; onCancel: () => void }) {
-  const [form, setForm] = useState({ title: product?.title || "", category: product?.category || "", description: product?.description || "", price: product ? String(product.price) : "", condition: product?.condition || "New", quantity: product ? String(product.quantity) : "1" });
+function ProductForm({ user, categories, product, serviceStore, onDone, onCancel }: { user: User; categories: Category[]; product?: ProductView; serviceStore?: boolean; onDone: () => Promise<unknown>; onCancel: () => void }) {
+  const [form, setForm] = useState({ title: product?.title || "", category: product?.category || "", description: product?.description || "", price: product ? String(product.price) : "", condition: product?.condition || "New", quantity: product ? String(product.quantity) : "1", listingKind: product?.listingKind || (serviceStore ? "service" : "product"), priceUnit: product?.priceUnit || "", turnaround: product?.turnaround || "", serviceArea: product?.serviceArea || "", serviceHours: product?.serviceHours || "", serviceDelivery: product?.serviceDelivery || "" });
   const [images, setImages] = useState<string[]>(product?.images || []);
   const [photoError, setPhotoError] = useState("");
   const { busy, msg, run } = useRunner(onDone);
   const set = (k: keyof typeof form, v: string) => setForm({ ...form, [k]: v });
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!images.length) { setPhotoError("Add at least one photo."); return; }
+    if (!images.length && form.listingKind !== 'service') { setPhotoError("Add at least one photo."); return; }
     const payload = { ...form, price: Number(form.price), quantity: Number(form.quantity), images, ...(product ? { productId: product.id } : {}) };
     const ok = await run(() => post(user, product ? "updateProduct" : "createProduct", payload), product ? "Product updated." : "Product added. It is now live.");
     if (ok) onCancel();
   }
   return (
     <form className="soko-admin-card soko-product-form" onSubmit={(e) => void submit(e)}>
-      <h2><Package size={19} /> {product ? "Edit product" : "Add a product"}</h2>
+      <h2><Package size={19} /> {product ? "Edit listing" : "Add a listing"}</h2>
+      <label>Listing type<select value={form.listingKind} onChange={(e) => set("listingKind", e.target.value)}><option value="product">Physical product</option><option value="service">Service</option></select></label>
       <Msg msg={msg} />{photoError && <p className="soko-alert error">{photoError}</p>}
       <label>Product name<input required maxLength={120} value={form.title} onChange={(e) => set("title", e.target.value)} /></label>
       <label>Category<select required value={form.category} onChange={(e) => set("category", e.target.value)}><option value="">Choose category</option>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
       <label>Description<textarea required rows={3} maxLength={1500} value={form.description} onChange={(e) => set("description", e.target.value)} /></label>
       <div className="soko-form-row">
-        <label>Price (KSh)<input required type="number" min={1} step={1} value={form.price} onChange={(e) => set("price", e.target.value)} /></label>
-        <label>Quantity in stock<input required type="number" min={0} step={1} value={form.quantity} onChange={(e) => set("quantity", e.target.value)} /></label>
+        <label>Price (KSh)<input required type="number" min={form.listingKind === 'service' ? 0 : 1} step={1} value={form.price} onChange={(e) => set("price", e.target.value)} /></label>
+        {form.listingKind === 'product' ? <label>Quantity in stock<input required type="number" min={0} step={1} value={form.quantity} onChange={(e) => set("quantity", e.target.value)} /></label> : <label>Price basis<input value={form.priceUnit} onChange={(e) => set("priceUnit", e.target.value)} placeholder="e.g. per hour / per page" /></label>}
       </div>
-      <label>Condition<select value={form.condition} onChange={(e) => set("condition", e.target.value)}><option>New</option><option>Used - like new</option><option>Used - good</option><option>Refurbished</option></select></label>
-      <label>Photos (1 to 5)</label>
+      {form.listingKind === 'service' ? <><label>Service area<input value={form.serviceArea} onChange={(e) => set("serviceArea", e.target.value)} placeholder="Where do you serve customers?" /></label><div className="soko-form-row"><label>Turnaround / duration<input value={form.turnaround} onChange={(e) => set("turnaround", e.target.value)} placeholder="e.g. 1-2 days" /></label><label>Working hours<input value={form.serviceHours} onChange={(e) => set("serviceHours", e.target.value)} placeholder="e.g. Mon-Sat, 8am-6pm" /></label></div><label>Delivery / how service is provided<input value={form.serviceDelivery} onChange={(e) => set("serviceDelivery", e.target.value)} placeholder="e.g. On campus, online, pickup" /></label></> : <label>Condition<select value={form.condition} onChange={(e) => set("condition", e.target.value)}><option>New</option><option>Used - like new</option><option>Used - good</option><option>Refurbished</option></select></label>}
+      <label>Photos (optional for services, 1 to 5 for products)</label>
       <PhotoPicker user={user} urls={images} setUrls={setImages} max={5} setError={setPhotoError} />
       <div className="soko-actions"><button type="button" className="soko-ghost" onClick={onCancel}>Cancel</button><button className="soko-primary" disabled={busy}>{busy ? "Saving…" : product ? "Save product" : "Add product"}</button></div>
     </form>
@@ -320,7 +324,7 @@ function GroupCard({ url }: { url: string }) {
   return (
     <div className="soko-group-card">
       <span className="soko-group-icon"><MessageCircle size={22} /></span>
-      <div><strong>Join the Chuka Soko sellers' WhatsApp group</strong><small>Selling tips, updates and direct help from the admin and other sellers.</small></div>
+      <div><strong>Join the Chuka Community WhatsApp group</strong><small>Selling tips, updates and direct help from the admin and other sellers.</small></div>
       <a href={url} target="_blank" rel="noreferrer">Join group</a>
     </div>
   );
@@ -373,7 +377,7 @@ function IndividualPanel({ user, me, categories, reload }: { user: User; me: Me;
   const { config, listings } = me;
   const percent = config.commissionPercent;
   const limitReached = listings.length >= config.maxIndividualListings;
-  const adminChat = (p: ProductView) => config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Chuka Soko admin, I listed "${p.title}" (${money(p.price)}). I am paying the ${percent}% commission of ${money(p.commissionAmount || 0)}. M-Pesa code: `) : "";
+  const adminChat = (p: ProductView) => config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Sherrif, I listed "${p.title}" (${money(p.price)}). I am paying the ${percent}% commission of ${money(p.commissionAmount || 0)}. M-Pesa code: `) : "";
   const setQty = (p: ProductView, q: number | { delta: number }) => void run(() => post(user, "setQuantity", { productId: p.id, ...(typeof q === "number" ? { quantity: q } : q) }), "Stock updated.");
   return (
     <div>
@@ -416,7 +420,8 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
   if (!user) return <div className="soko-empty"><StoreIcon size={34} /><h3>Sell on Chuka Soko</h3><p>Sign in with Google to open your own store and list products.</p><button onClick={onSignIn}>Sign in with Google</button></div>;
   if (!me) return <div className="soko-loading"><LoaderCircle className="spin" /> Loading your store…</div>;
   const { store, config } = me;
-  const adminChat = config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Chuka Soko admin, I have requested a store${store ? ` ("${store.name}")` : ""} and want to pay the KSh ${config.storeFee} opening fee.`) : "";
+  const effectiveFee = store?.storeFee ?? config.storeFee;
+  const adminChat = config.adminWhatsApp ? waLink(config.adminWhatsApp, `Hello Sherrif, I have requested a store${store ? ` ("${store.name}")` : ""} and want to confirm the KSh ${effectiveFee} opening fee.`) : "";
 
   const group = <GroupCard url={config.sellersGroupUrl} />;
   if (!store || store.status === "rejected") return (
@@ -426,7 +431,7 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
         <button className={mode === "items" ? "selected" : ""} onClick={() => setMode("items")}><strong>Sell items</strong><small>No store fee · {config.commissionPercent}% commission per listing</small></button>
         <button className={mode === "store" ? "selected" : ""} onClick={() => setMode("store")}><strong>Open a store</strong><small>One-time {money(config.storeFee)} · up to {config.maxProductsPerStore} products</small></button>
       </div>
-      {mode === "items" ? <IndividualPanel user={user} me={me} categories={categories} reload={reload} /> : <StoreForm user={user} store={store} fee={config.storeFee} resubmit={Boolean(store)} onDone={reload} />}
+      {mode === "items" ? <IndividualPanel user={user} me={me} categories={categories} reload={reload} /> : <StoreForm user={user} store={store} fee={effectiveFee} resubmit={Boolean(store)} onDone={reload} />}
       {group}
     </div>
   );
@@ -434,10 +439,10 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
   if (store.status === "pending") return (
     <div className="soko-seller-page">
       <div className="soko-status-card"><h2>Waiting for approval</h2>
-        <p><strong>{store.name}</strong> has been submitted. Pay the one-time opening fee of <strong>{money(config.storeFee)}</strong> to the Chuka Soko admin, then message the admin so your store can be approved.</p>
+        <p><strong>{store.name}</strong> has been submitted. Pay the one-time opening fee of <strong>{money(effectiveFee)}</strong> to the Chuka Soko admin, then message the admin so your store can be approved.</p>
         {adminChat && <a href={adminChat} target="_blank" rel="noreferrer">Message the admin on WhatsApp</a>}
         <small>Payments are made outside this app. The admin approves your store after receiving your payment.</small></div>
-      <StoreForm user={user} store={store} fee={config.storeFee} onDone={reload} />
+      <StoreForm user={user} store={store} fee={effectiveFee} onDone={reload} />
       {group}
     </div>
   );
@@ -452,24 +457,24 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
         <div className="soko-head-actions"><button className="soko-ghost" onClick={() => openStore(store.slug)}>View public page</button><button className="soko-ghost" onClick={() => setEditStore(!editStore)}><Pencil size={14} /> Edit store</button></div>
       </div>
       <div className="soko-stat-grid four">
-        <div><Package /><strong>{me.stats.total}</strong><small>Products</small></div>
+        <div><Package /><strong>{me.stats.total}</strong><small>Listings</small></div>
         <div><CheckCircle2 /><strong>{me.stats.inStock}</strong><small>In stock</small></div>
         <div><ShoppingBag /><strong>{me.stats.lowStock}</strong><small>Low stock</small></div>
         <div><X /><strong>{me.stats.soldOut}</strong><small>Sold out</small></div>
       </div>
       <Msg msg={msg} />
-      {editStore && <StoreForm user={user} store={store} fee={config.storeFee} onDone={async () => { await reload(); setEditStore(false); }} />}
-      {editing ? <ProductForm user={user} categories={categories} product={editing === "new" ? undefined : editing} onDone={reload} onCancel={() => setEditing(null)} /> : (
-        <button className="soko-primary add-btn" disabled={limitReached} onClick={() => setEditing("new")}><Plus size={16} /> {limitReached ? `Limit of ${config.maxProductsPerStore} products reached` : "Add a product"}</button>
+      {editStore && <StoreForm user={user} store={store} fee={effectiveFee} onDone={async () => { await reload(); setEditStore(false); }} />}
+      {editing ? <ProductForm user={user} categories={categories} product={editing === "new" ? undefined : editing} serviceStore={store.serviceStore} onDone={reload} onCancel={() => setEditing(null)} /> : (
+        <button className="soko-primary add-btn" disabled={limitReached} onClick={() => setEditing("new")}><Plus size={16} /> {limitReached ? `Limit of ${config.maxProductsPerStore} listings reached` : store.serviceStore ? "Add a service" : "Add a product"}</button>
       )}
       <section className="soko-admin-card">
-        <h2><Package size={19} /> My products</h2>
+        <h2><Package size={19} /> My listings</h2>
         <p>Update stock after each sale. At 0 the product shows as sold out; 3 or fewer shows "low stock".</p>
         {me.products.length === 0 ? <div className="soko-inline-empty">You have not added any products yet.</div> : me.products.map((p) => (
           <div className={`soko-row${p.status === "paused" ? " paused" : ""}`} key={p.id}>
             <div className="soko-row-main"><SokoImg src={p.images[0]} fallback={<span className="soko-row-noimg"><ShoppingBag size={16} /></span>} />
-              <span><strong>{p.title}</strong><small>{money(p.price)} · {p.status === "paused" ? "Paused (hidden)" : p.availability}</small></span></div>
-            <QtyControl product={p} disabled={busy} onSet={(q) => setQty(p, q)} />
+              <span><strong>{p.title}</strong><small>{money(p.price)} · {p.listingKind === "service" ? "Service listing" : p.status === "paused" ? "Paused (hidden)" : p.availability}</small></span></div>
+            {p.listingKind !== "service" && <QtyControl product={p} disabled={busy} onSet={(q) => setQty(p, q)} />}
             <div className="soko-row-actions">
               <button disabled={busy} onClick={() => void run(() => post(user, "setProductStatus", { productId: p.id, status: p.status === "paused" ? "active" : "paused" }), p.status === "paused" ? "Product is live again." : "Product hidden.")} title={p.status === "paused" ? "Resume" : "Pause"}>{p.status === "paused" ? <Play size={14} /> : <Pause size={14} />}</button>
               <button disabled={busy} onClick={() => setEditing(p)} title="Edit"><Pencil size={14} /></button>
@@ -487,9 +492,22 @@ function SellerDashboard({ user, onSignIn, me, categories, reload, openStore }: 
 /* ------------------------------------------------------------------ */
 /* Admin dashboard                                                     */
 /* ------------------------------------------------------------------ */
+function SettingsPanel({ user, config, onSaved }: { user: User; config: Config; onSaved: () => Promise<unknown> }) {
+  const [form, setForm] = useState({ storeFee: String(config.storeFee), commissionPercent: String(config.commissionPercent), maxProductsPerStore: String(config.maxProductsPerStore), maxIndividualListings: String(config.maxIndividualListings), adminWhatsApp: config.adminWhatsApp, sellersGroupUrl: config.sellersGroupUrl });
+  const { busy, msg, run } = useRunner(onSaved);
+  const set = (k: keyof typeof form, v: string) => setForm((old) => ({ ...old, [k]: v }));
+  return <section className="soko-admin-card"><h2><ShieldCheck size={19} /> Marketplace settings</h2><p>Changes apply to new requests and listings. A store may have its own fee override in the Stores tab.</p><Msg msg={msg} />
+    <form onSubmit={(e) => { e.preventDefault(); void run(() => post(user, "updateSettings", { ...form, storeFee: Number(form.storeFee), commissionPercent: Number(form.commissionPercent), maxProductsPerStore: Number(form.maxProductsPerStore), maxIndividualListings: Number(form.maxIndividualListings) }), "Settings saved."); }}>
+      <div className="soko-form-row"><label>Default store opening fee (KSh)<input type="number" min={0} value={form.storeFee} onChange={(e) => set("storeFee", e.target.value)} /></label><label>Individual listing commission (%)<input type="number" min={0} max={100} value={form.commissionPercent} onChange={(e) => set("commissionPercent", e.target.value)} /></label></div>
+      <div className="soko-form-row"><label>Products per store<input type="number" min={1} value={form.maxProductsPerStore} onChange={(e) => set("maxProductsPerStore", e.target.value)} /></label><label>Individual listing limit<input type="number" min={1} value={form.maxIndividualListings} onChange={(e) => set("maxIndividualListings", e.target.value)} /></label></div>
+      <label>Sherrif WhatsApp number<input value={form.adminWhatsApp} onChange={(e) => set("adminWhatsApp", e.target.value)} /></label><label>Shared Chuka community WhatsApp group URL<input value={form.sellersGroupUrl} onChange={(e) => set("sellersGroupUrl", e.target.value)} /></label>
+      <button className="soko-primary" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
+    </form></section>;
+}
+
 function AdminDashboard({ user, config, onChanged }: { user: User; config: Config; onChanged: () => Promise<unknown> }) {
   const [data, setData] = useState<AdminData | null>(null);
-  const [tab, setTab] = useState<"requests" | "commissions" | "stores" | "payments" | "products" | "reports">("requests");
+  const [tab, setTab] = useState<"requests" | "commissions" | "stores" | "payments" | "products" | "reports" | "settings">("requests");
   const [loadError, setLoadError] = useState("");
   const load = useCallback(async () => {
     try { setData(await post(user, "adminOverview")); setLoadError(""); } catch (e) { setLoadError(errMsg(e)); }
@@ -505,7 +523,7 @@ function AdminDashboard({ user, config, onChanged }: { user: User; config: Confi
   const ask = (q: string) => window.prompt(q)?.trim() || "";
   const pending = data.stores.filter((s) => s.status === "pending");
   const pendingC = data.products.filter((x) => x.listingType === "individual" && x.commissionStatus !== "paid");
-  const tabs: [typeof tab, string][] = [["requests", `Requests (${pending.length})`], ["commissions", `Commissions (${pendingC.length})`], ["stores", "Stores"], ["payments", "Payments"], ["products", "Products"], ["reports", `Reports (${data.reports.filter((r) => r.status === "new").length})`]];
+  const tabs: [typeof tab, string][] = [["requests", `Requests (${pending.length})`], ["commissions", `Commissions (${pendingC.length})`], ["stores", "Stores"], ["payments", "Payments"], ["products", "Products"], ["reports", `Reports (${data.reports.filter((r) => r.status === "new").length})`], ["settings", "Settings"]];
   return (
     <div>
       <div className="soko-stat-grid four">
@@ -517,13 +535,14 @@ function AdminDashboard({ user, config, onChanged }: { user: User; config: Confi
       <div className="soko-tabs">{tabs.map(([k, label]) => <button key={k} className={tab === k ? "selected" : ""} onClick={() => setTab(k)}>{label}</button>)}</div>
       <Msg msg={msg} />
 
-      {tab === "requests" && <section className="soko-admin-card"><h2><Users size={19} /> Store requests</h2><p>Payments happen outside the app. When you receive the {money(config.storeFee)} fee, enter the M-Pesa code to record it, then approve. The code is optional.</p>
+      {tab === "requests" && <section className="soko-admin-card"><h2><Users size={19} /> Store requests</h2><p>Payments happen outside the app. Check each store’s expected fee, enter the amount received and M-Pesa code. Amount differences show as a warning in the ledger; approval is not blocked. The code is optional.</p>
         {pending.length === 0 ? <div className="soko-inline-empty">No stores waiting for approval.</div> : pending.map((s) => {
-          const c = codes[s.storeId] || { ref: "", amount: String(config.storeFee) };
+          const expectedStoreFee = s.storeFee ?? config.storeFee;
+          const c = codes[s.storeId] || { ref: "", amount: String(expectedStoreFee) };
           return <div className="soko-request" key={s.storeId}>
-            <div><span className="soko-admin-logo"><SokoImg src={s.logoUrl} fallback={<StoreIcon size={18} />} /></span><strong>{s.name}</strong><small>{s.ownerEmail} · {s.location}</small><a href={waLink(s.whatsapp, `Hello, this is Chuka Soko about your store "${s.name}".`)} target="_blank" rel="noreferrer">Chat on WhatsApp</a></div>
+            <div><span className="soko-admin-logo"><SokoImg src={s.logoUrl} fallback={<StoreIcon size={18} />} /></span><strong>{s.name}</strong><small>{s.ownerEmail} · {s.location} · Expected fee: {money(expectedStoreFee)}</small><a href={waLink(s.whatsapp, `Hello, this is Chuka Soko about your store "${s.name}".`)} target="_blank" rel="noreferrer">Chat on WhatsApp</a></div>
             <label>M-Pesa code<input value={c.ref} placeholder="e.g. QAB123XYZ" onChange={(e) => setCodes({ ...codes, [s.storeId]: { ...c, ref: e.target.value.toUpperCase() } })} /></label>
-            <label>Amount<input type="number" min={1} value={c.amount} onChange={(e) => setCodes({ ...codes, [s.storeId]: { ...c, amount: e.target.value } })} /></label>
+            <label>Amount<input type="number" min={0} value={c.amount} onChange={(e) => setCodes({ ...codes, [s.storeId]: { ...c, amount: e.target.value } })} /></label>
             <div className="soko-row-actions wide">
               <button className="primary" disabled={busy} onClick={() => void run(() => post(user, "approveStore", { storeId: s.storeId, ...(c.ref.trim() ? { payment: { mpesaReference: c.ref, amount: Number(c.amount) } } : {}) }), "Store approved and now live.")}>{c.ref.trim() ? "Log payment & approve" : "Approve"}</button>
               <button className="danger" disabled={busy} onClick={() => { const reason = ask("Reason for rejecting this store?"); if (reason) void run(() => post(user, "rejectStore", { storeId: s.storeId, reason }), "Store rejected."); }}>Reject</button>
@@ -547,7 +566,7 @@ function AdminDashboard({ user, config, onChanged }: { user: User; config: Confi
         {data.stores.map((s) => <div className="soko-row" key={s.storeId}>
           <div className="soko-row-main"><span className="soko-admin-logo"><SokoImg src={s.logoUrl} fallback={<StoreIcon size={18} />} /></span><span><strong>{s.name}</strong><small>{s.ownerEmail} · {s.location}</small></span></div>
           <span className={`soko-badge ${s.status === "active" ? "ok" : s.status === "pending" ? "low" : "out"}`}>{s.status}</span>
-          <div className="soko-row-actions wide">
+          <div className="soko-row-actions wide"><button disabled={busy} onClick={() => { const value = window.prompt(`Store fee for ${s.name} (blank = use default KSh ${config.storeFee}; 0 = free):`, s.storeFee == null ? "" : String(s.storeFee)); if (value !== null) void run(() => post(user, "setStoreFee", { storeId: s.storeId, storeFee: value.trim() }), "Store fee override saved."); }}>Fee: {s.storeFee == null ? `Default ${money(config.storeFee)}` : money(s.storeFee)}</button>
             {s.status === "active" && <><button disabled={busy} onClick={() => void run(() => post(user, "setStoreFeatured", { storeId: s.storeId, featured: !isTrue(s.featured) }), "Featured status updated.")}><Star size={14} />{isTrue(s.featured) ? "Unfeature" : "Feature"}</button>
               <button className="danger" disabled={busy} onClick={() => { const reason = ask("Reason for suspending this store?"); if (reason) void run(() => post(user, "suspendStore", { storeId: s.storeId, reason }), "Store suspended and hidden."); }}>Suspend</button></>}
             {(s.status === "suspended" || s.status === "rejected") && <button disabled={busy} onClick={() => void run(() => post(user, "reinstateStore", { storeId: s.storeId }), "Store is live again.")}>Reinstate</button>}
@@ -567,7 +586,7 @@ function AdminDashboard({ user, config, onChanged }: { user: User; config: Confi
         {data.payments.length === 0 && <div className="soko-inline-empty">No payments recorded yet.</div>}</section>}
 
       {tab === "products" && <section className="soko-admin-card"><h2><ShoppingBag size={19} /> All products</h2>
-        {data.products.map((p) => <div className="soko-row" key={p.productId}><div className="soko-row-main"><SokoImg src={p.image} fallback={<span className="soko-row-noimg"><ShoppingBag size={16} /></span>} /><span><strong>{p.title}</strong><small>{p.listingType === "individual" ? `Individual: ${p.sellerName}` : storeName(p.storeId)} · {money(p.price)} · {p.quantity} in stock · {p.status}</small></span></div>
+        {data.products.map((p) => <div className="soko-row" key={p.productId}><div className="soko-row-main"><SokoImg src={p.image} fallback={<span className="soko-row-noimg"><ShoppingBag size={16} /></span>} /><span><strong>{p.title}</strong><small>{p.listingType === "individual" ? `Individual: ${p.sellerName}` : storeName(p.storeId)} · {money(p.price)} · {p.listingKind === "service" ? "Service" : `${p.quantity} in stock`} · {p.status}</small></span></div>
           <div className="soko-row-actions wide"><button disabled={busy} onClick={() => void run(() => post(user, "setProductFeatured", { productId: p.productId, featured: !p.featured }), "Featured status updated.")}><Star size={14} />{p.featured ? "Unfeature" : "Feature"}</button>
             <button className="danger" disabled={busy} onClick={() => { if (window.confirm(`Remove "${p.title}" from Chuka Soko?`)) void run(() => post(user, "removeProduct", { productId: p.productId }), "Product removed."); }}>Remove</button></div></div>)}
         {data.products.length === 0 && <div className="soko-inline-empty">No products yet.</div>}</section>}
@@ -576,6 +595,7 @@ function AdminDashboard({ user, config, onChanged }: { user: User; config: Confi
         {data.reports.map((r) => { const prod = data.products.find((p) => p.productId === r.productId); return <div className="soko-row" key={r.reportId}><div className="soko-row-main"><span><strong>{r.reason}</strong><small>{prod ? `Product: ${prod.title}` : `Store: ${storeName(r.storeId)}`}{r.details ? ` · ${r.details}` : ""}</small></span></div>
           {r.status === "new" ? <div className="soko-row-actions wide"><button disabled={busy} onClick={() => void run(() => post(user, "resolveReport", { reportId: r.reportId, status: "resolved" }), "Report resolved.")}>Resolve</button><button disabled={busy} onClick={() => void run(() => post(user, "resolveReport", { reportId: r.reportId, status: "dismissed" }), "Report dismissed.")}>Dismiss</button></div> : <span className="soko-badge ok">{r.status}</span>}</div>; })}
         {data.reports.length === 0 && <div className="soko-inline-empty">No reports.</div>}</section>}
+      {tab === "settings" && <SettingsPanel user={user} config={config} onSaved={onChanged} />}
     </div>
   );
 }
@@ -669,7 +689,7 @@ export default function ChukaSoko({ user, onSignIn, onBack }: Props) {
 
       {view === "market" && <>
         <div className="soko-hero"><div><span className="soko-kicker">BUY • SELL • CONNECT</span><h1>Find what you need.<br /><em>Open your own store.</em></h1><p>Shop from student-run stores around Chuka. Sell a single item with a one-time {config.commissionPercent}% commission, or open your own store for KSh {config.storeFee}. Buyers and sellers chat on WhatsApp and arrange payment and delivery directly.</p>
-          <div className="soko-support-links"><button onClick={goSeller}>Start selling</button>{config.adminWhatsApp && <a href={waLink(config.adminWhatsApp)} target="_blank" rel="noreferrer">Seller support on WhatsApp</a>}{config.sellersGroupUrl && <a href={config.sellersGroupUrl} target="_blank" rel="noreferrer">Join sellers' group</a>}</div></div>
+          <div className="soko-support-links"><button onClick={goSeller}>Start selling</button>{config.adminWhatsApp && <a href={waLink(config.adminWhatsApp, "Hello Sherrif, I need help with Chuka Soko.")} target="_blank" rel="noreferrer"><img className="soko-support-avatar" src={`${import.meta.env.BASE_URL}sherif.jpeg`} alt="Sherrif" /> Chat Sherrif on WhatsApp</a>}{config.sellersGroupUrl && <a href={config.sellersGroupUrl} target="_blank" rel="noreferrer">Join sellers' group</a>}</div></div>
           <div className="soko-hero-art"><ShoppingBag size={74} /><span>Chuka community marketplace</span></div></div>
         <div className="soko-market-tools">
           <label className="soko-search"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products, stores or location" /></label>
@@ -686,7 +706,7 @@ export default function ChukaSoko({ user, onSignIn, onBack }: Props) {
         <div className="soko-store-head"><span className="soko-store-logo big"><SokoImg src={storePage.logoUrl} fallback={<StoreIcon size={28} />} /></span>
           <div><h1>{storePage.name}</h1><small>{storePage.location}</small>{storePage.description && <p>{storePage.description}</p>}</div>
           <div className="soko-store-cta"><a className="soko-wa" href={waLink(storePage.whatsapp, `Hi ${storePage.name}, I found your store on Chuka Soko.`)} target="_blank" rel="noreferrer"><MessageCircle size={15} /> Chat on WhatsApp</a><a className="soko-share" href={waLink("", `🛍️ *${storePage.name}* on Chuka Soko — ${storePage.location}\n${storeLink(storePage.slug)}`)} target="_blank" rel="noreferrer"><Share2 size={13} /> Share store</a></div></div>
-        {(storePage.products || []).length ? <div className="soko-product-grid">{(storePage.products || []).map((p) => <ProductCard key={p.id} p={p} store={storePage} onOpen={openDetails} onReport={(x) => void report(x)} />)}</div> : <div className="soko-empty"><ShoppingBag size={34} /><h3>No products yet</h3><p>This store has not listed any products.</p></div>}
+        {(storePage.products || []).length ? <div className="soko-product-grid">{(storePage.products || []).map((p) => <ProductCard key={p.id} p={p} store={storePage} onOpen={openDetails} onReport={(x) => void report(x)} />)}</div> : <div className="soko-empty"><ShoppingBag size={34} /><h3>No listings yet</h3><p>This store has not published any listings.</p></div>}
       </div>)}
 
       {view === "seller" && <SellerDashboard user={user} onSignIn={onSignIn} me={me} categories={categories} reload={refreshAll} openStore={openStore} />}
