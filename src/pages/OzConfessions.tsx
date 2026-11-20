@@ -260,7 +260,7 @@ async function shareCardPicture(p: { number: number; category: string; categoryL
 /* ------------------------------------------------------------------ */
 /* Feed bubble                                                         */
 /* ------------------------------------------------------------------ */
-function Bubble({ p, ctx, full, onDeleted }: { p: Post; ctx: OzCtx; full?: boolean; onDeleted?: (n: number) => void }) {
+export function Bubble({ p, ctx, full, onDeleted }: { p: Post; ctx: OzCtx; full?: boolean; onDeleted?: (n: number) => void }) {
   const { body, videos } = splitVideos(p.text)
   const link = ozLink(`thread/${p.number}`)
   const snippet = p.text.length > 300 ? `${p.text.slice(0, 299)}…` : p.text

@@ -258,3 +258,60 @@ a.oz-fac:hover { border-color: var(--green); }
 .oz-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px #0f5a2e66; }
 .oz-fab:active { transform: scale(.97); }
 @media (max-width: 520px) { .oz-fab span { display: none; } .oz-fab { padding: 13px; } }
+
+/* Home: trending */
+.oz-home { max-width: 1040px; margin-inline: auto; }
+.oz-trending { width: 100%; margin: 26px 0 8px; text-align: left; }
+.oz-tr-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; color: #128c4a; }
+.oz-tr-head h2 { font: 800 22px/1.1 'Manrope', sans-serif; letter-spacing: -.5px; color: #12301f; margin: 0; }
+.oz-tr-head small { color: var(--muted); font-size: 13px; }
+.oz-tr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.oz-tr-block { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 16px; box-shadow: 0 6px 20px #173d2508; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.oz-tr-block header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.oz-tr-block h3 { font: 800 15px 'Manrope', sans-serif; margin: 0; flex: 1; color: #12301f; }
+.oz-tr-ic { width: 32px; height: 32px; border-radius: 10px; background: var(--green-soft); color: var(--green); display: grid; place-items: center; }
+.oz-tr-block header a { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: #128c4a; text-decoration: none; }
+.oz-tr-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 8px; margin: 0 -8px; border-radius: 12px; text-decoration: none; color: inherit; transition: background .15s; }
+.oz-tr-row + .oz-tr-row { border-top: 1px solid var(--line); border-radius: 0; }
+.oz-tr-row:hover { background: var(--green-soft); }
+.oz-tr-main { display: grid; gap: 3px; font-size: 14px; line-height: 1.4; color: #1c2b22; min-width: 0; overflow-wrap: anywhere; }
+.oz-tr-main em { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .3px; color: #128c4a; text-transform: uppercase; }
+.oz-tr-stat { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: #12301f; background: #f1f5f2; padding: 4px 9px; border-radius: 99px; }
+.oz-tr-go { flex-shrink: 0; color: var(--muted); margin-top: 3px; }
+.oz-tr-vids { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.oz-tr-vid { position: relative; aspect-ratio: 16 / 11; border-radius: 14px; overflow: hidden; background: linear-gradient(160deg, #2a1450, #173d25); display: block; }
+.oz-tr-vid img, .oz-tr-vfb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.oz-tr-vid::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, #000c 0%, #0000 60%); }
+.oz-tr-play { position: absolute; z-index: 2; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: #ffffffee; color: #12301f; display: grid; place-items: center; }
+.oz-tr-live { position: absolute; z-index: 2; top: 8px; left: 8px; background: #d93025; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 99px; letter-spacing: .4px; }
+.oz-tr-vt { position: absolute; z-index: 2; left: 9px; right: 9px; bottom: 8px; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.oz-tr-skel { display: grid; gap: 10px; padding-top: 4px; }
+.oz-tr-skel i { height: 38px; border-radius: 10px; background: linear-gradient(90deg, #eef3ef 25%, #f8fbf9 50%, #eef3ef 75%); background-size: 200% 100%; animation: oz-sk 1.2s infinite; }
+@keyframes oz-sk { to { background-position: -200% 0; } }
+
+/* Home: admin card */
+.oz-admin { width: min(100%, 620px); margin: 26px auto 8px; padding: 20px; border-radius: 24px; text-align: left; background: linear-gradient(145deg, #0f2a1b, #173d25); color: #eafaf1; box-shadow: 0 14px 36px #0f2a1b44; display: grid; gap: 14px; }
+.oz-admin-who { display: flex; align-items: center; gap: 14px; }
+.oz-admin-ph { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; border: 3px solid #25d366; box-shadow: 0 0 0 4px #25d36633; flex-shrink: 0; background: #1d4a30; }
+.oz-admin-init { display: grid; place-items: center; font: 800 24px 'Manrope', sans-serif; color: #eafaf1; }
+.oz-admin-who > div { display: grid; gap: 2px; }
+.oz-admin-tag { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: #6ee7a0; }
+.oz-admin-who strong { font: 800 22px 'Manrope', sans-serif; letter-spacing: -.4px; }
+.oz-admin-who small { color: #b7dcc7; font-size: 13px; }
+.oz-admin-msg { margin: 0; font-size: 14px; line-height: 1.5; color: #d3ecdc; }
+.oz-admin-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.oz-btn-wa, .oz-btn-mail { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border-radius: 99px; font: 800 14px 'Manrope', sans-serif; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+.oz-btn-wa { background: #25d366; color: #063d1d; flex: 1; min-width: 190px; box-shadow: 0 8px 20px #25d36644; }
+.oz-btn-mail { background: #ffffff1a; color: #fff; border: 1px solid #ffffff44; }
+.oz-btn-wa:hover, .oz-btn-mail:hover { transform: translateY(-2px); }
+.oz-admin-num { color: #8fc4a5; font-size: 12px; }
+
+/* Landing: confessions panel reuses the Confessions page look */
+.oz-trending .ng-wrap.oz-tr-conf { max-width: none; width: 100%; min-height: 0; margin: 0 0 16px; padding: 18px 16px 20px; border-radius: 28px; box-sizing: border-box; }
+.oz-trending .oz-tr-conf .ng-list { grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); align-items: start; }
+.oz-trending .oz-tr-conf .ng-post { border-radius: 22px; }
+.oz-tr-conf-all { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; justify-self: center; }
+
+/* Quick-links row: admin WhatsApp pill */
+.oz-quick a.oz-quick-wa { display: inline-flex; align-items: center; gap: 6px; background: #25d366; border-color: #25d366; color: #063d1d; box-shadow: 0 4px 14px #25d36655; }
+.oz-quick a.oz-quick-wa:hover { background: #1fbd5b; border-color: #1fbd5b; }

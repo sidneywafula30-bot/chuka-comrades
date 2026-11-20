@@ -11,13 +11,10 @@ import Hookup from './OzHookup'
 import Trends from './OzTrends'
 import News from './OzNews'
 import Admin from './OzAdmin'
+import { AdminCard, TrendingNow, adminWaUrl } from './OzHomeExtras'
 import './Cpl.css'
 import './Efootball.css'
 import './Ozone.css'
-
-/** O-Zone admin WhatsApp (international format, no +). */
-const OZONE_ADMIN_WA = '254707245180'
-const adminWaUrl = (text = 'Hi O-Zone admin, ') => `https://wa.me/${OZONE_ADMIN_WA}?text=${encodeURIComponent(text)}`
 
 const SAUTI = ['sauti', 'issue', 'report', 'faculties', 'faculty', 'polls', 'poll', 'promises', 'aspirants', 'aspirant']
 
@@ -99,6 +96,14 @@ function Home({ ctx }: { ctx: OzCtx }) {
       <h1>Chuka O-Zone</h1>
       <p>Say it anonymously, speak up for your faculty, and meet people on campus.</p>
 
+      <div className="oz-quick">
+        <a href="#/ozone/confess">➕ Confess</a>
+        <a href="#/ozone/report">📢 Report issue</a>
+        <a href="#/ozone/polls">🗳️ Polls</a>
+        <a href="#/ozone/aspirants">🏛️ Elections</a>
+        <a className="oz-quick-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Chat admin</a>
+      </div>
+
       <div className="oz-live"><span className="oz-live-dot" /> O-Zone community is live <span className="oz-live-note">Anonymous · moderated · campus-focused</span></div>
 
       {waUrl && (
@@ -109,11 +114,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
         </a>
       )}
 
-      <a className="oz-wa oz-wa-admin" href={adminWaUrl()} target="_blank" rel="noopener noreferrer">
-        <span className="oz-wa-ic"><WhatsAppLogo size={26} /></span>
-        <span className="oz-wa-t"><strong>Chat the O-Zone admin</strong><small>Questions, tips, adverts or a problem? Message +254 707 245 180.</small></span>
-        <span className="oz-wa-go">Chat</span>
-      </a>
+      <TrendingNow ctx={ctx} />
 
       <div className="oz-tiles">
         <a className="oz-tile oz-feature" href="#/ozone/confessions">
@@ -144,12 +145,8 @@ function Home({ ctx }: { ctx: OzCtx }) {
       </div>
 
 
-      <div className="oz-quick">
-        <a href="#/ozone/confess">➕ Confess</a>
-        <a href="#/ozone/report">📢 Report issue</a>
-        <a href="#/ozone/polls">🗳️ Polls</a>
-        <a href="#/ozone/aspirants">🏛️ Elections</a>
-      </div>
+
+      <AdminCard />
 
       <nav className="cpl-links" aria-label="O-Zone links">
         <a className="cpl-link" href="#/ozone/news">News</a>
