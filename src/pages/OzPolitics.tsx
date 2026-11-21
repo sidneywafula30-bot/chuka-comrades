@@ -447,7 +447,7 @@ export default function OzPolitics({
     )
   }
 
-  if (adminRoute && ctx.me && !ctx.me.isAdmin) {
+  if (adminRoute && !ctx.me?.isAdmin) {
     return (
       <div className="cpl-home oz-politics">
         <a className="cpl-link" href="#/ozone">← Back to Chuka O-Zone</a>
@@ -464,6 +464,27 @@ export default function OzPolitics({
 
       <h1>🏛️ Chuka Politics</h1>
       <p>Student leadership, aspirants, public questions and community polls.</p>
+
+      {ctx.me?.isAdmin && (
+        <a
+          className="cpl-link"
+          href="#/ozone/politics/admin"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '12px 18px',
+            margin: '12px 0 18px',
+            borderRadius: '10px',
+            background: '#173f35',
+            color: '#ffffff',
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+        >
+          🛡️ Manage Chuka Politics
+        </a>
+      )}
 
       {error && (
         <p className="cpl-err" role="alert">
