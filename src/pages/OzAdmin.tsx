@@ -312,6 +312,7 @@ function Content() {
     <div className="oz-list">
       <ShareTools />
       <IssueUpdates />
+      <Section title="O-Zone News & Telegram announcements"><TelegramNewsTools /></Section>
       <Section title="Chuka Trends videos"><TrendTools /></Section>
       <Section title="Polls"><PollForm /></Section>
       <Section title="Promises"><PromiseForm /></Section>
@@ -321,6 +322,33 @@ function Content() {
       <Section title="Settings"><Settings /></Section>
     </div>
   )
+}
+
+function TelegramNewsTools() {
+  const [title,setTitle] = useState('')
+  const [body,setBody] = useState('')
+  const [publishAt,setPublishAt] = useState('')
+  const [rows,setRows] = useState<Array<Record<string,string>>>([])
+  const [err,setErr] = useState('')
+  const [busy,setBusy] = useState(false)
+  async function refresh() { try { setRows(await oz<Array<Record<string,string>>>('admin_news_telegram_list')) } catch(e) { setErr((e as Error).message) } }
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setBusy(true); setErr('')
+    try { await oz('admin_news_telegram_save',{title, text:body, publishAt:publishAt || undefined}); setTitle(''); setBody(''); setPublishAt(''); await refresh() }
+    catch(e) { setErr((e as Error).message) } finally { setBusy(false) }
+  }
+  return <div className="oz-form">
+    <p className="cpl-sub oz-small">Create original O-Zone announcements for the Telegram channel. External publisher/RSS headlines are not copied or republished.</p>
+    <form className="cpl-form" onSubmit={(e)=>void submit(e)}>
+      <label>Announcement title<input required minLength={4} maxLength={120} value={title} onChange={e=>setTitle(e.target.value)} /></label>
+      <label>Announcement text<textarea required minLength={10} maxLength={3000} rows={4} value={body} onChange={e=>setBody(e.target.value)} /></label>
+      <label>Schedule time (optional; blank publishes now)<input type="datetime-local" value={publishAt} onChange={e=>setPublishAt(e.target.value)} /></label>
+      <button className="lp-btn" disabled={busy}>{busy ? 'Saving…' : 'Save / publish announcement'}</button>
+    </form>
+    <Err msg={err} />
+    <div className="oz-actions"><button type="button" className="oz-ghost" onClick={()=>void refresh()}>Refresh announcement history</button></div>
+    {rows.map(r=><div className="cpl-card" key={r.id}><b>{r.title}</b><p className="cpl-sub oz-small">{r.status} · {r.publishAt}</p>{r.error && <p className="oz-over">{r.error}</p>}</div>)}
+  </div>
 }
 
 function Result({ text, url }: { text: string; url: string }) {

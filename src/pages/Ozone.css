@@ -370,3 +370,5 @@ a.oz-fac:hover { border-color: var(--green); }
   .oz-admin-desk .ef-tabs button { padding: 8px 11px; }
   .oz-admin-desk .oz-actions > * { max-width: 100%; }
 }
+
+.oz-pol-form{display:grid;gap:12px;margin:12px 0;padding:16px}.oz-pol-form input,.oz-pol-form select,.oz-pol-form textarea,.oz-politics textarea{width:100%;padding:12px;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--card,#fff);color:inherit;font:inherit}.oz-pol-form textarea{min-height:130px}.oz-pol-form label{display:grid;gap:6px}.oz-pol-form button,.oz-pol-actions button{border:0;border-radius:10px;padding:11px 14px;background:#173f70;color:white;font-weight:700}.oz-pol-actions{display:flex;flex-wrap:wrap;gap:8px}.oz-pol-actions button{font-size:12px}.oz-politics .cpl-card{margin:12px 0;padding:16px}.oz-pol-disclaimer{font-size:12px;opacity:.7;margin:24px 0}.oz-success{padding:10px 12px;background:#e7f7ed;color:#155b2c;border-radius:10px}

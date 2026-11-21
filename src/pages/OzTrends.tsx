@@ -4,11 +4,11 @@ import { oz, waShare, type TrendItem, type TrendList } from '../lib/ozone'
 import { Err, Gate, ShareButton, type OzCtx } from './OzCommon'
 import './OzTrends.css'
 
-const siteName = (t: TrendItem) => (t.source === 'tiktok' ? 'TikTok' : 'YouTube')
+const siteName = (t: TrendItem) => (t.source === 'telegram' ? 'Telegram' : t.source === 'tiktok' ? 'TikTok' : 'YouTube')
 
 /** Official embed players. Only the one video the person tapped is ever loaded. */
 function embedSrc(t: TrendItem) {
-  return t.source === 'tiktok'
+  return t.source === 'telegram' ? '' : t.source === 'tiktok'
     ? `https://www.tiktok.com/player/v1/${encodeURIComponent(t.videoId)}?autoplay=1&loop=0`
     : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(t.videoId)}?autoplay=1&rel=0&playsinline=1`
 }
@@ -38,7 +38,9 @@ function Card({ t, playing, onPlay, onStop }: { t: TrendItem; playing: boolean; 
     <article className={`tr-card${t.live ? ' live' : ''}`} ref={ref}>
       <div className="tr-media">
         <div className={`tr-stage${t.vertical ? ' v' : ''}`}>
-          {playing ? (
+          {playing && t.source === 'telegram' ? (
+            <a className="tr-thumb" href={t.url} target="_blank" rel="noopener noreferrer" aria-label="Open video on Telegram"><span className="tr-fallback">Open video on Telegram</span><span className="tr-play"><ExternalLink size={24} /></span></a>
+          ) : playing ? (
             <iframe title={t.title} src={embedSrc(t)} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
           ) : (
             <button type="button" className="tr-thumb" onClick={onPlay} aria-label={`Play: ${t.title}`}>
@@ -196,7 +198,9 @@ function Reel({ t, active, sound, onSound }: { t: TrendItem; active: boolean; so
     <section className="tt-item" data-k={t.key}>
       {t.thumb && !bad && <div className="tt-bg" style={{ backgroundImage: `url("${t.thumb}")` }} />}
       <div className={`tt-stage${t.vertical ? ' v' : ''}`}>
-        {active ? <ReelPlayer t={t} sound={sound} /> : (
+        {active && t.source === 'telegram' ? (
+          <a className="tt-poster" href={t.url} target="_blank" rel="noopener noreferrer"><span>Open video on Telegram</span><span className="tt-spin" style={{ display: 'none' }} /></a>
+        ) : active ? <ReelPlayer t={t} sound={sound} /> : (
           <div className="tt-poster">
             {t.thumb && !bad ? <img src={t.thumb} alt="" referrerPolicy="no-referrer" onError={() => setBad(true)} /> : <span>{siteName(t)}</span>}
             <span className="tt-spin" />
@@ -210,9 +214,9 @@ function Reel({ t, active, sound, onSound }: { t: TrendItem; active: boolean; so
         <p>{t.title}</p>
       </div>
       <div className="tt-rail">
-        {active && <button type="button" onClick={onSound} aria-label={sound ? 'Mute' : 'Turn sound on'}>{sound ? <Volume2 size={26} /> : <VolumeX size={26} />}<small>{sound ? 'Sound' : 'Muted'}</small></button>}
+        {active && t.source !== 'telegram' && <button type="button" onClick={onSound} aria-label={sound ? 'Mute' : 'Turn sound on'}>{sound ? <Volume2 size={26} /> : <VolumeX size={26} />}<small>{sound ? 'Sound' : 'Muted'}</small></button>}
         <a className="wa" href={waShare(`${note}\n\n${t.url}`)} target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><MessageCircle size={26} /><small>Share</small></a>
-        <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${siteName(t)}`}><ExternalLink size={24} /><small>{siteName(t)}</small></a>
+        <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${siteName(t)}`}><ExternalLink size={24} /><small>{t.source === 'telegram' ? 'Watch' : siteName(t)}</small></a>
       </div>
     </section>
   )

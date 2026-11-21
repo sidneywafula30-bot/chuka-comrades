@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
 import { WhatsAppLogo } from '../components/BrandLogos'
-import { ArrowLeft, Clapperboard, Flame, Megaphone, Newspaper, ShieldCheck, LifeBuoy, MessageCircle, Users } from 'lucide-react'
+import { ArrowLeft, Bell, Clapperboard, Flame, Megaphone, Newspaper, ShieldCheck, LifeBuoy, MessageCircle, Users, Vote } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import { oz, ozReady, type Config, type Me } from '../lib/ozone'
 import { ShareButton, type OzCtx } from './OzCommon'
@@ -10,6 +10,8 @@ import { AspirantPage, Elections, Faculties, FacultyPage, IssueDetail, Issues, P
 import Hookup from './OzHookup'
 import Trends from './OzTrends'
 import News from './OzNews'
+import Politics from './OzPolitics'
+import Notifications from './OzNotifications'
 import Admin from './OzAdmin'
 import { AdminCard, TrendingNow } from './OzHomeExtras'
 import { ADMIN_NAME, AdminAvatar, adminWaUrl } from '../components/AdminChat'
@@ -64,9 +66,11 @@ export default function Ozone({ user, route }: { user: User | null; route: strin
   else if (page === 'aspirant') body = <AspirantPage id={arg} ctx={ctx} />
   else if (page === 'promises') body = <Promises />
   else if (page === 'aspirants') body = <Elections key={arg} ctx={ctx} initialMode={arg === 'apply' ? 'apply' : ''} />
+  else if (page === 'politics') body = <Politics ctx={ctx} admin={arg === 'admin'} apply={arg === 'apply'} />
   else if (page === 'hookup') body = <Hookup ctx={ctx} />
   else if (page === 'trends') body = <Trends ctx={ctx} />
   else if (page === 'news') body = <News ctx={ctx} />
+  else if (page === 'notifications') body = <Notifications />
   else if (page === 'admin') {
     body = !user ? <div className="cpl-home"><p className="cpl-empty">Sign in with Google to continue.</p><button type="button" className="lp-btn" onClick={signIn}>Sign in</button></div>
       : !me ? <p className="cpl-empty">Checking access…</p>
@@ -103,6 +107,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
         <a href="#/ozone/confess">➕ Confess</a>
         <a href="#/ozone/report">📢 Report issue</a>
         <a href="#/ozone/polls">🗳️ Polls</a>
+        <a href="#/ozone/notifications"><Bell size={15} /> Updates</a>
         <a href="#/ozone/aspirants">🏛️ Elections</a>
         <a className="oz-quick-wa" href={adminWaUrl()} target="_blank" rel="noopener noreferrer"><AdminAvatar className="oz-quick-ph" /> Chat {ADMIN_NAME}</a>
       </div>
@@ -120,6 +125,11 @@ function Home({ ctx }: { ctx: OzCtx }) {
       <TrendingNow ctx={ctx} />
 
       <div className="oz-tiles">
+        <a className="oz-tile oz-feature oz-politics-tile" href="#/ozone/politics">
+          <span className="oz-ic oz-ic-politics"><Vote size={24} /></span>
+          <strong>Chuka Politics</strong>
+          <small>Explore student leadership, aspirants, manifestos, public questions and campus opinion polls.</small>
+        </a>
         <a className="oz-tile oz-feature" href="#/ozone/confessions">
           <span className="oz-ic a"><Flame size={24} /></span>
           <strong>Confessions</strong>
@@ -134,6 +144,11 @@ function Home({ ctx }: { ctx: OzCtx }) {
           <span className="oz-ic d"><Clapperboard size={24} /></span>
           <strong>Chuka Trends</strong>
           <small>Videos and live streams from campus. Scroll and watch.</small>
+        </a>
+        <a className="oz-tile" href="#/ozone/notifications">
+          <span className="oz-ic e"><Bell size={24} /></span>
+          <strong>O-Zone Updates</strong>
+          <small>Official announcements published by O-Zone admins.</small>
         </a>
         <a className="oz-tile" href="#/ozone/news">
           <span className="oz-ic e"><Newspaper size={24} /></span>
@@ -152,6 +167,7 @@ function Home({ ctx }: { ctx: OzCtx }) {
       <AdminCard />
 
       <nav className="cpl-links" aria-label="O-Zone links">
+        <a className="cpl-link" href="#/ozone/notifications">O-Zone updates</a>
         <a className="cpl-link" href="#/ozone/news">News</a>
         <a className="cpl-link" href="#/ozone/confess">Confess now</a>
         <a className="cpl-link" href="#/ozone/report">Report an issue</a>

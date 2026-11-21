@@ -45,6 +45,7 @@ export type AspirantFull = { aspirant: Aspirant; issues: Issue[] }
 export type MyAspirant = { id: number; name: string; position: string; facultyCode: string; status: string; acceptIssues: boolean }
 export type NewsItem = { id: string; title: string; summary: string; url: string; image: string; source: string; publishedAt: string; topic: 'politics' | 'general'; via: string }
 export type NewsList = { items: NewsItem[]; next: number | null; fetchedAt: string; note: string }
+export type OzNotification = { id: string; title: string; body: string; publishedAt: string }
 export type AspirantGroup = { position: string; aspirants: Aspirant[] }
 export type FacultyFull = { code: string; name: string; url: string; score: Score; leaders: Leader[]; electionMode: boolean; aspirants?: AspirantGroup[] }
 export type Question = { id: number; facultyCode: string; position: string; question: string; votes: number; deadline: string; answers: { aspirantId: number; name: string; text: string; at: string }[] }
