@@ -2,19 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import type { User } from 'firebase/auth'
 import {
   ArrowLeft, BookOpen, Camera, CheckCircle2, ChevronRight, Download, ExternalLink, Eye, FileText, Flag, FolderOpen, Inbox,
-  ListChecks, LoaderCircle, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
+  GraduationCap, ListChecks, LoaderCircle, Pencil, Play, Plus, Search, Share2, ShieldCheck, Trash2, Upload, X,
 } from 'lucide-react'
 import {
   labsApi, labsReady, TYPE_LABELS, EXAM_TYPES, STUDY_IMAGE_MAX_PX, STUDY_IMAGE_QUALITY, yearLabel, semesterLabel, currentAcademicYear,
-  shareUrl, resourceIdFromHash, youtubeId, youtubeThumb, PAYWALL_EVENT,
+  shareUrl, resourceIdFromHash, youtubeId, youtubeThumb, PAYWALL_EVENT, MAX_UNITS_PER_DAY, UNIT_NO_NAME, codeKey,
   type AccessInfo, type AccessUser, type AdminUnit, type Countdown, type PaymentInfo,
-  type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit,
+  type AdminQueue, type ExamType, type LabsConfig, type Programme, type ReportItem, type Resource, type ResourceType, type Suggestion, type Unit, type MyUnits, type UnitCodes,
 } from '../lib/labs'
 import { fileToB64, shrinkImage } from '../lib/files'
 import { CalendarCard, AdminCalendarTab } from './StudyLabsCalendar'
 import YouTubePanel from './StudyLabsYoutube'
 import WikiPanel from './StudyLabsWikipedia'
 import ScanBody from './StudyLabsScan'
+import LiveCamera from './StudyLabsCamera'
 import { scanJob } from '../lib/scanJob'
 import { QaViewer } from './StudyLabsQa'
 import './StudyLabs.css'
@@ -179,6 +180,7 @@ function UploadModal({ unit, config, user, onSignIn, onClose, onDone }: { unit: 
   const [msg, setMsg] = useState<Note>(null)
   const [done, setDone] = useState(false)
   const [findYt, setFindYt] = useState(false)
+  const [camera, setCamera] = useState(false)
   const needsExam = type === 'cat' || type === 'paper'
   const maxFiles = config?.maxFiles ?? 5
   const maxFileMB = config?.maxFileMB ?? 10
@@ -234,6 +236,13 @@ function UploadModal({ unit, config, user, onSignIn, onClose, onDone }: { unit: 
       </Modal>
     )
   }
+  if (camera) {
+    return (
+      <Modal title="Take photos" onClose={() => setCamera(false)} wide>
+        <LiveCamera count={files.length} max={maxFiles} onCapture={(f) => setFiles((cur) => [...cur, f].slice(0, maxFiles))} onClose={() => setCamera(false)} />
+      </Modal>
+    )
+  }
   return (
     <Modal title={`Upload to ${unit.code}`} onClose={onClose}>
       <form className="sl-form" onSubmit={submit}>
@@ -261,10 +270,13 @@ function UploadModal({ unit, config, user, onSignIn, onClose, onDone }: { unit: 
           </>
         )}
         {type !== 'video' && (
-          <label className="sl-drop"><Upload size={18} /> Choose files
-            <input type="file" multiple onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
-            <small>Up to {maxFiles} files, {maxFileMB} MB each. Photos are shrunk automatically.</small>
-          </label>
+          <div className="sl-capture-row">
+            <button type="button" className="sl-ghost" onClick={() => setCamera(true)} disabled={files.length >= maxFiles}><Camera size={15} /> Take photos</button>
+            <label className="sl-drop"><Upload size={18} /> Choose from gallery or files
+              <input type="file" multiple onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
+              <small>Up to {maxFiles} files, {maxFileMB} MB each. Photos are shrunk automatically. Use either one, or both.</small>
+            </label>
+          </div>
         )}
         {files.length > 0 && (
           <ul className="sl-picked">{files.map((f, i) => (
@@ -278,36 +290,230 @@ function UploadModal({ unit, config, user, onSignIn, onClose, onDone }: { unit: 
   )
 }
 
-function SuggestModal({ programme, onClose }: { programme: Programme; onClose: () => void }) {
-  const [year, setYear] = useState(1)
-  const [semester, setSemester] = useState(1)
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
+/* ------------------------------------------------------------------ */
+/* v1.4: my course, add units, add buttons                             */
+/* ------------------------------------------------------------------ */
+type CourseInfo = { programmeId: string; programmeName: string; year: number; semester: number }
+
+/** Pick or change your course, year and semester. Saved to your account. */
+function CourseSetupModal({ programmes, current, onClose, onSaved }: { programmes: Programme[]; current: CourseInfo | null; onClose: () => void; onSaved: () => void }) {
+  const [q, setQ] = useState('')
+  const [progId, setProgId] = useState(current?.programmeId ?? '')
+  const [year, setYear] = useState(current?.year ?? 1)
+  const [semester, setSemester] = useState(current?.semester ?? 1)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<Note>(null)
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (!code.trim() || !name.trim()) return setMsg({ type: 'err', text: 'Enter the unit code and name.' })
+  const active = useMemo(() => programmes.filter((p) => p.active), [programmes])
+  const chosen = active.find((p) => p.id === progId) ?? null
+  const matches = useMemo(() => {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const list = words.length ? active.filter((p) => words.every((w) => `${p.name} ${p.level} ${p.department}`.toLowerCase().includes(w))) : active
+    return list.slice(0, 40)
+  }, [active, q])
+  const years = Array.from({ length: chosen?.years || 4 }, (_, i) => i + 1)
+
+  async function save() {
+    if (!chosen) return setMsg({ type: 'err', text: 'Choose your course first.' })
     setBusy(true); setMsg(null)
     try {
-      await labsApi.suggestUnit({ programmeId: programme.id, year, semester, code: code.trim(), name: name.trim() })
-      setMsg({ type: 'ok', text: 'Thanks! An admin will review your suggestion.' }); setCode(''); setName('')
-    } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
+      await labsApi.setMyCourse({ programmeId: chosen.id, year: Math.min(year, chosen.years || 4), semester })
+      onSaved(); onClose()
+    } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
   }
   return (
-    <Modal title="Suggest a missing unit" onClose={onClose}>
-      <form className="sl-form" onSubmit={submit}>
-        <p className="sl-sub">{programme.name}</p>
+    <Modal title={current ? 'Change my course' : 'Set my course'} onClose={onClose}>
+      <div className="sl-form">
+        <p className="sl-sub">Pick your course, year and semester once. Study Labs then shows only the units you need. You can change it any time, for example when a new semester starts.</p>
+        <label>Your course
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search: e.g. computer science, nursing, education…" autoComplete="off" />
+        </label>
+        {chosen && <p className="sl-chosen"><CheckCircle2 size={14} /> {chosen.name}</p>}
+        <ul className="sl-pick-list">
+          {matches.map((p) => (
+            <li key={p.id}><button type="button" className={p.id === progId ? 'on' : ''} onClick={() => { setProgId(p.id); setYear((y) => Math.min(y, p.years || 4)) }}>
+              <strong>{p.name}</strong><small>{[p.level, p.department].filter(Boolean).join(' · ')}</small>
+            </button></li>
+          ))}
+          {matches.length === 0 && <li className="sl-sub">No course matches. Try fewer letters.</li>}
+        </ul>
         <div className="sl-two">
-          <label>Year<select value={year} onChange={(e) => setYear(Number(e.target.value))}>{Array.from({ length: programme.years || 4 }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}</select></label>
+          <label>Year<select value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}</select></label>
           <label>Semester<select value={semester} onChange={(e) => setSemester(Number(e.target.value))}>{[1, 2, 3].map((s) => <option key={s} value={s}>{semesterLabel(s)}</option>)}</select></label>
         </div>
-        <label>Unit code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. COSC 101" /></label>
-        <label>Unit name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Introduction to Computer Science" /></label>
         <Msg msg={msg} />
-        <button className="sl-primary" disabled={busy}>{busy ? 'Sending…' : 'Send suggestion'}</button>
-      </form>
+        <button className="sl-primary" disabled={busy || !chosen} onClick={() => void save()}>{busy ? 'Saving…' : 'Save my course'}</button>
+      </div>
     </Modal>
+  )
+}
+
+/**
+ * Add units to the shared catalogue for one programme, year and semester.
+ * Search the timetable code list (or type any code), tick the units, add an optional name.
+ */
+function AddUnitsModal({ programme, startYear, startSemester, onClose, onDone }: { programme: Programme; startYear?: number; startSemester?: number; onClose: () => void; onDone: () => void }) {
+  const [year, setYear] = useState(startYear ?? 1)
+  const [semester, setSemester] = useState(startSemester ?? 1)
+  const [pool, setPool] = useState<UnitCodes | null>(null)
+  const [have, setHave] = useState<Set<string>>(new Set())
+  const [q, setQ] = useState('')
+  const [picked, setPicked] = useState<{ code: string; name: string }[]>([])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<Note>(null)
+
+  useEffect(() => {
+    let live = true
+    labsApi.unitCodes().then((p) => { if (live) setPool(p) }).catch(() => { if (live) setPool({ codes: [], names: {} }) })
+    labsApi.units(programme.id).then((u) => { if (live) setHave(new Set(u.map((x) => codeKey(x.code)))) }).catch(() => {})
+    return () => { live = false }
+  }, [programme.id])
+
+  const term = q.trim().toUpperCase().replace(/\s+/g, '')
+  const pickedKeys = useMemo(() => new Set(picked.map((p) => codeKey(p.code))), [picked])
+  const suggestions = useMemo(() => {
+    if (!pool || !term) return []
+    const nameMatch = q.trim().toLowerCase()
+    const out = pool.codes.filter((c) => {
+      const k = codeKey(c)
+      return !pickedKeys.has(k) && (k.includes(term) || (pool.names[k] ?? '').toLowerCase().includes(nameMatch))
+    })
+    out.sort((a, b) => Number(codeKey(b).startsWith(term)) - Number(codeKey(a).startsWith(term)) || a.localeCompare(b))
+    return out.slice(0, 8)
+  }, [pool, term, q, pickedKeys])
+  const typedLooksLikeCode = /^[A-Za-z]{3,6}\s?\d{3,6}$/.test(q.trim())
+  const typedIsNew = typedLooksLikeCode && !suggestions.some((c) => codeKey(c) === term) && !pickedKeys.has(term)
+
+  function pickCode(code: string) {
+    const clean = code.toUpperCase().replace(/\s+/g, ' ').trim()
+    const spaced = /\s/.test(clean) ? clean : clean.replace(/^([A-Z]+)(\d+)$/, '$1 $2')
+    if (pickedKeys.has(codeKey(spaced))) return
+    if (picked.length >= MAX_UNITS_PER_DAY) return setMsg({ type: 'err', text: `You can add up to ${MAX_UNITS_PER_DAY} new units a day.` })
+    setPicked((cur) => [...cur, { code: spaced, name: pool?.names[codeKey(spaced)] ?? '' }])
+    setQ(''); setMsg(null)
+  }
+
+  async function save() {
+    setBusy(true); setMsg(null)
+    try {
+      const r = await labsApi.addUnits({ programmeId: programme.id, year, semester, items: picked.map((p) => ({ code: p.code, name: p.name.trim() || undefined })) })
+      setMsg({ type: 'ok', text: `Added ${r.added}${r.skipped ? `, ${r.skipped} already there` : ''}. You can add ${r.remainingToday} more new unit${r.remainingToday === 1 ? '' : 's'} today.` })
+      setHave((cur) => new Set([...cur, ...picked.map((p) => codeKey(p.code))]))
+      setPicked([]); onDone()
+    } catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  const years = Array.from({ length: programme.years || 4 }, (_, i) => i + 1)
+  return (
+    <Modal title="Add units" onClose={onClose}>
+      <div className="sl-form">
+        <p className="sl-sub">{programme.name}</p>
+        <div className="sl-two">
+          <label>Year<select value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}</select></label>
+          <label>Semester<select value={semester} onChange={(e) => setSemester(Number(e.target.value))}>{[1, 2, 3].map((s) => <option key={s} value={s}>{semesterLabel(s)}</option>)}</select></label>
+        </div>
+        <label>Search a unit code or name
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. COSC 101" autoComplete="off"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (suggestions[0]) pickCode(suggestions[0]); else if (typedLooksLikeCode) pickCode(q) } }} />
+        </label>
+        {pool === null && term && <p className="sl-sub">Loading unit codes…</p>}
+        {(suggestions.length > 0 || typedIsNew) && (
+          <ul className="sl-pick-list">
+            {suggestions.map((c) => (
+              <li key={c}><button type="button" onClick={() => pickCode(c)}>
+                <strong>{c}</strong><small>{pool?.names[codeKey(c)] ?? 'Name not added yet'}{have.has(codeKey(c)) ? ' · already in this course' : ''}</small>
+              </button></li>
+            ))}
+            {typedIsNew && <li><button type="button" onClick={() => pickCode(q)}><strong>Add “{q.trim().toUpperCase()}”</strong><small>Not in the code list. You can still add it.</small></button></li>}
+          </ul>
+        )}
+        {picked.length > 0 && (
+          <ul className="sl-picked">
+            {picked.map((p) => (
+              <li key={p.code} className="sl-pick-row">
+                <b>{p.code}</b>
+                <input value={p.name} onChange={(e) => setPicked((cur) => cur.map((x) => (x.code === p.code ? { ...x, name: e.target.value } : x)))} placeholder="Unit name (optional)" maxLength={100} />
+                <button type="button" className="sl-icon-btn" onClick={() => setPicked((cur) => cur.filter((x) => x.code !== p.code))} aria-label={`Remove ${p.code}`}><X size={14} /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="sl-sub">You can add up to {MAX_UNITS_PER_DAY} new units a day. Units already in this course do not count.</p>
+        <Msg msg={msg} />
+        <button className="sl-primary" disabled={busy || picked.length === 0} onClick={() => void save()}>{busy ? 'Adding…' : `Add ${picked.length || ''} unit${picked.length === 1 ? '' : 's'} to ${yearLabel(year)}, ${semesterLabel(semester)}`}</button>
+      </div>
+    </Modal>
+  )
+}
+
+/**
+ * Two ways to add a unit you found: "In my course" puts it in the shared catalogue for your course, year and semester;
+ * "Just for me" only pins it to your own list (a retake, an elective, a unit from another course).
+ */
+function AddButtons({ code, name, unitId, user, course, onSignIn, onNeedCourse, onChanged, onMsg }: {
+  code: string; name?: string; unitId?: string; user: User | null; course: CourseInfo | null
+  onSignIn: () => void; onNeedCourse: () => void; onChanged: () => void; onMsg: (n: Note) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  if (!user) return <button type="button" className="sl-mini" onClick={onSignIn}><Plus size={13} /> Sign in to add</button>
+  const real = name && name !== UNIT_NO_NAME ? name : undefined
+  async function inCourse() {
+    if (!course) return onNeedCourse()
+    setBusy(true)
+    try {
+      const r = await labsApi.addUnits({ programmeId: course.programmeId, year: course.year, semester: course.semester, items: [{ code, name: real }] })
+      onMsg({ type: 'ok', text: r.added ? `${code} added to ${yearLabel(course.year)}, ${semesterLabel(course.semester)}. ${r.remainingToday} new unit${r.remainingToday === 1 ? '' : 's'} left today.` : `${code} is already in your course.` })
+      onChanged()
+    } catch (e) { onMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  async function justMe() {
+    setBusy(true)
+    try {
+      await labsApi.addExtra(unitId ? { unitId } : { code, name: real })
+      onMsg({ type: 'ok', text: `${code} added to your list.` }); onChanged()
+    } catch (e) { onMsg({ type: 'err', text: errMsg(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <span className="sl-add-btns">
+      <button type="button" className="sl-mini" disabled={busy} onClick={() => void inCourse()}><Plus size={13} /> In my course</button>
+      <button type="button" className="sl-mini ghost" disabled={busy} onClick={() => void justMe()}>Just for me</button>
+    </span>
+  )
+}
+
+/** Top of the home page for a signed-in student: their semester only, plus their extra units. */
+function MySemester({ my, loading, onSetup, onAdd, onUnit, onRemoveExtra }: {
+  my: MyUnits | null; loading: boolean; onSetup: () => void; onAdd: () => void; onUnit: (u: Unit) => void; onRemoveExtra: (u: Unit) => void
+}) {
+  if (loading && !my) return <Loading />
+  if (!my?.course) {
+    return (
+      <section className="sl-course-card">
+        <div><strong>Set your course</strong><p className="sl-sub">Choose your course, year and semester once and this page shows only the units you need.</p></div>
+        <button className="sl-primary inline" onClick={onSetup}><GraduationCap size={15} /> Set my course</button>
+      </section>
+    )
+  }
+  const c = my.course
+  return (
+    <>
+      <section className="sl-course-card on">
+        <div><span className="sl-kicker">MY SEMESTER</span><strong>{c.programmeName}</strong>
+          <div className="sl-course-tags"><span>{yearLabel(c.year)}</span><span>{semesterLabel(c.semester)}</span><span>{my.units.length} unit{my.units.length === 1 ? '' : 's'}</span></div></div>
+        <div className="sl-course-actions">
+          <button className="sl-ghost" onClick={onSetup}><Pencil size={14} /> Change</button>
+          <button className="sl-primary inline" onClick={onAdd}><Plus size={15} /> Add units</button>
+        </div>
+      </section>
+      {my.units.length === 0
+        ? <Empty title="No units in this semester yet" text="Tap Add units, search the code and tick the ones you study. Your classmates will see them too." />
+        : <div className="sl-mysem-grid">{my.units.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div>}
+      {my.extras.length > 0 && (
+        <section className="sl-group"><h2>My extra units</h2>
+          <div className="sl-mysem-grid">{my.extras.map((u) => (
+            <div key={u.id} className="sl-extra-row"><UnitRow u={u} onOpen={onUnit} /><button className="sl-icon-btn sl-extra-x" onClick={() => onRemoveExtra(u)} aria-label={`Remove ${u.code} from my list`}><X size={14} /></button></div>
+          ))}</div>
+        </section>
+      )}
+    </>
   )
 }
 
@@ -349,18 +555,36 @@ function UnitRow({ u, onOpen }: { u: Unit; onOpen: (u: Unit) => void }) {
   )
 }
 
-function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport, isAdmin, onScan }: {
+function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user, onReport, isAdmin, onScan, onSignIn }: {
   programmes: Programme[]; loading: boolean; onProgramme: (p: Programme) => void; onUnit: (u: Unit) => void
-  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void; isAdmin: boolean; onScan: () => void
+  onResourceError: (m: string) => void; user: User | null; onReport: (r: Resource) => void; isAdmin: boolean; onScan: () => void; onSignIn: () => void
 }) {
   const [q, setQ] = useState('')
   const [level, setLevel] = useState('All')
   const [results, setResults] = useState<{ units: Unit[]; resources: Resource[] } | null>(null)
   const [searching, setSearching] = useState(false)
   const [err, setErr] = useState<Note>(null)
+  const [my, setMy] = useState<MyUnits | null>(null)
+  const [myLoading, setMyLoading] = useState(false)
+  const [setup, setSetup] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [note, setNote] = useState<Note>(null)
+  const [pool, setPool] = useState<UnitCodes | null>(null)
   const levels = useMemo(() => ['All', ...Array.from(new Set(programmes.map((p) => p.level).filter(Boolean)))], [programmes])
   const filtered = programmes.filter((p) => p.active && (level === 'All' || p.level === level))
   const term = q.trim().toLowerCase()
+
+  const loadMy = useCallback(async () => {
+    if (!labsReady || !user) { setMy(null); return }
+    setMyLoading(true)
+    try { setMy(await labsApi.myUnits()) } catch (e) { setNote({ type: 'err', text: errMsg(e) }) } finally { setMyLoading(false) }
+  }, [user])
+  useEffect(() => { void loadMy() }, [loadMy])
+
+  const course = my?.course ?? null
+  const myProgramme = course ? programmes.find((p) => p.id === course.programmeId) ?? null : null
+  const mineIds = useMemo(() => new Set([...(my?.units ?? []), ...(my?.extras ?? [])].map((u) => u.id)), [my])
 
   // Courses are matched instantly in the browser: every word typed must appear somewhere in the name, level or department.
   const matchedProgrammes = useMemo(() => {
@@ -383,6 +607,20 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
     return () => { live = false; clearTimeout(t) }
   }, [term])
 
+  // The timetable code list is fetched once, the first time someone searches.
+  useEffect(() => {
+    if (!term || pool || !labsReady) return
+    labsApi.unitCodes().then(setPool).catch(() => setPool({ codes: [], names: {} }))
+  }, [term, pool])
+
+  // Codes from the list that no search result already shows, so a unit nobody has added yet can still be found and added.
+  const poolHits = useMemo(() => {
+    const k = term.replace(/\s+/g, '').toUpperCase()
+    if (!pool || k.length < 2) return []
+    const shown = new Set((results?.units ?? []).map((u) => codeKey(u.code)))
+    return pool.codes.filter((c) => codeKey(c).includes(k) && !shown.has(codeKey(c))).slice(0, 8)
+  }, [pool, term, results])
+
   async function removeResource(r: Resource) {
     if (!window.confirm(`Delete “${r.title}” for everyone? This cannot be undone.`)) return
     try {
@@ -390,9 +628,14 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
       setResults((cur) => (cur ? { ...cur, resources: cur.resources.filter((x) => x.id !== r.id) } : cur))
     } catch (ex) { onResourceError(errMsg(ex)) }
   }
+  async function removeExtra(u: Unit) {
+    try { await labsApi.removeExtra(u.id); await loadMy() } catch (ex) { setNote({ type: 'err', text: errMsg(ex) }) }
+  }
 
   const searchingNow = Boolean(term)
-  const nothing = results !== null && !searching && matchedProgrammes.length === 0 && results.units.length === 0 && results.resources.length === 0
+  const nothing = results !== null && !searching && matchedProgrammes.length === 0 && results.units.length === 0 && results.resources.length === 0 && poolHits.length === 0
+  const compact = Boolean(user && course)
+  const addProps = { user, course, onSignIn, onNeedCourse: () => setSetup(true), onChanged: () => { void loadMy() }, onMsg: setNote }
 
   return (
     <>
@@ -400,7 +643,7 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
         <div>
           <span className="sl-kicker">CHUKA STUDY LABS</span>
           <h1>Notes, CATs &amp; past papers <em>by comrades, for comrades</em></h1>
-          <p>Find your programme, open your unit and download what other students have shared. Add your own to help the next class.</p>
+          <p>Set your course once, open your unit and download what other students have shared. Add your own to help the next class.</p>
           <button className="sl-primary inline" onClick={onScan}><Camera size={15} /> Scan a paper with the live camera</button>
         </div>
         <div className="sl-hero-art"><BookOpen size={46} /><span>Study together</span></div>
@@ -412,6 +655,7 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
         {searching ? <LoaderCircle className="sl-spin" size={16} /> : q && <button type="button" className="sl-icon-btn" onClick={() => setQ('')} aria-label="Clear search"><X size={16} /></button>}
       </form>
       <Msg msg={err} />
+      <Msg msg={note} />
 
       {searchingNow ? (
         <>
@@ -429,7 +673,27 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
               </div>
             </section>
           )}
-          {results && results.units.length > 0 && <section className="sl-group"><h2>Units</h2><div className="sl-unit-list">{results.units.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div></section>}
+          {results && results.units.length > 0 && (
+            <section className="sl-group"><h2>Units</h2>
+              <div className="sl-unit-list">{results.units.map((u) => (
+                <div key={u.id} className="sl-result-row">
+                  <UnitRow u={u} onOpen={onUnit} />
+                  {mineIds.has(u.id) ? <span className="sl-chip">In my list</span> : <AddButtons code={u.code} name={u.name} unitId={u.id} {...addProps} />}
+                </div>
+              ))}</div>
+            </section>
+          )}
+          {poolHits.length > 0 && (
+            <section className="sl-group"><h2>Other unit codes</h2>
+              <p className="sl-sub">Nobody has uploaded to these yet. Add one to your course or your own list to start.</p>
+              <div className="sl-unit-list">{poolHits.map((c) => (
+                <div key={c} className="sl-result-row">
+                  <div className="sl-unit static"><span className="sl-unit-code">{c}</span><span className="sl-unit-name"><strong>{pool?.names[codeKey(c)] ?? UNIT_NO_NAME}</strong></span></div>
+                  <AddButtons code={c} name={pool?.names[codeKey(c)]} {...addProps} />
+                </div>
+              ))}</div>
+            </section>
+          )}
           {results && results.resources.length > 0 && (
             <section className="sl-group"><h2>Notes, papers &amp; videos</h2>
               <div className="sl-grid">{results.resources.map((r) => <ResourceCard key={r.id} r={r} showUnit canReport={Boolean(user)} onReport={onReport} onDelete={isAdmin ? removeResource : undefined} onError={onResourceError} admin={isAdmin} />)}</div>
@@ -440,27 +704,44 @@ function Home({ programmes, loading, onProgramme, onUnit, onResourceError, user,
         </>
       ) : (
         <>
+          {user ? (
+            <MySemester my={my} loading={myLoading} onSetup={() => setSetup(true)} onAdd={() => setAdding(true)} onUnit={onUnit} onRemoveExtra={(u) => void removeExtra(u)} />
+          ) : (
+            <section className="sl-course-card">
+              <div><strong>Only see your own units</strong><p className="sl-sub">Sign in and set your course, year and semester to see just what you study.</p></div>
+              <button className="sl-primary inline" onClick={onSignIn}>Sign in</button>
+            </section>
+          )}
           <CalendarCard isAdmin={isAdmin} />
-          <div className="sl-section-head"><h2>Choose your programme</h2></div>
-          {levels.length > 2 && <div className="sl-tabs">{levels.map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l}</button>)}</div>}
-          {loading ? <Loading /> : filtered.length === 0 ? <Empty title="No programmes yet" text="An admin still needs to add programmes. Check back soon." /> : (
-            <div className="sl-prog-grid">
-              {filtered.map((p) => (
-                <button key={p.id} className="sl-prog" onClick={() => onProgramme(p)}>
-                  <span className="sl-prog-ico"><BookOpen size={18} /></span>
-                  <span><strong>{p.name}</strong><small>{[p.level, p.department].filter(Boolean).join(' · ')}</small></span>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-            </div>
+          <div className="sl-section-head">
+            <h2>{compact ? 'Other courses' : 'Choose your programme'}</h2>
+            {compact && <button className="sl-mini ghost" onClick={() => setShowAll(!showAll)}>{showAll ? 'Hide' : 'Browse all courses'}</button>}
+          </div>
+          {(!compact || showAll) && (
+            <>
+              {levels.length > 2 && <div className="sl-tabs">{levels.map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l}</button>)}</div>}
+              {loading ? <Loading /> : filtered.length === 0 ? <Empty title="No programmes yet" text="An admin still needs to add programmes. Check back soon." /> : (
+                <div className="sl-prog-grid">
+                  {filtered.map((p) => (
+                    <button key={p.id} className="sl-prog" onClick={() => onProgramme(p)}>
+                      <span className="sl-prog-ico"><BookOpen size={18} /></span>
+                      <span><strong>{p.name}</strong><small>{[p.level, p.department].filter(Boolean).join(' · ')}</small></span>
+                      <ChevronRight size={16} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
+      {setup && <CourseSetupModal programmes={programmes} current={course} onClose={() => setSetup(false)} onSaved={() => { void loadMy() }} />}
+      {adding && myProgramme && course && <AddUnitsModal programme={myProgramme} startYear={course.year} startSemester={course.semester} onClose={() => setAdding(false)} onDone={() => { void loadMy() }} />}
     </>
   )
 }
 
-function ProgrammePage({ programme, user, onUnit, onSuggest, onSignIn }: { programme: Programme; user: User | null; onUnit: (u: Unit) => void; onSuggest: () => void; onSignIn: () => void }) {
+function ProgrammePage({ programme, user, onUnit, onAdd, onSetCourse, onSignIn }: { programme: Programme; user: User | null; onUnit: (u: Unit) => void; onAdd: () => void; onSetCourse: () => void; onSignIn: () => void }) {
   const [units, setUnits] = useState<Unit[] | null>(null)
   const [err, setErr] = useState<Note>(null)
   useEffect(() => {
@@ -479,9 +760,10 @@ function ProgrammePage({ programme, user, onUnit, onSuggest, onSignIn }: { progr
   return (
     <>
       <div className="sl-page-head"><div><span className="sl-kicker">PROGRAMME</span><h1>{programme.name}</h1><small>{[programme.level, programme.department].filter(Boolean).join(' · ')}</small></div>
-        <button className="sl-ghost" onClick={user ? onSuggest : onSignIn}><Plus size={15} /> Suggest a missing unit</button></div>
+        <div className="sl-course-actions"><button className="sl-ghost" onClick={user ? onSetCourse : onSignIn}><GraduationCap size={15} /> Make this my course</button>
+          <button className="sl-ghost" onClick={user ? onAdd : onSignIn}><Plus size={15} /> Add units</button></div></div>
       <Msg msg={err} />
-      {units === null ? <Loading /> : groups.length === 0 ? <Empty title="No units yet" text="Know a unit that belongs here? Suggest it and an admin will add it." /> : groups.map(([label, list]) => (
+      {units === null ? <Loading /> : groups.length === 0 ? <Empty title="No units yet" text="Know a unit that belongs here? Tap Add units and search its code." /> : groups.map(([label, list]) => (
         <section key={label} className="sl-group"><h2>{label}</h2><div className="sl-unit-list">{list.map((u) => <UnitRow key={u.id} u={u} onOpen={onUnit} />)}</div></section>
       ))}
     </>
@@ -494,6 +776,16 @@ function UnitPage({ unit, user, config, isAdmin, onSignIn, onReport }: { unit: U
   const [msg, setMsg] = useState<Note>(null)
   const [uploading, setUploading] = useState(false)
   const [tick, setTick] = useState(0)
+  const [shownName, setShownName] = useState(unit.name)
+  const [nameDraft, setNameDraft] = useState('')
+  const [naming, setNaming] = useState(false)
+  useEffect(() => { setShownName(unit.name) }, [unit.id, unit.name])
+  async function saveName() {
+    if (nameDraft.trim().length < 3) return setMsg({ type: 'err', text: 'Type the unit name (at least 3 letters).' })
+    setNaming(true)
+    try { await labsApi.nameUnit(unit.id, nameDraft.trim()); setShownName(nameDraft.trim()); setMsg({ type: 'ok', text: 'Thanks! The unit name was saved.' }) }
+    catch (e) { setMsg({ type: 'err', text: errMsg(e) }) } finally { setNaming(false) }
+  }
   useEffect(() => {
     let live = true
     setList(null)
@@ -517,13 +809,18 @@ function UnitPage({ unit, user, config, isAdmin, onSignIn, onReport }: { unit: U
   }
   return (
     <>
-      <div className="sl-page-head"><div><span className="sl-kicker">{unit.code}</span><h1>{unit.name}</h1><small>{unit.programmeName ? `${unit.programmeName} · ` : ''}{yearLabel(unit.year)}, {semesterLabel(unit.semester)}</small></div>
+      <div className="sl-page-head"><div><span className="sl-kicker">{unit.code}</span><h1>{shownName}</h1><small>{unit.programmeName ? `${unit.programmeName} · ` : ''}{yearLabel(unit.year)}, {semesterLabel(unit.semester)}</small></div>
         <button className="sl-primary inline" onClick={user ? () => setUploading(true) : onSignIn}><Upload size={15} /> {user ? 'Upload' : 'Sign in to upload'}</button></div>
       <div className="sl-tabs">
         {(['all', ...TYPES] as const).map((t) => <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t === 'all' ? 'All' : TYPE_LABELS[t]} <b>{counts[t] ?? 0}</b></button>)}
         <button className={`yt${type === 'youtube' ? ' on' : ''}`} onClick={() => setType('youtube')}><Play size={13} /> Find on YouTube</button>
         <button className={`yt${type === 'wiki' ? ' on' : ''}`} onClick={() => setType('wiki')}><BookOpen size={13} /> Wikipedia</button>
       </div>
+      {user && shownName === UNIT_NO_NAME && (
+        <div className="sl-name-box"><span>This unit has no name yet. Know it?</span>
+          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Unit name" maxLength={100} />
+          <button type="button" className="sl-mini" disabled={naming} onClick={() => void saveName()}>{naming ? 'Saving…' : 'Save name'}</button></div>
+      )}
       <Msg msg={msg} />
       {type === 'wiki' ? (
         <WikiPanel user={user} onSignIn={onSignIn} defaultQuery={unit.name} chips={[unit.name, `${unit.name} introduction`]} />
@@ -1030,7 +1327,8 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
   const [fatal, setFatal] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [reporting, setReporting] = useState<Resource | null>(null)
-  const [suggesting, setSuggesting] = useState<Programme | null>(null)
+  const [adding, setAdding] = useState<Programme | null>(null)
+  const [settingCourse, setSettingCourse] = useState<Programme | null>(null)
   const [toast, setToast] = useState<Note>(null)
   const [access, setAccess] = useState<AccessInfo | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -1111,9 +1409,9 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
 
       {view.name === 'home' && (
         <Home programmes={programmes} loading={loading} user={user} isAdmin={isAdmin} onScan={() => (user ? setScanning(true) : onSignIn())} onProgramme={(p) => setView({ name: 'programme', programme: p })}
-          onUnit={(u) => openUnit(u)} onReport={setReporting} onResourceError={(m) => setToast({ type: 'err', text: m })} />
+          onUnit={(u) => openUnit(u)} onReport={setReporting} onResourceError={(m) => setToast({ type: 'err', text: m })} onSignIn={onSignIn} />
       )}
-      {view.name === 'programme' && <ProgrammePage programme={view.programme} user={user} onSignIn={onSignIn} onUnit={(u) => openUnit(u, view.programme)} onSuggest={() => setSuggesting(view.programme)} />}
+      {view.name === 'programme' && <ProgrammePage programme={view.programme} user={user} onSignIn={onSignIn} onUnit={(u) => openUnit(u, view.programme)} onAdd={() => setAdding(view.programme)} onSetCourse={() => setSettingCourse(view.programme)} />}
       {view.name === 'unit' && <UnitPage unit={view.unit} user={user} config={config} isAdmin={isAdmin} onSignIn={onSignIn} onReport={setReporting} />}
       {view.name === 'resource' && <ResourcePage id={view.id} user={user} isAdmin={isAdmin} onSignIn={onSignIn} onReport={setReporting} onOpenUnit={(u) => openUnit(u)} />}
       {view.name === 'mine' && user && <MinePage />}
@@ -1122,7 +1420,8 @@ export default function StudyLabs({ user, onSignIn, onBack }: Props) {
       {scanning && <Modal title="Scan a CAT or paper" wide onClose={() => setScanning(false)}><ScanBody uid={user?.uid ?? ''} onClose={() => setScanning(false)} onDone={() => {}} /></Modal>}
       {paywall && <PaywallModal payment={paywall.payment} email={user?.email} onClose={() => setPaywall(null)} />}
       {reporting && <ReportModal resource={reporting} onClose={() => setReporting(null)} />}
-      {suggesting && <SuggestModal programme={suggesting} onClose={() => setSuggesting(null)} />}
+      {adding && <AddUnitsModal programme={adding} onClose={() => setAdding(null)} onDone={() => {}} />}
+      {settingCourse && <CourseSetupModal programmes={programmes} current={{ programmeId: settingCourse.id, programmeName: settingCourse.name, year: 1, semester: 1 }} onClose={() => setSettingCourse(null)} onSaved={() => { setToast({ type: 'ok', text: `${settingCourse.name} is now your course. Open Browse to see your semester.` }); setView({ name: 'home' }) }} />}
     </div>
   )
 }

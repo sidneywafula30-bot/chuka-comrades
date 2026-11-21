@@ -486,6 +486,28 @@ export const labsApi = {
       ok: boolean
     }>('report', { resourceId, reason }),
 
+  unitCodes: () => call<UnitCodes>('unit_codes'),
+
+  myCourse: () => call<MyCourse>('my_course'),
+
+  setMyCourse: (c: { programmeId: string; year: number; semester: number }) =>
+    call<MyCourse>('set_my_course', { ...c }),
+
+  myUnits: () => call<MyUnits>('my_units'),
+
+  /** Adds units to the shared catalogue for a programme / year / semester. Max 15 new units a day. */
+  addUnits: (a: { programmeId: string; year: number; semester: number; items: { code: string; name?: string }[] }) =>
+    call<{ added: number; skipped: number; remainingToday: number }>('add_units', { ...a }),
+
+  /** Pins a unit to the student's own list. Give unitId, or a code that is not in the catalogue yet. */
+  addExtra: (a: { unitId?: string; code?: string; name?: string }) =>
+    call<{ ok: boolean; unitId: string; already: boolean }>('add_extra', { ...a }),
+
+  removeExtra: (unitId: string) => call<{ ok: boolean }>('remove_extra', { unitId }),
+
+  /** Fills a unit's name if it has none yet. */
+  nameUnit: (unitId: string, name: string) => call<{ ok: boolean; updated: number }>('name_unit', { unitId, name }),
+
   suggestUnit: (s: {
     programmeId: string
     year: number
@@ -693,6 +715,27 @@ export const labsApi = {
 
 export const STUDY_IMAGE_MAX_PX = 1600
 export const STUDY_IMAGE_QUALITY = 0.8
+
+/* ---------- my course, my units, unit codes (v1.4) ---------- */
+
+/** Shown for a unit nobody has named yet. Matches UNIT_NO_NAME in Timetable.gs. */
+export const UNIT_NO_NAME = 'Name not added yet'
+/** New units one student may add per day. Matches LIMITS.MAX_UNITS_PER_DAY on the server. */
+export const MAX_UNITS_PER_DAY = 15
+
+export type MyCourse = { set: false } | { set: true; programmeId: string; year: number; semester: number }
+
+export type MyUnits = {
+  course: { programmeId: string; programmeName: string; year: number; semester: number } | null
+  units: Unit[]
+  extras: Unit[]
+}
+
+/** names are keyed by the code without spaces, e.g. COSC102. */
+export type UnitCodes = { codes: string[]; names: Record<string, string> }
+
+export const codeKey = (code: string) => code.toUpperCase().replace(/\s+/g, '')
+
 
 export const yearLabel = (y: number) =>
   `Year ${y}`
