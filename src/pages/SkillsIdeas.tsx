@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { errMsg, fmtDate, type Note } from '../lib/hub'
 import { Empty, Loading, Modal, Msg } from '../components/HubUi'
 import { ChatRoom } from '../components/CitChat'
+import { ShareBar } from '../components/Bluesky'
 import '../components/Cit.css'
 
 type Status = 'open' | 'planned' | 'building' | 'done' | 'hidden'
@@ -107,6 +108,7 @@ export function IdeasBoard({ user, onSignIn, isAdmin }: { user: User | null; onS
                   <small className="sl-sub">By {i.user_name || 'a comrade'} · {fmtDate(i.created_at)}</small>
                   <div className="sl-foot-actions" style={{ marginTop: 8, flexWrap: 'wrap' }}>
                     <button className="sl-mini" onClick={() => setOpenId(openId === i.id ? null : i.id)}><MessageCircle size={13} /> {openId === i.id ? 'Hide discussion' : 'Discuss'}</button>
+                    <ShareBar text={`Coding idea: ${i.title}`} tags={i.tags} />
                     {i.link && <a className="sl-mini ghost" href={i.link} target="_blank" rel="noreferrer noopener"><ExternalLink size={13} /> Link</a>}
                     {isAdmin && (
                       <>
