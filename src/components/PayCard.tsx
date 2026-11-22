@@ -1,7 +1,7 @@
 import { Lock, RefreshCw } from 'lucide-react'
 import type { User } from 'firebase/auth'
-import { ADMIN_WHATSAPP, paymentLink, showPhone, type Settings } from '../lib/hostel'
-import { WhatsAppLogo } from './BrandLogos'
+import { paymentLink, type Settings } from '../lib/hostel'
+import { HostelAdminLogo } from './HostelAdminChat'
 import GoogleSignInButton from './GoogleSignInButton'
 
 type Props = {
@@ -32,12 +32,12 @@ export default function PayCard({ kind, user, settings, headline, detail, onSign
       </div>
       <ol className="hs-pay-steps">
         <li><b>1</b><span>{user ? <>Signed in as <strong>{user.email}</strong>.</> : 'Sign in with Google (your access is tied to your email).'}</span></li>
-        <li><b>2</b><span>{settings.payNote || `Pay KSh ${price} by M-Pesa to the admin (${showPhone(ADMIN_WHATSAPP)}).`}</span></li>
+        <li><b>2</b><span>{settings.payNote || `Pay KSh ${price} by M-Pesa. Tap the button below on WhatsApp and the admin will give you the payment number.`}</span></li>
         <li><b>3</b><span>Tap the button below and send the admin your M-Pesa code on WhatsApp. Access{until} is activated for your email.</span></li>
       </ol>
       <div className="hs-pay-actions">
         {user ? (
-          <a className="hs-pay-wa" href={paymentLink(kind, user.email ?? '', price)} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Activate on WhatsApp</a>
+          <a className="hs-pay-wa" href={paymentLink(kind, user.email ?? '', price)} target="_blank" rel="noopener noreferrer"><HostelAdminLogo className="hs-pay-ph" /> Activate on WhatsApp</a>
         ) : (
           <GoogleSignInButton onClick={onSignIn} disabled={authBusy} label="Sign in to unlock" />
         )}

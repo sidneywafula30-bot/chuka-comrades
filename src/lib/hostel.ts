@@ -8,7 +8,8 @@ export const STUDENT_GROUP_URL =
   (import.meta.env.VITE_HOSTEL_STUDENT_GROUP as string) || 'https://chat.whatsapp.com/BhLqKOxHjigHF3oH6fyuFM'
 export const LANDLORD_GROUP_URL =
   (import.meta.env.VITE_HOSTEL_LANDLORD_GROUP as string) || 'https://chat.whatsapp.com/FDizebVp5qP0yr91lnNduG'
-export const ADMIN_WHATSAPP = (import.meta.env.VITE_ADMIN_WHATSAPP as string) || '254184198432'
+/** Hostel admin WhatsApp. Fixed here (like the O-Zone admin) so every hostel button uses the same number. */
+export const ADMIN_WHATSAPP = '254792545125'
 
 export const MAX_PHOTOS = 3
 

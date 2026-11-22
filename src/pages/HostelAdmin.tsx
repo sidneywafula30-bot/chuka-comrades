@@ -486,7 +486,7 @@ function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings
           <label>Hostel access (KSh)<input type="number" inputMode="numeric" min={0} value={hostelPrice} onChange={(e) => setHostelPrice(e.target.value)} required /></label>
           <label>Roommate posting (KSh)<input type="number" inputMode="numeric" min={0} value={roommatePrice} onChange={(e) => setRoommatePrice(e.target.value)} required /></label>
           <label className="wide">Payment instructions shown to students <small>(optional)</small>
-            <textarea value={payNote} onChange={(e) => setPayNote(e.target.value)} rows={2} maxLength={300} placeholder="e.g. Send the money by M-Pesa to 0184 198 432 (Sidney W.), then WhatsApp the M-Pesa code." />
+            <textarea value={payNote} onChange={(e) => setPayNote(e.target.value)} rows={2} maxLength={300} placeholder="e.g. Send the money by M-Pesa to 0792 545 125, then WhatsApp the M-Pesa code." />
           </label>
         </div>
       </fieldset>

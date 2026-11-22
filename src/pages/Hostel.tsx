@@ -15,6 +15,7 @@ import { GoogleMapsLogo, WhatsAppLogo } from '../components/BrandLogos'
 import Avatar from '../components/Avatar'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import PayCard from '../components/PayCard'
+import HostelAdminFab, { HostelAdminLogo } from '../components/HostelAdminChat'
 import SemesterCalendar from '../components/SemesterCalendar'
 import HostelAdmin from './HostelAdmin'
 import Roommates from './Roommates'
@@ -149,7 +150,7 @@ export default function Hostel({ user }: { user: User | null }) {
 
         <div className="hs-groups">
           <a href={STUDENT_GROUP_URL} target="_blank" rel="noopener noreferrer">
-            <WhatsAppLogo size={30} />
+            <HostelAdminLogo className="hs-group-ph" />
             <span><strong>Students: Hostels &amp; Reviews</strong><small>Ask questions and share hostel experiences.</small></span>
             <ExternalLink size={16} />
           </a>
@@ -211,6 +212,7 @@ export default function Hostel({ user }: { user: User | null }) {
       </main>
 
       {lightbox && <PhotoViewer box={lightbox} onChange={setLightbox} />}
+      <HostelAdminFab />
     </div>
   )
 }
