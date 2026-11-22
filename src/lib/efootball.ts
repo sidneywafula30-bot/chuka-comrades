@@ -59,6 +59,8 @@ export type LeagueRecent = { id: string; p1: string; p2: string; s1: number; s2:
 /** One league: its table, recent results and the fixture rules. */
 export type League = {
   league: LeagueInfo; table: LeagueRow[]; recent: LeagueRecent[]
+  /** Every active member. Sent to the founder only (includes members hidden from the table). */
+  members?: { uid: string; username: string }[]
   today: string; fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number; serverNow: number
 }
 export type FixtureSide = { uid: string; username: string; squadId: string; strength: number; platform: string }

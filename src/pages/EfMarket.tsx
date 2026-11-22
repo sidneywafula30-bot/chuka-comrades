@@ -16,7 +16,7 @@ export default function EfMarket({ me, signedIn, onSignIn }: { me: Me | null; si
   const [q, setQ] = useState('')
   const [posting, setPosting] = useState(false)
   const type = tab === 'sell' || tab === 'buy' ? tab : ''
-  const list = useApi<Listing[]>('listings', { type }, 0, tab !== 'mine')
+  const list = useApi<Listing[]>('listings', { type, as: me?.uid ?? '' }, 0, tab !== 'mine')
   const mine = useApi<Listing[]>('myListings', {}, 0, signedIn && tab === 'mine')
   const [zoom, setZoom] = useState('')
   const [nonce, setNonce] = useState(0)

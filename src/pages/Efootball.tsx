@@ -67,7 +67,7 @@ export default function Efootball({ user, route }: { user: User | null; route: s
         <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
       </header>
       <main className="cpl-main">{body}</main>
-      <AdminFab />
+      <AdminFab page={page} />
     </div>
   )
 }

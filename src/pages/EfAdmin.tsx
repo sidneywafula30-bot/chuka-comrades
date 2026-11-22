@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Copy, Trophy } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
 import { usePayCfg } from '../components/EfPay'
-import { driveImg, ef, fmtStamp, fromParts, toParts, tournamentInviteLink, type AdminEarnings, type AdminLeague, type AdminPay, type AdminPlayer, type Attention, type FplAdminInfo, type HomeData, type PayAdmin, type Tournament, ksh, waLink } from '../lib/efootball'
+import { driveImg, ef, fmtStamp, fromParts, toParts, tournamentInviteLink, type AdminEarnings, type AdminLeague, type AdminPay, type AdminPlayer, type Attention, type FplAdminInfo, type HomeData, type Listing, type PayAdmin, type Tournament, ksh, waLink } from '../lib/efootball'
 
-type Tab = 'payments' | 'payouts' | 'tournament' | 'attention' | 'leagues' | 'players' | 'settings' | 'fpl'
+type Tab = 'payments' | 'listings' | 'payouts' | 'tournament' | 'attention' | 'leagues' | 'players' | 'settings' | 'fpl'
 type Msg = { ok: boolean; text: string } | null
 
 export default function EfAdmin() {
@@ -14,11 +14,11 @@ export default function EfAdmin() {
       <h2>eFootball admin</h2>
       <p className="cpl-sub">Verify M-Pesa payments, pay hosts, run the knockout and keep the leagues tidy. League results settle themselves.</p>
       <div className="ef-tabs" role="tablist">
-        {([['payments', 'Payments'], ['payouts', 'Host payouts'], ['tournament', 'Tournament'], ['attention', 'Needs attention'], ['leagues', 'Leagues'], ['players', 'Players'], ['settings', 'Settings'], ['fpl', 'FPL']] as [Tab, string][]).map(([id, label]) => (
+        {([['payments', 'Payments'], ['listings', 'Listings'], ['payouts', 'Host payouts'], ['tournament', 'Tournament'], ['attention', 'Needs attention'], ['leagues', 'Leagues'], ['players', 'Players'], ['settings', 'Settings'], ['fpl', 'FPL']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
-      {tab === 'payments' ? <PaymentsAdmin /> : tab === 'payouts' ? <PayoutsAdmin /> : tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'leagues' ? <LeaguesAdmin /> : tab === 'players' ? <PlayersAdmin /> : tab === 'fpl' ? <FplAdmin /> : <SettingsAdmin />}
+      {tab === 'payments' ? <PaymentsAdmin /> : tab === 'listings' ? <ListingsAdmin /> : tab === 'payouts' ? <PayoutsAdmin /> : tab === 'tournament' ? <TournamentAdmin /> : tab === 'attention' ? <AttentionAdmin /> : tab === 'leagues' ? <LeaguesAdmin /> : tab === 'players' ? <PlayersAdmin /> : tab === 'fpl' ? <FplAdmin /> : <SettingsAdmin />}
     </div>
   )
 }
@@ -78,6 +78,46 @@ function PaymentsAdmin() {
   )
 }
 
+/* ---------------- marketplace: take down live listings ---------------- */
+function ListingsAdmin() {
+  const [list, setList] = useState<Listing[] | null>(null)
+  const [q, setQ] = useState('')
+  const { setMsg, el } = useMsg()
+  const load = useCallback(() => ef<Listing[]>('listings', { type: '' }).then(setList).catch((e) => setMsg({ ok: false, text: (e as Error).message })), [setMsg])
+  useEffect(() => { void load() }, [load])
+  async function remove(l: Listing) {
+    if (!window.confirm(`Remove "${l.title}" by ${l.owner.username}? It disappears from the marketplace.`)) return
+    setMsg(null)
+    try { await ef('listingRemove', { id: l.id }); setMsg({ ok: true, text: 'Listing removed.' }); await load() }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+  }
+  const s = q.toLowerCase()
+  const shown = (list ?? []).filter((l) => !s || l.title.toLowerCase().includes(s) || l.owner.username.toLowerCase().includes(s))
+  return (
+    <>
+      <section className="cpl-card">
+        <h3>Live marketplace listings</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 10px' }}>Listings go live when you verify their payment and stay up for 30 days. Remove anything fake, abusive or already sold. Removing does not refund the fee.</p>
+        <div className="cpl-inline"><input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${list?.length ?? 0} listings (title or seller)`} aria-label="Search listings" /></div>
+        {el}
+      </section>
+      {list && !shown.length && <p className="cpl-empty">No live listings.</p>}
+      {shown.map((l) => (
+        <section className="cpl-card" key={l.id}>
+          <div className="cpl-row" style={{ border: 0, padding: 0 }}>
+            <div>
+              <strong>{l.title} <span className="ef-pill gold">{l.type === 'sell' ? 'For sale' : 'Wanted'}</span></strong>
+              <small>{ksh(l.price)} · {l.platform}{l.strength ? ` · strength ${l.strength}` : ''} · {l.owner.username} · live since {fmtStamp(l.approvedAt)}</small>
+            </div>
+            {l.imageId && <a href={driveImg(l.imageId, 1200)} target="_blank" rel="noopener noreferrer">Screenshot</a>}
+            <button className="lp-btn cpl-danger" onClick={() => void remove(l)}>Remove</button>
+          </div>
+        </section>
+      ))}
+    </>
+  )
+}
+
 /* ---------------- tournament form ---------------- */
 function TournamentAdmin() {
   const [t, setT] = useState<Tournament | null | undefined>(undefined)
@@ -122,7 +162,7 @@ function TournamentForm({ t, onSaved }: { t: Tournament | null; onSaved: () => P
   const first = toParts(t?.windows[0][0] ?? '')
   const reg = toParts(t?.regClose ?? '')
   const w = (i: number, k: 0 | 1, d: string) => toParts(t?.windows[i][k] ?? '').time || d
-  const [name, setName] = useState(t?.name ?? 'Chuka Friday Knockout')
+  const [name, setName] = useState(t?.name ?? 'Chuka Weekly Knockout')
   const [date, setDate] = useState(first.date)
   const [regTime, setRegTime] = useState(reg.time || '13:00')
   const [times, setTimes] = useState([w(0, 0, '14:00'), w(0, 1, '15:15'), w(1, 0, '15:25'), w(1, 1, '16:10'), w(2, 0, '16:20'), w(2, 1, '17:00')])
@@ -160,7 +200,7 @@ function TournamentForm({ t, onSaved }: { t: Tournament | null; onSaved: () => P
       </fieldset>
       {open && (
         <div className="cpl-grid2">
-          <label>Match day (Friday)<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label>Match day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label>Registration closes at<input type="time" value={regTime} onChange={(e) => setRegTime(e.target.value)} /><small>Same day, before Round 1. Pools are drawn automatically then.</small></label>
         </div>
       )}

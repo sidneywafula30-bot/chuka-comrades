@@ -37,7 +37,7 @@ function PublicView({ id, me }: { id: string; me: Me | null }) {
       <a className="cpl-link" href="#/efootball/league">Back to leagues</a>
       <Banner L={L} sub={`${L.members} ${L.members === 1 ? 'member' : 'members'} · ${L.isPublic ? 'public league' : 'invite-only'}`} action={L.isPublic && L.code && !me?.profile?.league ? <a className="lp-btn" href={`#/efootball/league/join/${L.code}`}>Join this league</a> : null} />
       <Tabs value={tab} onChange={setTab} items={[['today', 'Today'], ['table', 'Table'], ['results', 'Results']]} />
-      {tab === 'today' ? <TodayBoard id={L.id} me={me?.uid ?? ''} zoom={setZoom} /> : tab === 'table' ? <Table lg={data} me={me?.uid ?? ''} zoom={setZoom} /> : <Results lg={data} zoom={setZoom} />}
+      {tab === 'today' ? <TodayBoard id={L.id} name={L.name} me={me?.uid ?? ''} zoom={setZoom} /> : tab === 'table' ? <Table lg={data} me={me?.uid ?? ''} zoom={setZoom} /> : <Results lg={data} name={L.name} zoom={setZoom} />}
       <Zoom id={zoom} close={() => setZoom('')} />
     </div>
   )
@@ -54,7 +54,7 @@ function MyLeague({ L, me, reload }: { L: LeagueInfo; me: Me; reload: () => Prom
   const both = useCallback(async () => { await Promise.all([reload(), Promise.resolve(lg.retry())]) }, [reload, lg])
   const open = me.matches.filter((m) => m.status === 'pending' || m.status === 'disputed').length
   const isFounder = L.founderUid === me.uid
-  const members = (lg.data?.table ?? []).map((r) => ({ uid: r.uid, username: r.username }))
+  const members = lg.data?.members ?? (lg.data?.table ?? []).map((r) => ({ uid: r.uid, username: r.username }))
 
   return (
     <div className="cpl-page">
@@ -65,7 +65,7 @@ function MyLeague({ L, me, reload }: { L: LeagueInfo; me: Me; reload: () => Prom
       <Tabs value={tab} onChange={setTab} items={[['today', 'Today'], ['mine', `My fixtures${open ? ` (${open})` : ''}`], ['table', 'Table'], ['results', 'Results'], ['invite', 'Invite & settings']]} />
       {lg.err && <p className="cpl-err" role="alert">{lg.err}</p>}
       {tab === 'mine' ? <Mine me={me} reload={both} skew={skew} zoom={setZoom} />
-        : tab === 'today' ? <TodayBoard id={L.id} me={me.uid} zoom={setZoom} />
+        : tab === 'today' ? <TodayBoard id={L.id} name={L.name} me={me.uid} zoom={setZoom} />
         : tab === 'invite' ? (
           <>
             <section className="cpl-card">
@@ -82,7 +82,7 @@ function MyLeague({ L, me, reload }: { L: LeagueInfo; me: Me; reload: () => Prom
             {lg.data.table.length > 0 && <div className="ef-actions" style={{ marginTop: 0, marginBottom: 12 }}><ShareCardButton label="Share league card" filename="chuka-league.png" text={`${L.name} table in the Chuka eFootball league`} build={() => leagueCard(lg.data!, L)} /></div>}
             <Table lg={lg.data} me={me.uid} zoom={setZoom} />
           </>
-        ) : <Results lg={lg.data} zoom={setZoom} />}
+        ) : <Results lg={lg.data} name={L.name} zoom={setZoom} />}
       <Zoom id={zoom} close={() => setZoom('')} />
     </div>
   )
@@ -216,7 +216,7 @@ function FixtureCard({ f, me, zoom }: { f: FixtureRow; me: string; zoom: (id: st
   )
 }
 
-function TodayBoard({ id, me, zoom }: { id: string; me: string; zoom: (id: string) => void }) {
+function TodayBoard({ id, name, me, zoom }: { id: string; name: string; me: string; zoom: (id: string) => void }) {
   const { data, err } = useApi<Fixtures>('fixtures', { id }, 60000)
   const skew = data ? data.serverNow - Date.now() : 0
   const left = useCountdown(data?.closeAt ?? '', skew)
@@ -235,6 +235,7 @@ function TodayBoard({ id, me, zoom }: { id: string; me: string; zoom: (id: strin
         </div>
         <strong>{data.reported} of {data.total} reported</strong>
         <div className="ef-bar" aria-hidden><i style={{ width: `${pct}%` }} /></div>
+        <div className="ef-actions" style={{ marginTop: 4 }}><ShareCardButton label="Share fixtures card" filename="chuka-fixtures.png" text={`${name}: ${data.isToday ? 'today’s' : 'latest'} fixtures in the Chuka eFootball league`} build={async () => fixturesCard(data, name)} /></div>
       </section>
       <div className="ef-fixtures">{data.list.map((f) => <FixtureCard key={f.id} f={f} me={me} zoom={zoom} />)}</div>
     </>
@@ -267,7 +268,7 @@ function Table({ lg, me, zoom }: { lg: League; me: string; zoom: (id: string) =>
   )
 }
 
-function Results({ lg, zoom }: { lg: League; zoom: (id: string) => void }) {
+function Results({ lg, name, zoom }: { lg: League; name: string; zoom: (id: string) => void }) {
   if (!lg.recent.length) return <section className="cpl-card"><p className="cpl-empty" style={{ margin: 0 }}>No results yet.</p></section>
   return (
     <section className="cpl-card">
@@ -278,10 +279,38 @@ function Results({ lg, zoom }: { lg: League; zoom: (id: string) => void }) {
           <b>{r.s1} – {r.s2}</b>
           <span className="t">{r.p2}</span>
           <button type="button" className="ef-mini-thumb" onClick={() => r.sq2 && zoom(r.sq2)} aria-label={`${r.p2} squad`}><DriveImage id={r.sq2} w={96} fallback={<span>{r.p2.slice(0, 1).toUpperCase()}</span>} /></button>
+          <span className="ef-share-cell"><ShareCardButton label="Share" className="ef-share-mini" filename="chuka-result.png" text={`${r.p1} ${r.s1} – ${r.s2} ${r.p2} in ${name}, Chuka eFootball league`} build={async () => resultCard(r, name)} /></span>
         </div>
       ))}
     </section>
   )
+}
+
+/** Share card of a fixture day: every pairing with its score (or "vs" while still to play). */
+function fixturesCard(d: Fixtures, name: string): CardSpec {
+  const shown = d.list.slice(0, 14)
+  return {
+    theme: 'green',
+    eyebrow: `${d.isToday ? 'Today' : 'Latest'} · ${fmtDay(d.closeAt)}`,
+    title: `${name} fixtures`,
+    subtitle: `Results due by ${d.closeHour}:00 (${d.closeHour % 12 || 12} pm)`,
+    stats: [{ value: String(d.total), label: 'Fixtures' }, { value: String(d.reported), label: 'Reported' }, { value: String(Math.max(0, d.total - d.reported)), label: 'To play' }],
+    head: ['#', 'Fixture', 'Score'],
+    rows: shown.map((f, i) => ({ cells: [String(i + 1), `${f.p1.username} v ${f.p2.username}`, f.status === 'confirmed' && f.s1 !== null ? `${f.s1}-${f.s2}` : f.status === 'void' ? 'Void' : 'vs'], hot: f.status === 'confirmed' })),
+    note: d.list.length > shown.length ? `+ ${d.list.length - shown.length} more fixtures` : '',
+    footer: `${window.location.host}${window.location.pathname}#/efootball/league`,
+  }
+}
+
+/** Share card of one confirmed result. */
+function resultCard(r: League['recent'][number], name: string): CardSpec {
+  const winner = r.s1 > r.s2 ? r.p1 : r.s2 > r.s1 ? r.p2 : 'Draw'
+  return {
+    theme: 'green', eyebrow: `${name} · Full time`, title: `${r.p1} vs ${r.p2}`, subtitle: fmtDay(r.at),
+    stats: [{ value: `${r.s1} – ${r.s2}`, label: 'Final score' }, { value: winner, label: r.s1 === r.s2 ? 'Result' : 'Winner' }],
+    head: [], rows: [],
+    footer: `${window.location.host}${window.location.pathname}#/efootball/league`,
+  }
 }
 
 /** Share card of the league table: logo, top 10 players. */

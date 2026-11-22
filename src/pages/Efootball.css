@@ -381,7 +381,7 @@ a.ef-wa-admin .ef-badge { width: 30px; height: 30px; }
 .ef-pl-cell > span { display: grid; gap: 3px; min-width: 0; }
 .ef-mini-thumb { width: 34px; height: 34px; border-radius: 10px; overflow: hidden; padding: 0; border: 0; background: #e1eee6; flex-shrink: 0; cursor: zoom-in; display: grid; place-items: center; color: #1f5a38; font: 800 13px 'Manrope', sans-serif; }
 .ef-mini-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ef-result { display: grid; grid-template-columns: 34px 1fr auto 1fr 34px; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.ef-result { display: grid; grid-template-columns: 34px 1fr auto 1fr 34px auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .ef-result:first-of-type { border-top: 0; }
 .ef-result .t { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ef-result .t.h { text-align: right; }
@@ -413,3 +413,10 @@ a.ef-wa-admin .ef-badge { width: 30px; height: 30px; }
 @media (max-width: 420px) { .ef-sizes { grid-template-columns: 1fr; } }
 
 @media (prefers-reduced-motion: reduce) { .ef-fab, .ef-fab:hover { transition: none; transform: none; } }
+
+/* small share button on a result row */
+.ef-share-cell { display: grid; justify-items: end; gap: 2px; }
+.ef-share-mini { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: #eef5f0; color: #1f5a38; font: 700 12px 'Manrope', sans-serif; cursor: pointer; }
+.ef-share-mini:hover { background: #e2efe6; }
+.ef-share-mini:focus-visible { outline: 3px solid var(--ef-pitch); outline-offset: 2px; }
+@media (max-width: 520px) { .ef-result { grid-template-columns: 30px 1fr auto 1fr 30px; } .ef-share-cell { grid-column: 1 / -1; justify-items: center; } }

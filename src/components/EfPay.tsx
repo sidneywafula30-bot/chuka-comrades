@@ -41,10 +41,12 @@ export function AdminChat({ message, label = 'Chat admin on WhatsApp' }: { messa
 }
 
 /** Floating button on every eFootball page, bottom right. */
-export function AdminFab() {
+export function AdminFab({ page = '' }: { page?: string }) {
   const cfg = usePayCfg()
+  const where: Record<string, string> = { league: 'my league', players: 'the players list', market: 'the marketplace', fpl: 'FPL', tournament: 'the weekly knockout', join: 'the weekly knockout', profile: 'my profile' }
+  const msg = where[page] ? `Hi eFootball admin, I need help with ${where[page]}. ` : 'Hi eFootball admin, '
   return (
-    <a className="ef-fab" href={waLink(cfg.adminWa, 'Hi eFootball admin, ')} target="_blank" rel="noopener noreferrer" aria-label="Chat with the eFootball admin on WhatsApp">
+    <a className="ef-fab" href={waLink(cfg.adminWa, msg)} target="_blank" rel="noopener noreferrer" aria-label="Chat with the eFootball admin on WhatsApp">
       <AdminBadge size={44} /><span>Chat admin</span>
     </a>
   )

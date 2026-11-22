@@ -163,7 +163,7 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
 
       {t.status !== 'open' && signedIn && me && (
         current ? <MyPool t={t} pool={current} me={me} act={act} busy={busy} msg={msg} />
-          : eliminated ? <section className="cpl-card"><h3>Your tournament</h3><p className="cpl-msg">You are out of this tournament. Thanks for playing; join the next one on Monday.</p></section>
+          : eliminated ? <section className="cpl-card"><h3>Your tournament</h3><p className="cpl-msg">You are out of this tournament. Thanks for playing; join the next one when it opens.</p></section>
           : t.status === 'running' ? <section className="cpl-card"><h3>Your tournament</h3><p className="cpl-empty" style={{ textAlign: 'left' }}>You did not join this tournament, but you can follow it below.</p></section>
           : null
       )}
