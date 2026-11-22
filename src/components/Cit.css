@@ -1,0 +1,45 @@
+/* CIT Group: chat, live room, pricing and channel shelf. Reuses the existing sl-* look of the Skills pages. */
+.cit-chat { display: flex; flex-direction: column; border: 1px solid #d6e4db; border-radius: 14px; background: #fff; overflow: hidden; }
+.cit-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; background: #f3f8f5; border-bottom: 1px solid #d6e4db; font-size: 14px; }
+.cit-chat-head small { color: #5b6b62; }
+.cit-msgs { flex: 1; min-height: 220px; max-height: 420px; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.cit-msg { max-width: 88%; padding: 7px 11px; border-radius: 12px; background: #f1f3f2; font-size: 14px; line-height: 1.35; word-break: break-word; }
+.cit-msg.mine { align-self: flex-end; background: #dff3e6; }
+.cit-msg.staff { background: #fff4d6; }
+.cit-msg b { display: block; font-size: 12px; margin-bottom: 2px; color: #33463b; }
+.cit-msg .cit-badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #1f7a4a; color: #fff; font-size: 10px; font-weight: 600; }
+.cit-msg small { display: block; margin-top: 2px; color: #7a8a81; font-size: 11px; }
+.cit-msg .cit-tools { display: inline-flex; gap: 6px; margin-left: 8px; }
+.cit-msg .cit-tools button { border: 0; background: none; color: #b3261e; font-size: 11px; cursor: pointer; padding: 0; }
+.cit-empty { margin: auto; color: #6b7b72; font-size: 14px; text-align: center; padding: 20px; }
+.cit-send { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #d6e4db; }
+.cit-send input { flex: 1; border: 1px solid #d6e4db; border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; min-width: 0; }
+.cit-note { padding: 12px 14px; font-size: 14px; color: #5b6b62; }
+.cit-inbox { display: grid; gap: 8px; margin-bottom: 14px; }
+.cit-inbox button { text-align: left; border: 1px solid #d6e4db; background: #fff; border-radius: 12px; padding: 10px 12px; cursor: pointer; font: inherit; }
+.cit-inbox button.on { border-color: #1f7a4a; background: #f3f8f5; }
+.cit-inbox b { display: block; font-size: 14px; }
+.cit-inbox span { display: block; font-size: 13px; color: #5b6b62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cit-live { display: grid; gap: 14px; }
+.cit-live-wrap { position: relative; padding-top: 56.25%; border-radius: 14px; overflow: hidden; background: #0b0f0d; }
+.cit-live-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+@media (min-width: 900px) { .cit-live.split { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; } }
+.cit-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d93025; margin-right: 6px; animation: cit-pulse 1.4s infinite; }
+@keyframes cit-pulse { 50% { opacity: .35; } }
+.cit-price { display: grid; gap: 10px; border: 1px solid #d6e4db; border-radius: 14px; padding: 14px; background: #f9fcfa; margin: 14px 0; }
+.cit-price h3 { margin: 0; font-size: 16px; }
+.cit-price-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.cit-opt { border: 1px solid #d6e4db; background: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; font: inherit; }
+.cit-opt.on { border-color: #1f7a4a; box-shadow: 0 0 0 2px #cfe9da; }
+.cit-opt b { display: block; font-size: 18px; }
+.cit-opt span { font-size: 12px; color: #5b6b62; }
+.cit-pay { display: grid; gap: 8px; font-size: 14px; }
+.cit-pay code { background: #eef4f0; padding: 2px 8px; border-radius: 6px; font-size: 15px; }
+.cit-paid { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #dff3e6; color: #1f7a4a; font-size: 12px; font-weight: 600; }
+.cit-shelf { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.cit-shelf a { flex: 0 0 210px; text-decoration: none; color: inherit; }
+.cit-shelf img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #e5ece8; }
+.cit-shelf span { display: block; font-size: 13px; margin-top: 6px; line-height: 1.3; }
+.cit-pick { border: 2px solid #f0b429; border-radius: 14px; padding: 4px; margin-bottom: 14px; }
+.cit-pick > small { display: block; padding: 6px 10px 0; font-weight: 700; color: #9a6b00; }
+.cit-next { margin: 6px 0 0; padding: 8px 10px; border-radius: 10px; background: #eef7f1; font-size: 13px; }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ChefHat, Copy, ExternalLink, ImagePlus, Link2, MessageCircle, Pencil, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react'
-import { skillsApi, skillsReady, type Meal, type Order, type PendingOrder, type Product, type SkillsConfig } from '../lib/skills'
+import { Copy, ExternalLink, ImagePlus, Link2, MessageCircle, Pencil, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react'
+import { skillsApi, skillsReady, type Order, type PendingOrder, type Product, type SkillsConfig } from '../lib/skills'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
 import { shrinkImage } from '../lib/files'
 import { AttachList, Empty, FilePicker, Loading, Modal, Msg } from '../components/HubUi'
@@ -17,81 +17,6 @@ function waLink(config: SkillsConfig, user: User | null, p: { title: string; pri
     `Order ref: ${orderId}`, `Name: ${user?.displayName ?? ''}`, `Email: ${user?.email ?? ''}`,
   ].join('\n')
   return `https://wa.me/${config.whatsapp}?text=${encodeURIComponent(text)}`
-}
-
-/* ---------- cooking corner (TheMealDB) ---------- */
-function MealView({ m, onClose }: { m: Meal; onClose: () => void }) {
-  return (
-    <Modal title={m.name} onClose={onClose}>
-      {m.thumb && <img className="hub-thumb" style={{ cursor: 'default' }} src={m.thumb} alt="" referrerPolicy="no-referrer" />}
-      <div className="hub-meta">{m.category && <span>{m.category}</span>}{m.area && <span>{m.area}</span>}</div>
-      {m.ingredients && m.ingredients.length > 0 && (
-        <>
-          <h3 style={{ margin: '12px 0 6px' }}>Ingredients</h3>
-          <ul className="pr-ing">{m.ingredients.map((i, k) => <li key={k}>{i.measure} {i.name}</li>)}</ul>
-        </>
-      )}
-      {m.instructions && <><h3 style={{ margin: '12px 0 6px' }}>Method</h3><p style={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>{m.instructions}</p></>}
-      <p className="sl-sub" style={{ marginTop: 12 }}>
-        {m.youtube && <><a className="sl-link" href={m.youtube} target="_blank" rel="noreferrer noopener">Watch on YouTube <ExternalLink size={12} /></a> · </>}
-        Recipe from <a className="sl-link" href="https://www.themealdb.com" target="_blank" rel="noreferrer noopener">TheMealDB</a>
-      </p>
-    </Modal>
-  )
-}
-
-export function Kitchen({ user, onSignIn }: { user: User | null; onSignIn: () => void }) {
-  const [day, setDay] = useState<Meal | null>(null)
-  const [q, setQ] = useState('')
-  const [by, setBy] = useState<'search' | 'ingredient'>('search')
-  const [res, setRes] = useState<Meal[] | null>(null)
-  const [open, setOpen] = useState<Meal | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<Note>(null)
-  useEffect(() => { if (skillsReady) skillsApi.meals('day').then((r) => setDay(r.items[0] ?? null)).catch(() => {}) }, [])
-  async function go(e: FormEvent) {
-    e.preventDefault()
-    if (!user) return onSignIn()
-    setBusy(true); setMsg(null)
-    try {
-      const r = await skillsApi.meals(by, q.trim())
-      if (r.error) setMsg({ type: 'err', text: r.error })
-      setRes(r.items)
-    } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
-  }
-  async function show(m: Meal) {
-    if (m.instructions) return setOpen(m)
-    try { const r = await skillsApi.meals('lookup', m.id); if (r.items[0]) setOpen(r.items[0]) } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) }
-  }
-  if (!skillsReady) return null
-  return (
-    <>
-      <div className="hub-sec"><h2><ChefHat size={18} style={{ verticalAlign: -3 }} /> Cooking corner</h2></div>
-      <p className="sl-sub" style={{ marginTop: 0 }}>Learning to cook or bake? Find a recipe by name, or by an ingredient you already have.</p>
-      {day && !res && (
-        <article className="sl-resource pr-day" onClick={() => show(day)} style={{ cursor: 'pointer' }}>
-          {day.thumb && <img className="hub-thumb" style={{ cursor: 'pointer' }} src={day.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" />}
-          <div className="sl-resource-top"><span className="sl-chip">Recipe of the day</span>{day.area && <span className="sl-chip">{day.area}</span>}</div>
-          <h3>{day.name}</h3>
-        </article>
-      )}
-      <form className="sl-search" onSubmit={go} style={{ marginTop: 10 }}>
-        <Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={by === 'search' ? 'Recipe name, e.g. pilau, pancakes' : 'An ingredient, e.g. chicken, rice'} />
-        <button className="sl-primary small" disabled={busy || q.trim().length < 2}>{busy ? '…' : 'Find'}</button>
-      </form>
-      <div className="hub-chips"><button className={by === 'search' ? 'on' : ''} onClick={() => setBy('search')}>By name</button><button className={by === 'ingredient' ? 'on' : ''} onClick={() => setBy('ingredient')}>By ingredient</button></div>
-      <Msg msg={msg} />
-      {res && (res.length === 0 ? <Empty icon={<ChefHat size={26} />} title="No recipes found" text="Try another word." /> : (
-        <div className="sl-grid">{res.map((m) => (
-          <article className="sl-resource" key={m.id} onClick={() => show(m)} style={{ cursor: 'pointer' }}>
-            {m.thumb && <img className="hub-thumb" style={{ cursor: 'pointer' }} src={m.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" />}
-            <h3>{m.name}</h3>
-          </article>))}</div>
-      ))}
-      <p className="sl-sub">Recipes from <a className="sl-link" href="https://www.themealdb.com" target="_blank" rel="noreferrer noopener">TheMealDB</a>.</p>
-      {open && <MealView m={open} onClose={() => setOpen(null)} />}
-    </>
-  )
 }
 
 /* ---------- shop ---------- */

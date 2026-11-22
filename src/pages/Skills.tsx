@@ -6,11 +6,12 @@ import { COURSE_PROVIDERS, PROVIDER_TYPES, providerLink } from '../lib/coursePro
 import ProviderLogo from '../components/ProviderLogo'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
 import { AttachList, Empty, FilePicker, HubShell, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
-import { AdminOrders, AdminProducts, AdminSettings, Kitchen, Library, Shop } from './SkillsShop'
-import Explore, { type Tab as ExploreTab } from './SkillsExplore'
+import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './SkillsShop'
+import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
+import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'explore' | 'shop' | 'teach' | 'admin' } | { name: 'class'; id: string }
+type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' } | { name: 'class'; id: string }
 const call = skillsApi.call
 
 /* ---------- recommendations ---------- */
@@ -26,6 +27,7 @@ function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User 
     <article className="sl-resource">
       <div className="sl-resource-top">
         <span className="sl-chip">{r.kind === 'video' ? 'Video' : 'Course'}</span><span className="sl-chip">{r.skill}</span>
+        {r.featured && <span className="hub-pay">Pick of the week</span>}
         {r.kind === 'course' && r.isFree === 'yes' && <span className="hub-pay">Free</span>}
         {r.status !== 'approved' && <StatusBadge s={r.status} />}
       </div>
@@ -35,6 +37,7 @@ function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User 
       <h3>{r.title}</h3>
       <small className="sl-unitline">{r.kind === 'video' ? r.channel : r.provider}{r.category ? ` · ${r.category}` : ''}</small>
       <p>{r.reason}</p>
+      {r.nextStep && <p className="cit-next"><b>Your next step:</b> {r.nextStep}</p>}
       {r.status === 'rejected' && r.rejectReason && <p className="sl-reject">Reason: {r.rejectReason}</p>}
       <small className="sl-sub">Recommended by {r.userName || 'a comrade'}{r.userEmail ? ` · ${r.userEmail}` : ''} · {fmtDate(r.createdAt)}</small>
       <div className="sl-resource-foot"><span className="sl-foot-actions">
@@ -54,6 +57,7 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   const [skill, setSkill] = useState('')
   const [category, setCategory] = useState(config.categories[0] ?? 'Other')
   const [reason, setReason] = useState('')
+  const [nextStep, setNextStep] = useState('')
   const [provider, setProvider] = useState('')
   const [isFree, setIsFree] = useState('unsure')
   const [busy, setBusy] = useState(false)
@@ -62,7 +66,7 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setMsg(null)
     try {
-      await skillsApi.submitRec({ kind, url: url.trim(), title: title.trim(), skill: skill.trim(), category, reason: reason.trim(), ...(kind === 'course' ? { provider: provider.trim(), isFree } : {}) })
+      await skillsApi.submitRec({ kind, url: url.trim(), title: title.trim(), skill: skill.trim(), category, reason: reason.trim(), nextStep: nextStep.trim() || undefined, ...(kind === 'course' ? { provider: provider.trim(), isFree } : {}) })
       setDone(true); onDone()
     } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
   }
@@ -86,6 +90,7 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
           <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{config.categories.map((c) => <option key={c}>{c}</option>)}</select></label>
         </div>
         <label>Why is it helpful?<textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} /></label>
+        <label>Your next step (optional): what should people DO after watching?<input value={nextStep} onChange={(e) => setNextStep(e.target.value)} maxLength={200} placeholder="e.g. Try this formula on your own budget sheet this week" /></label>
         <Msg msg={msg} />
         <button className="sl-primary" disabled={busy}>{busy ? 'Sending…' : 'Send for approval'}</button>
       </form>
@@ -93,15 +98,7 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   )
 }
 
-const GOAL_LINKS: { tab: ExploreTab; label: string; hint: string }[] = [
-  { tab: 'earning', label: 'Earn', hint: 'Skills that can bring income' },
-  { tab: 'interest', label: 'Interest', hint: 'Learn something curious' },
-  { tab: 'health', label: 'Health', hint: 'Body and mind' },
-  { tab: 'hobby', label: 'Hobby', hint: 'Creative and fun' },
-  { tab: 'chuka', label: 'Chuka courses', hint: 'All university programmes' },
-]
-
-function Learn({ user, onSignIn, config, onRecommend, onExplore }: { user: User | null; onSignIn: () => void; config: SkillsConfig; onRecommend: (p?: { url: string; title: string }) => void; onExplore: (t: ExploreTab) => void }) {
+function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | null; onSignIn: () => void; config: SkillsConfig; isAdmin: boolean; onRecommend: (p?: { url: string; title: string }) => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
   const [kind, setKind] = useState('')
@@ -127,12 +124,10 @@ function Learn({ user, onSignIn, config, onRecommend, onExplore }: { user: User 
   return (
     <>
       <section className="sl-hero">
-        <div><span className="sl-kicker">CHUKA SKILLS</span><h1>Learn a skill <em>from comrades, free courses &amp; videos</em></h1>
-          <p>Browse videos and courses recommended by students, join a class run by the Chuka Skills team, or search free courses from {COURSE_PROVIDERS.length} providers.</p></div>
+        <div><span className="sl-kicker">CIT GROUP · CHUKA AI COMMUNITY</span><h1>Learn Google Sheets, AI &amp; data skills <em>and turn them into income</em></h1>
+          <p>Live classes in Google Sheets, AI coding, AI skills and AI data analysis, plus hand-picked videos on AI and the job market. Search free courses from {COURSE_PROVIDERS.length} providers too.</p></div>
         <div className="sl-hero-art"><GraduationCap size={46} /><span>Grow your skills</span></div>
       </section>
-      <div className="hub-sec"><h2>What do you want to learn for?</h2></div>
-      <div className="hub-chips">{GOAL_LINKS.map((g) => <button key={g.tab} title={g.hint} onClick={() => onExplore(g.tab)}>{g.label}</button>)}</div>
       <div className="hub-bar">
         <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recommended videos and courses, e.g. CapCut, barbering, Python…" /></form>
         <button className="sl-primary small" onClick={user ? () => onRecommend() : onSignIn}><Plus size={15} /> Recommend</button>
@@ -145,8 +140,15 @@ function Learn({ user, onSignIn, config, onRecommend, onExplore }: { user: User 
       </div>
       <Msg msg={msg} />
       {!items ? <Loading /> : items.length === 0 ? <Empty icon={<Video size={26} />} title="Nothing recommended yet" text="Recommend a helpful video or course, or search below." /> : (
-        <div className="sl-grid">{items.map((r) => <RecCard key={r.id} r={r} user={user} onSignIn={onSignIn} onError={(m) => setMsg({ type: 'err', text: m })} />)}</div>
+        <div className="sl-grid">{items.map((r) => (
+          <div key={r.id} className={r.featured ? 'cit-pick' : undefined}>
+            <RecCard r={r} user={user} onSignIn={onSignIn} onError={(m) => setMsg({ type: 'err', text: m })}>
+              {isAdmin && r.status === 'approved' && <button className="sl-mini" onClick={() => skillsApi.admin.featureRec(r.id, r.featured).then(load).catch((e) => setMsg({ type: 'err', text: errMsg(e) }))}>{r.featured ? 'Remove pick' : 'Pick of the week'}</button>}
+            </RecCard>
+          </div>))}</div>
       )}
+
+      <ChannelShelf config={config} />
 
       <div className="hub-sec"><h2>Search YouTube</h2></div>
       <form className="sl-search" onSubmit={ytSearch}><Search size={18} /><input value={yq} onChange={(e) => setYq(e.target.value)} placeholder="Search tutorials, e.g. “graphic design for beginners”" />
@@ -162,7 +164,6 @@ function Learn({ user, onSignIn, config, onRecommend, onExplore }: { user: User 
           </article>))}</div>
       ))}
 
-      <Kitchen user={user} onSignIn={onSignIn} />
       <CourseFinder />
     </>
   )
@@ -351,7 +352,7 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
   const upcoming = c.sessions.filter((s) => new Date(s.endAt).getTime() >= now)
   const past = c.sessions.filter((s) => new Date(s.endAt).getTime() < now)
   const where = c.mode === 'physical' ? c.venue : (c.joinLink ?? '')
-  const details = `Chuka Skills class: ${c.title}.${c.joinLink ? ` Join: ${c.joinLink}` : ' Join the class on Chuka Comrades to see the link.'}`
+  const details = `CIT Group class: ${c.title}.${c.joinLink ? ` Join: ${c.joinLink}` : ' Get access on Chuka Comrades to see the link.'}`
   return (
     <>
       <div className="sl-page-head"><div><span className="sl-kicker">{c.skill.toUpperCase()}</span><h1>{c.title}</h1></div></div>
@@ -364,9 +365,10 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
         <AttachList items={c.attachments} call={call} onError={(m) => setMsg({ type: 'err', text: m })} />
         {c.status === 'approved' && !c.mine && !isAdmin && (c.joined
           ? <button className="sl-mini danger" disabled={busy} onClick={() => run(() => skillsApi.leave(c.id), 'You left the class.')}>Leave class</button>
-          : <button className="sl-primary small" disabled={busy} onClick={() => (user ? run(() => skillsApi.join(c.id), 'You joined. The class link is now visible.') : onSignIn())}>{user ? 'Join this class' : 'Sign in to join'}</button>)}
+          : c.access !== 'all' ? null : <button className="sl-primary small" disabled={busy} onClick={() => (user ? run(() => skillsApi.join(c.id), 'You joined. The class link is now visible.') : onSignIn())}>{user ? 'Join this class' : 'Sign in to join'}</button>)}
         {isAdmin && <button className="sl-mini" onClick={() => onEdit(c)}><Pencil size={13} /> Edit class</button>}
       </article>
+      {c.status === 'approved' && !c.mine && !isAdmin && <AccessPanel cls={c} user={user} onSignIn={onSignIn} config={config} onChanged={() => { void load() }} />}
 
       {(c.sessions.length > 0 || isAdmin) && (
         <>
@@ -425,6 +427,12 @@ function ClassPage({ id, user, onSignIn, config, isAdmin, tick, onEdit, onGone }
             </div>
           ))}
           {d.members.length > 0 && <details style={{ marginTop: 16 }}><summary className="sl-sub">Students ({d.members.length})</summary><ul className="sl-picked">{d.members.map((m, i) => <li key={i}>{m.name || 'Student'} · {m.email}</li>)}</ul></details>}
+        </>
+      )}
+      {c.status === 'approved' && (
+        <>
+          <div className="hub-sec"><h2>Class discussion</h2></div>
+          <ChatRoom room={`class:${c.id}`} user={user} onSignIn={onSignIn} isAdmin={isAdmin} title={c.title} sub="Open to the community" placeholder="Ask a question or share your progress…" />
         </>
       )}
       {(c.mine || isAdmin) && <p style={{ marginTop: 18 }}><button className="sl-mini danger" onClick={async () => { if (window.confirm('Delete this class, its sessions and everything in it?')) { try { await skillsApi.deleteClass(c.id); onGone() } catch (e) { err(e) } } }}><Trash2 size={13} /> Delete class</button></p>}
@@ -512,7 +520,7 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
 
 /* ---------- admin ---------- */
 function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick: number; config: SkillsConfig; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void; onConfigChanged: () => void }) {
-  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings'>('all')
+  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live'>('all')
   const [edits, setEdits] = useState<Record<string, { title?: string; category?: string }>>({})
   const [q, setQ] = useState<{ classes: ClassItem[]; recs: Rec[] } | null>(null)
   const [all, setAll] = useState<ClassItem[] | null>(null)
@@ -522,7 +530,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
   const loadQ = useCallback(() => skillsApi.admin.queue().then(setQ).catch(err), [])
   const loadAll = useCallback(() => skillsApi.admin.classes().then(setAll).catch((e) => { err(e); setAll([]) }), [])
   useEffect(() => { void loadQ() }, [loadQ, tick])
-  useEffect(() => { if (tab === 'all') void loadAll() }, [tab, loadAll, tick])
+  useEffect(() => { if (tab === 'all' || tab === 'live') void loadAll() }, [tab, loadAll, tick])
   const noop = () => {}
   const decide = (kind: 'class' | 'rec', id: string, d: 'approve' | 'reject') =>
     (kind === 'class' ? skillsApi.admin.reviewClass(id, d, reasons[id]?.trim()) : skillsApi.admin.reviewRec(id, d, reasons[id]?.trim(), edits[id]))
@@ -537,6 +545,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
         {config.allowTutorCreate && <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>}
         <button className={tab === 'products' ? 'on' : ''} onClick={() => setTab('products')}>Products</button>
         <button className={tab === 'orders' ? 'on' : ''} onClick={() => setTab('orders')}>Orders</button>
+        <button className={tab === 'live' ? 'on' : ''} onClick={() => setTab('live')}>Live</button>
         <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>
       </div>
       <Msg msg={msg} />
@@ -561,6 +570,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
       ))}
       {tab === 'products' && <AdminProducts config={config} tick={tick} />}
       {tab === 'orders' && <AdminOrders tick={tick} />}
+      {tab === 'live' && <AdminLive config={config} classes={all ?? []} onSaved={onConfigChanged} />}
       {tab === 'settings' && <AdminSettings config={config} onSaved={onConfigChanged} />}
       {tab === 'all' && (
         <>
@@ -588,7 +598,6 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const [tick, setTick] = useState(0)
   const [fatal, setFatal] = useState('')
   const [classQ, setClassQ] = useState('')
-  const [exploreTab, setExploreTab] = useState<ExploreTab>('earning')
   const loadConfig = useCallback(() => { if (skillsReady) skillsApi.config().then((c) => setConfig({ ...FALLBACK_CONFIG, ...c, whatsapp: c.whatsapp || ADMIN_WA })).catch((e) => setFatal(errMsg(e))) }, [])
   useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => {
@@ -601,20 +610,22 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const name = view.name
   const open = (id: string) => setView({ name: 'class', id })
   return (
-    <HubShell name="Chuka Skills" sub="Chuka Comrades" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
+    <HubShell name="CIT Group" sub="Chuka AI Community" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
       onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : 'learn' }))}
       nav={<>
         <button className={name === 'learn' ? 'on' : ''} onClick={() => setView({ name: 'learn' })}>Learn</button>
-        <button className={name === 'explore' ? 'on' : ''} onClick={() => setView({ name: 'explore' })}>Explore</button>
         <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => { setClassQ(''); setView({ name: 'classes' }) }}>Classes</button>
+        <button className={name === 'live' ? 'on' : ''} onClick={() => setView({ name: 'live' })}>{config.live.on && <span className="cit-dot" />}Live</button>
         <button className={name === 'shop' ? 'on' : ''} onClick={() => setView({ name: 'shop' })}><ShoppingBag size={14} /> Shop</button>
+        <button className={name === 'chat' ? 'on' : ''} onClick={() => gated({ name: 'chat' })}><MessageCircle size={14} /> {isAdmin ? 'Inbox' : 'Ask admin'}</button>
         <button className={name === 'teach' ? 'on' : ''} onClick={() => gated({ name: 'teach' })}>My skills</button>
         {isAdmin && <button className={name === 'admin' ? 'on' : ''} onClick={() => setView({ name: 'admin' })}><ShieldCheck size={14} /> Admin</button>}
       </>}>
       {!skillsReady && <Msg msg={{ type: 'err', text: 'Skills server not connected yet. Add VITE_SKILLS_API_URL to .env and restart npm run dev.' }} />}
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
-      {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} onRecommend={(p) => setRecOpen(p ?? 'new')} onExplore={(t) => { setExploreTab(t); setView({ name: 'explore' }) }} />}
-      {view.name === 'explore' && <Explore key={exploreTab} initialTab={exploreTab} onClasses={(q) => { setClassQ(q); setView({ name: 'classes' }) }} />}
+      {view.name === 'live' && <LiveRoom config={config} user={user} onSignIn={onSignIn} isAdmin={isAdmin} onOpenClass={open} />}
+      {view.name === 'chat' && (isAdmin ? <><div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Student messages</h1></div></div><AdminInbox user={user} onSignIn={onSignIn} /></> : <StudentChat user={user} onSignIn={onSignIn} whatsapp={config.whatsapp} />)}
+      {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} />}
       {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}
       {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}

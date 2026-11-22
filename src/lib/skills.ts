@@ -17,20 +17,28 @@ const api = {
 export type Status = 'pending' | 'approved' | 'rejected'
 export type Mode = 'online' | 'physical' | 'hybrid'
 export type Provider = { name: string; about: string; url: string; search: boolean }
-export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean; payTo: string }
-export type Session = { id: string; title: string; startAt: string; endAt: string; note: string }
+export type Prices = { full: number; course: number; session: number; passDays: number }
+export type LiveState = { on: boolean; title?: string; classId?: string; free?: boolean; locked?: boolean; videoId?: string }
+export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean; payTo: string; prices: Prices; live: LiveState; channelId: string; channelHandle: string }
+export type AccessKind = 'full' | 'course' | 'session'
+export type ClassAccess = 'all' | 'sessions' | 'none'
+export type ChannelVideo = { videoId: string; title: string; published: string; thumbnail: string }
+export type PendingAccess = { orderId: string; kind: AccessKind; title: string; price: number; classId: string; sessionId: string; mpesaCode: string; createdAt: string }
+export type MyAccess = { full: boolean; passExpires: string; courses: string[]; sessions: string[]; pending: PendingAccess[]; prices: Prices }
+export const CHANNEL_URL = 'https://www.youtube.com/@ChukaAIcommunity'
+export type Session = { id: string; title: string; startAt: string; endAt: string; note: string; paid?: boolean }
 export type UpcomingSession = { id: string; classId: string; classTitle: string; skill: string; mode: Mode; venue: string; title: string; startAt: string; endAt: string }
 
 /** Admin WhatsApp number (country code, no +). People who want to teach a class message this number. */
 export const ADMIN_WA = (import.meta.env.VITE_ADMIN_WHATSAPP as string) || '254184198432'
 export type Rec = {
   id: string; kind: 'video' | 'course'; title: string; url: string; videoId: string; channel: string; thumbnail: string; provider: string; isFree: string
-  skill: string; category: string; reason: string; status: Status; rejectReason: string; userName: string; createdAt: string; votes: number; myVote: boolean; userEmail?: string
+  skill: string; category: string; reason: string; status: Status; rejectReason: string; userName: string; createdAt: string; votes: number; myVote: boolean; userEmail?: string; nextStep?: string; featured?: boolean
 }
 export type ClassItem = {
   id: string; title: string; skill: string; category: string; level: string; description: string; mode: Mode; venue: string; schedule: string; startDate: string
   capacity: number; status: Status; rejectReason: string; tutorName: string; createdAt: string; memberCount: number; joined: boolean; mine: boolean
-  attachments: Attachment[]; sessions: Session[]; joinLink?: string; tutorEmail?: string; meetSpace?: string
+  attachments: Attachment[]; sessions: Session[]; joinLink?: string; tutorEmail?: string; meetSpace?: string; access?: ClassAccess
 }
 export type ClassPost = { id: string; text: string; link: string; authorName: string; createdAt: string; attachments: Attachment[]; mine: boolean }
 export type ClassDetail = { cls: ClassItem; posts: ClassPost[]; members: { name: string; email: string }[] }
@@ -41,7 +49,7 @@ export type ClassInput = {
   startDate?: string; capacity: number; joinLink: string; files?: UploadFile[]; removeFileIds?: string[]
   tutorName?: string; meetSpace?: string
 }
-export type RecInput = { kind: 'video' | 'course'; url: string; title?: string; skill: string; category: string; reason: string; provider?: string; isFree?: string }
+export type RecInput = { kind: 'video' | 'course'; url: string; title?: string; skill: string; category: string; reason: string; provider?: string; isFree?: string; nextStep?: string }
 
 export const PAY_TO = (import.meta.env.VITE_PAY_TO as string) || '0184198432'
 
@@ -54,12 +62,11 @@ export type ProductInput = {
   status: 'draft' | 'live'; cover?: UploadFile; files?: UploadFile[]; removeFileIds?: string[]
 }
 export type OrderStatus = 'pending' | 'active' | 'rejected'
-export type Order = { id: string; productId: string; productTitle: string; price: number; name: string; email: string; mpesaCode: string; status: OrderStatus; note: string; createdAt: string; decidedAt: string }
+export type Order = { kind?: string; classId?: string; sessionId?: string; id: string; productId: string; productTitle: string; price: number; name: string; email: string; mpesaCode: string; status: OrderStatus; note: string; createdAt: string; decidedAt: string }
 export type PendingOrder = { orderId: string; productId: string; title: string; price: number; mpesaCode: string; createdAt: string }
-export type Meal = { id: string; name: string; thumb: string; category?: string; area?: string; instructions?: string; ingredients?: { name: string; measure: string }[]; youtube?: string; source?: string }
-export type MealResponse = { items: Meal[]; error?: string }
 
-export const FALLBACK_CONFIG: SkillsConfig = { categories: [], levels: ['All levels'], providers: [], files: DEFAULT_RULES, searchReady: false, whatsapp: ADMIN_WA, allowTutorCreate: false, payTo: PAY_TO }
+export const FALLBACK_CONFIG: SkillsConfig = { categories: [], levels: ['All levels'], providers: [], files: DEFAULT_RULES, searchReady: false, whatsapp: ADMIN_WA, allowTutorCreate: false, payTo: PAY_TO,
+  prices: { full: 2000, course: 1000, session: 100, passDays: 0 }, live: { on: false }, channelId: '', channelHandle: 'ChukaAIcommunity' }
 
 export const skillsApi = {
   call: api.call,
@@ -71,9 +78,12 @@ export const skillsApi = {
   vote: (id: string) => api.call<{ votes: number }>('rec_vote', { id }),
   ytSearch: (q: string) => api.call<YtResponse>('yt_search', { q }),
   upcoming: () => api.call<UpcomingSession[]>('sessions_upcoming'),
-  meals: (mode: 'day' | 'search' | 'ingredient' | 'lookup', q = '') => api.call<MealResponse>('meals', { mode, q }),
   products: () => api.call<Product[]>('products'),
   order: (productId: string, mpesaCode?: string) => api.call<{ id: string; status: OrderStatus; price: number; productTitle: string; payTo: string }>('order_create', { productId, mpesaCode }),
+  accessOrder: (p: { kind: AccessKind; classId?: string; sessionId?: string; mpesaCode?: string }) =>
+    api.call<{ id: string; status: OrderStatus; price: number; title: string; payTo: string }>('access_order', { ...p }),
+  myAccess: () => api.call<MyAccess>('my_access'),
+  channelFeed: () => api.call<{ items: ChannelVideo[]; error?: string }>('channel_feed'),
   library: () => api.call<{ library: Product[]; pending: PendingOrder[] }>('my_library'),
   classes: (q = '', category = '') => api.call<ClassItem[]>('classes', { q, category }),
   classGet: (id: string) => api.call<ClassDetail>('class_get', { id }),
@@ -95,6 +105,8 @@ export const skillsApi = {
     decideOrder: (id: string, decision: 'activate' | 'reject', note?: string) => api.call<{ status: OrderStatus }>('admin_order_decide', { id, decision, note }),
     saveCategories: (categories: string[]) => api.call<{ categories: string[] }>('admin_categories_save', { categories }),
     importPlaylist: (p: { url: string; skill: string; category: string; limit?: number; reason?: string }) => api.call<{ added: number; skipped: number }>('admin_playlist_import', { ...p }),
+    setLive: (l: { on: boolean; videoId?: string; title?: string; classId?: string; free?: boolean }) => api.call<LiveState>('admin_live_set', { ...l }),
+    featureRec: (id: string, off?: boolean) => api.call<{ ok: boolean }>('admin_rec_feature', { id, off }),
     deleteSession: (id: string) => api.call<{ deleted: boolean }>('admin_session_delete', { id }),
     queue: () => api.call<{ classes: ClassItem[]; recs: Rec[] }>('admin_queue'),
     reviewClass: (id: string, decision: 'approve' | 'reject', reason?: string) => api.call<{ status: Status }>('admin_review_class', { id, decision, reason }),
