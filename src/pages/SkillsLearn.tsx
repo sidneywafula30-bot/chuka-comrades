@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { ArrowRight, CheckCircle2, Circle, Code2, Download, ExternalLink, Laptop, Pencil, Plus, Trash2, Youtube } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Code2, Download, ExternalLink, Laptop, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { skillsApi, skillsReady, SW_PLATFORMS, type Software, type SoftwareInput, type SoftwarePrice } from '../lib/skills'
 import { LEARN_PATHS, type LearnPath } from '../lib/learnPaths'
 import { errMsg, type Note } from '../lib/hub'
@@ -167,7 +167,7 @@ export function PathPage({ path, onSeeContent, onSoftware }: { path: LearnPath; 
               <div>
                 <h3><span>{i + 1}</span> {s.title}</h3>
                 <p>{s.text}</p>
-                <a className="sl-mini ghost" href={`https://www.youtube.com/results?search_query=${encodeURIComponent(s.search)}`} target="_blank" rel="noreferrer noopener"><Youtube size={13} /> Watch tutorials <ExternalLink size={12} /></a>
+                <a className="sl-mini ghost" href={`https://www.youtube.com/results?search_query=${encodeURIComponent(s.search)}`} target="_blank" rel="noreferrer noopener"><Play size={13} /> Watch tutorials <ExternalLink size={12} /></a>
               </div>
             </li>
           )
