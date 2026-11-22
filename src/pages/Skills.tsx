@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, ExternalLink, GraduationCap, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
+import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, Download, ExternalLink, GraduationCap, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
 import { skillsApi, skillsReady, ADMIN_WA, FALLBACK_CONFIG, type ClassDetail, type ClassItem, type Mode, type Rec, type SkillsConfig, type UpcomingSession, type YtResponse } from '../lib/skills'
-import { COURSE_PROVIDERS, PROVIDER_TYPES, providerLink } from '../lib/courseProviders'
-import ProviderLogo from '../components/ProviderLogo'
+import { pathById } from '../lib/learnPaths'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
 import { AttachList, Empty, FilePicker, HubShell, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
 import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './SkillsShop'
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
+import { AdminSoftware, PathCards, PathPage, SoftwareList } from './SkillsLearn'
+import '../components/Cit.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' } | { name: 'class'; id: string }
+type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' } | { name: 'class'; id: string } | { name: 'path'; id: string }
 const call = skillsApi.call
 
 /* ---------- recommendations ---------- */
@@ -28,7 +29,6 @@ function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User 
       <div className="sl-resource-top">
         <span className="sl-chip">{r.kind === 'video' ? 'Video' : 'Course'}</span><span className="sl-chip">{r.skill}</span>
         {r.featured && <span className="hub-pay">Pick of the week</span>}
-        {r.kind === 'course' && r.isFree === 'yes' && <span className="hub-pay">Free</span>}
         {r.status !== 'approved' && <StatusBadge s={r.status} />}
       </div>
       {r.kind === 'video' && r.videoId && (play
@@ -59,14 +59,13 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   const [reason, setReason] = useState('')
   const [nextStep, setNextStep] = useState('')
   const [provider, setProvider] = useState('')
-  const [isFree, setIsFree] = useState('unsure')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<Note>(null)
   const [done, setDone] = useState(false)
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setMsg(null)
     try {
-      await skillsApi.submitRec({ kind, url: url.trim(), title: title.trim(), skill: skill.trim(), category, reason: reason.trim(), nextStep: nextStep.trim() || undefined, ...(kind === 'course' ? { provider: provider.trim(), isFree } : {}) })
+      await skillsApi.submitRec({ kind, url: url.trim(), title: title.trim(), skill: skill.trim(), category, reason: reason.trim(), nextStep: nextStep.trim() || undefined, ...(kind === 'course' ? { provider: provider.trim() } : {}) })
       setDone(true); onDone()
     } catch (err) { setMsg({ type: 'err', text: errMsg(err) }) } finally { setBusy(false) }
   }
@@ -79,10 +78,7 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
         {kind === 'course' ? (
           <>
             <label>Course title<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} /></label>
-            <div className="sl-two">
-              <label>Provider<input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="e.g. Coursera, freeCodeCamp" maxLength={60} /></label>
-              <label>Is it free?<select value={isFree} onChange={(e) => setIsFree(e.target.value)}><option value="yes">Yes, free</option><option value="no">Paid</option><option value="unsure">Not sure</option></select></label>
-            </div>
+            <label>Provider<input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="e.g. Coursera, Udemy" maxLength={60} /></label>
           </>
         ) : <label>Video title (only if it does not fill in automatically)<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} /></label>}
         <div className="sl-two">
@@ -98,9 +94,9 @@ function RecModal({ config, prefill, onClose, onDone }: { config: SkillsConfig; 
   )
 }
 
-function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | null; onSignIn: () => void; config: SkillsConfig; isAdmin: boolean; onRecommend: (p?: { url: string; title: string }) => void }) {
+function Learn({ user, onSignIn, config, isAdmin, onRecommend, onOpenPath, onAllSoftware, initialCat = '' }: { user: User | null; onSignIn: () => void; config: SkillsConfig; isAdmin: boolean; onRecommend: (p?: { url: string; title: string }) => void; onOpenPath: (id: string) => void; onAllSoftware: () => void; initialCat?: string }) {
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState('')
+  const [cat, setCat] = useState(initialCat)
   const [kind, setKind] = useState('')
   const [all, setAll] = useState<Rec[] | null>(null)
   const [msg, setMsg] = useState<Note>(null)
@@ -123,13 +119,26 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | 
   const ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${yq.trim()} tutorial`)}`
   return (
     <>
-      <section className="sl-hero">
-        <div><span className="sl-kicker">CIT GROUP · CHUKA AI COMMUNITY</span><h1>Learn Google Sheets, AI &amp; data skills <em>and turn them into income</em></h1>
-          <p>Live classes in Google Sheets, AI coding, AI skills and AI data analysis, plus hand-picked videos on AI and the job market. Search free courses from {COURSE_PROVIDERS.length} providers too.</p></div>
+      <section className="sl-hero cit-hero">
+        <div><span className="sl-kicker">CIT GROUP · CHUKA AI COMMUNITY</span><h1>Learn Google Sheets, AI &amp; computer skills <em>step by step</em></h1>
+          <p>Live classes in Google Sheets, AI coding, AI skills and data analysis. Start from zero with Learn Computer, set up VS Code, and install the software you need.</p>
+          <div className="cit-hero-actions">
+            <button className="sl-primary small" onClick={() => onOpenPath('computer')}>Start Learn Computer</button>
+            <button className="sl-mini cit-light" onClick={() => onOpenPath('vscode')}>Learn VS Code</button>
+          </div></div>
         <div className="sl-hero-art"><GraduationCap size={46} /><span>Grow your skills</span></div>
       </section>
+
+      <div className="hub-sec"><h2>Start here</h2></div>
+      <PathCards onOpen={onOpenPath} />
+
+      <div className="hub-sec"><h2>Software you need</h2><button className="sl-mini" onClick={onAllSoftware}><Download size={13} /> See all</button></div>
+      <p className="sl-sub" style={{ marginTop: 0 }}>Install these before your first class. Chosen by the CIT admin.</p>
+      <SoftwareList limit={4} onAll={onAllSoftware} />
+
+      <div className="hub-sec"><h2>Videos &amp; courses</h2></div>
       <div className="hub-bar">
-        <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recommended videos and courses, e.g. CapCut, barbering, Python…" /></form>
+        <form className="sl-search" onSubmit={(e) => e.preventDefault()}><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search videos and courses, e.g. Google Sheets, Python, VS Code…" /></form>
         <button className="sl-primary small" onClick={user ? () => onRecommend() : onSignIn}><Plus size={15} /> Recommend</button>
       </div>
       <div className="hub-chips">
@@ -139,7 +148,7 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | 
         </select>
       </div>
       <Msg msg={msg} />
-      {!items ? <Loading /> : items.length === 0 ? <Empty icon={<Video size={26} />} title="Nothing recommended yet" text="Recommend a helpful video or course, or search below." /> : (
+      {!items ? <Loading /> : items.length === 0 ? <Empty icon={<Video size={26} />} title="Nothing recommended yet" text="Recommend a helpful video or course, or search YouTube below." /> : (
         <div className="sl-grid">{items.map((r) => (
           <div key={r.id} className={r.featured ? 'cit-pick' : undefined}>
             <RecCard r={r} user={user} onSignIn={onSignIn} onError={(m) => setMsg({ type: 'err', text: m })}>
@@ -151,7 +160,7 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | 
       <ChannelShelf config={config} />
 
       <div className="hub-sec"><h2>Search YouTube</h2></div>
-      <form className="sl-search" onSubmit={ytSearch}><Search size={18} /><input value={yq} onChange={(e) => setYq(e.target.value)} placeholder="Search tutorials, e.g. “graphic design for beginners”" />
+      <form className="sl-search" onSubmit={ytSearch}><Search size={18} /><input value={yq} onChange={(e) => setYq(e.target.value)} placeholder="Search tutorials, e.g. “VS Code for beginners”" />
         <button className="sl-primary small" disabled={ybusy || yq.trim().length < 2}>{ybusy ? '…' : 'Search'}</button></form>
       {yq.trim().length >= 2 && <p className="sl-sub" style={{ marginTop: 8 }}>Or <a className="sl-link" href={ytLink} target="_blank" rel="noreferrer noopener">open this search on YouTube <ExternalLink size={12} /></a></p>}
       {yres?.error && <p className="sl-alert err" style={{ marginTop: 10 }}>{yres.error} <a className="sl-link" href={yres.fallbackUrl} target="_blank" rel="noreferrer noopener">Search on YouTube <ExternalLink size={12} /></a></p>}
@@ -164,41 +173,6 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend }: { user: User | 
           </article>))}</div>
       ))}
 
-      <CourseFinder />
-    </>
-  )
-}
-
-/* ---------- free course finder (any topic, 17 providers, official logos) ---------- */
-const TOPICS = ['Python', 'Excel', 'Accounting', 'Public health', 'Graphic design', 'Data science', 'English']
-function CourseFinder() {
-  const [q, setQ] = useState('')
-  const [type, setType] = useState<string>('All types')
-  const list = COURSE_PROVIDERS.filter((p) => type === 'All types' || p.type === type)
-  const phrase = q.trim()
-  return (
-    <>
-      <div className="hub-sec"><h2>Find free online courses</h2></div>
-      <p className="sl-sub" style={{ marginTop: 0 }}>Type any topic, then open it on the providers below. Each card opens that provider’s own search, so results are always current.</p>
-      <div className="hub-bar">
-        <div className="sl-search"><Search size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Any topic, e.g. data science, nursing, welding safety…" maxLength={100} aria-label="Course topic" /></div>
-        <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Provider type" style={{ borderRadius: 999, border: '1px solid #d6e4db', padding: '8px 12px', font: 'inherit', fontSize: 13 }}>
-          {PROVIDER_TYPES.map((t) => <option key={t}>{t}</option>)}
-        </select>
-      </div>
-      <div className="hub-chips">{TOPICS.map((t) => <button key={t} className={phrase.toLowerCase() === t.toLowerCase() ? 'on' : ''} onClick={() => setQ(t)}>{t}</button>)}</div>
-      <div className="sl-grid">{list.map((p) => {
-        const l = providerLink(p, phrase)
-        return (
-          <a key={p.id} className="cf-card" href={l.href} target="_blank" rel="noreferrer noopener">
-            <div className="cf-head"><ProviderLogo p={p} /><div><strong>{p.name}</strong><span className="sl-chip">{p.type}</span></div></div>
-            <p>{p.about}</p>
-            <small className="cf-access">{p.access}</small>
-            <span className="cf-go">{l.mode === 'browse' ? 'Browse catalogue' : l.mode === 'search' ? `Search “${phrase}”` : `Search “${phrase}” via Google`} <ExternalLink size={13} /></span>
-          </a>
-        )
-      })}</div>
-      <p className="sl-sub" style={{ marginTop: 12 }}>Chuka Skills links to these providers; it does not host their courses. Some courses are free only to study, with certificates, graded work or extended access paid. Check the price and terms before you enrol. Logos belong to their owners.</p>
     </>
   )
 }
@@ -520,7 +494,7 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
 
 /* ---------- admin ---------- */
 function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick: number; config: SkillsConfig; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void; onConfigChanged: () => void }) {
-  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live'>('all')
+  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live' | 'software'>('all')
   const [edits, setEdits] = useState<Record<string, { title?: string; category?: string }>>({})
   const [q, setQ] = useState<{ classes: ClassItem[]; recs: Rec[] } | null>(null)
   const [all, setAll] = useState<ClassItem[] | null>(null)
@@ -543,6 +517,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
         <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All classes</button>
         <button className={tab === 'recs' ? 'on' : ''} onClick={() => setTab('recs')}>Recommendations <b>{q?.recs.length ?? 0}</b></button>
         {config.allowTutorCreate && <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>}
+        <button className={tab === 'software' ? 'on' : ''} onClick={() => setTab('software')}>Software</button>
         <button className={tab === 'products' ? 'on' : ''} onClick={() => setTab('products')}>Products</button>
         <button className={tab === 'orders' ? 'on' : ''} onClick={() => setTab('orders')}>Orders</button>
         <button className={tab === 'live' ? 'on' : ''} onClick={() => setTab('live')}>Live</button>
@@ -568,6 +543,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
               {box(r.id)}<button className="sl-mini" onClick={() => decide('rec', r.id, 'approve')}>Approve</button><button className="sl-mini danger" onClick={() => decide('rec', r.id, 'reject')}>Reject</button></span>
           </RecCard>))}</div>
       ))}
+      {tab === 'software' && <AdminSoftware tick={tick} />}
       {tab === 'products' && <AdminProducts config={config} tick={tick} />}
       {tab === 'orders' && <AdminOrders tick={tick} />}
       {tab === 'live' && <AdminLive config={config} classes={all ?? []} onSaved={onConfigChanged} />}
@@ -598,6 +574,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const [tick, setTick] = useState(0)
   const [fatal, setFatal] = useState('')
   const [classQ, setClassQ] = useState('')
+  const [learnCat, setLearnCat] = useState('')
   const loadConfig = useCallback(() => { if (skillsReady) skillsApi.config().then((c) => setConfig({ ...FALLBACK_CONFIG, ...c, whatsapp: c.whatsapp || ADMIN_WA })).catch((e) => setFatal(errMsg(e))) }, [])
   useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => {
@@ -613,9 +590,10 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
     <HubShell name="CIT Group" sub="Chuka AI Community" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
       onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : 'learn' }))}
       nav={<>
-        <button className={name === 'learn' ? 'on' : ''} onClick={() => setView({ name: 'learn' })}>Learn</button>
+        <button className={name === 'learn' || name === 'path' ? 'on' : ''} onClick={() => { setLearnCat(''); setView({ name: 'learn' }) }}>Learn</button>
         <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => { setClassQ(''); setView({ name: 'classes' }) }}>Classes</button>
         <button className={name === 'live' ? 'on' : ''} onClick={() => setView({ name: 'live' })}>{config.live.on && <span className="cit-dot" />}Live</button>
+        <button className={name === 'software' ? 'on' : ''} onClick={() => setView({ name: 'software' })}><Download size={14} /> Software</button>
         <button className={name === 'shop' ? 'on' : ''} onClick={() => setView({ name: 'shop' })}><ShoppingBag size={14} /> Shop</button>
         <button className={name === 'chat' ? 'on' : ''} onClick={() => gated({ name: 'chat' })}><MessageCircle size={14} /> {isAdmin ? 'Inbox' : 'Ask admin'}</button>
         <button className={name === 'teach' ? 'on' : ''} onClick={() => gated({ name: 'teach' })}>My skills</button>
@@ -625,7 +603,9 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
       {view.name === 'live' && <LiveRoom config={config} user={user} onSignIn={onSignIn} isAdmin={isAdmin} onOpenClass={open} />}
       {view.name === 'chat' && (isAdmin ? <><div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Student messages</h1></div></div><AdminInbox user={user} onSignIn={onSignIn} /></> : <StudentChat user={user} onSignIn={onSignIn} whatsapp={config.whatsapp} />)}
-      {view.name === 'learn' && <Learn user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} />}
+      {view.name === 'learn' && <Learn key={learnCat} initialCat={learnCat} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} onOpenPath={(id) => setView({ name: 'path', id })} onAllSoftware={() => setView({ name: 'software' })} />}
+      {view.name === 'software' && <><div className="sl-page-head"><div><span className="sl-kicker">SOFTWARE</span><h1>Software you need</h1></div></div><p className="sl-sub" style={{ marginTop: 0 }}>Install these on your computer before class. The CIT admin keeps this list up to date.</p><SoftwareList /></>}
+      {view.name === 'path' && (() => { const path = pathById(view.id); return path ? <PathPage key={path.id} path={path} onSoftware={() => setView({ name: 'software' })} onSeeContent={(c) => { setLearnCat(c); setView({ name: 'learn' }) }} /> : null })()}
       {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}
       {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}
