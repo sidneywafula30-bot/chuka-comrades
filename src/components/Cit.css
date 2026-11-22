@@ -133,3 +133,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .cit-path { padding: 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .sl-resource, .cit-path, .cit-sw, .cit-progress span { transition: none; } .sl-resource:hover, .cit-path:hover, .cit-sw:hover { transform: none; } }
+
+/* ===== menu button (replaces the row of nav buttons) ===== */
+.cit-menu-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--cit-line); background: #fff; color: var(--cit-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.cit-menu-btn:hover { border-color: var(--cit-green); background: var(--cit-green-l); }
+.cit-menu-scrim { position: fixed; inset: 0; z-index: 9998; background: rgba(10,25,17,.28); }
+.cit-menu-panel { position: fixed; z-index: 9999; width: min(300px, calc(100vw - 24px)); max-height: calc(100vh - 90px); overflow-y: auto; display: grid; gap: 2px; padding: 8px; background: #fff; border: 1px solid var(--cit-line); border-radius: 16px; box-shadow: 0 18px 40px -12px rgba(10,25,17,.45); }
+.cit-menu-panel button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 12px; border: 0; border-radius: 12px; background: none; color: var(--cit-ink); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.cit-menu-panel button:hover { background: #f1f6f3; }
+.cit-menu-panel button.on { background: var(--cit-green-l); color: var(--cit-green-d); font-weight: 700; }
+.cit-menu-panel button svg { flex: 0 0 auto; color: var(--cit-green); }
+.cit-menu-panel button .cit-dot { margin: 0 0 0 auto; }

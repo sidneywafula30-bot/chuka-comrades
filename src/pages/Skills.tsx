@@ -8,12 +8,14 @@ import { AttachList, Empty, FilePicker, HubShell, Loading, Modal, Msg, StatusBad
 import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './SkillsShop'
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
+import CitMenu from '../components/CitMenu'
 import { AdminSoftware, PathCards, PathPage, SoftwareList } from './SkillsLearn'
 import '../components/Cit.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
 type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' } | { name: 'class'; id: string } | { name: 'path'; id: string }
 const call = skillsApi.call
+const menuLabel: Record<string, string> = { learn: 'Learn', path: 'Learn', classes: 'Classes', class: 'Classes', live: 'Live', software: 'Software', shop: 'Shop', chat: 'Messages', teach: 'My skills', admin: 'Admin' }
 
 /* ---------- recommendations ---------- */
 function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User | null; onSignIn: () => void; onError: (m: string) => void; children?: ReactNode }) {
@@ -589,16 +591,16 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   return (
     <HubShell name="CIT Group" sub="Chuka AI Community" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
       onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : 'learn' }))}
-      nav={<>
-        <button className={name === 'learn' || name === 'path' ? 'on' : ''} onClick={() => { setLearnCat(''); setView({ name: 'learn' }) }}>Learn</button>
-        <button className={name === 'classes' || name === 'class' ? 'on' : ''} onClick={() => { setClassQ(''); setView({ name: 'classes' }) }}>Classes</button>
-        <button className={name === 'live' ? 'on' : ''} onClick={() => setView({ name: 'live' })}>{config.live.on && <span className="cit-dot" />}Live</button>
-        <button className={name === 'software' ? 'on' : ''} onClick={() => setView({ name: 'software' })}><Download size={14} /> Software</button>
-        <button className={name === 'shop' ? 'on' : ''} onClick={() => setView({ name: 'shop' })}><ShoppingBag size={14} /> Shop</button>
-        <button className={name === 'chat' ? 'on' : ''} onClick={() => gated({ name: 'chat' })}><MessageCircle size={14} /> {isAdmin ? 'Inbox' : 'Ask admin'}</button>
-        <button className={name === 'teach' ? 'on' : ''} onClick={() => gated({ name: 'teach' })}>My skills</button>
-        {isAdmin && <button className={name === 'admin' ? 'on' : ''} onClick={() => setView({ name: 'admin' })}><ShieldCheck size={14} /> Admin</button>}
-      </>}>
+      nav={<CitMenu current={menuLabel[name]} items={[
+        { key: 'learn', label: 'Learn', icon: <GraduationCap size={18} />, on: name === 'learn' || name === 'path', onClick: () => { setLearnCat(''); setView({ name: 'learn' }) } },
+        { key: 'classes', label: 'Classes', icon: <BookOpen size={18} />, on: name === 'classes' || name === 'class', onClick: () => { setClassQ(''); setView({ name: 'classes' }) } },
+        { key: 'live', label: 'Live', icon: <Video size={18} />, on: name === 'live', dot: config.live.on, onClick: () => setView({ name: 'live' }) },
+        { key: 'software', label: 'Software', icon: <Download size={18} />, on: name === 'software', onClick: () => setView({ name: 'software' }) },
+        { key: 'shop', label: 'Shop', icon: <ShoppingBag size={18} />, on: name === 'shop', onClick: () => setView({ name: 'shop' }) },
+        { key: 'chat', label: isAdmin ? 'Inbox' : 'Ask admin', icon: <MessageCircle size={18} />, on: name === 'chat', onClick: () => gated({ name: 'chat' }) },
+        { key: 'teach', label: 'My skills', icon: <Users size={18} />, on: name === 'teach', onClick: () => gated({ name: 'teach' }) },
+        ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: <ShieldCheck size={18} />, on: name === 'admin', onClick: () => setView({ name: 'admin' }) }] : []),
+      ]} />}>
       {!skillsReady && <Msg msg={{ type: 'err', text: 'Skills server not connected yet. Add VITE_SKILLS_API_URL to .env and restart npm run dev.' }} />}
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
       {view.name === 'live' && <LiveRoom config={config} user={user} onSignIn={onSignIn} isAdmin={isAdmin} onOpenClass={open} />}
