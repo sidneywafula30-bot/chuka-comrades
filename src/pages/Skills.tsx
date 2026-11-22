@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, Download, ExternalLink, GraduationCap, Lightbulb, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Trophy, Users, Video } from 'lucide-react'
+import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, Download, ExternalLink, GraduationCap, Lightbulb, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
 import { skillsApi, skillsReady, ADMIN_WA, FALLBACK_CONFIG, type ClassDetail, type ClassItem, type Mode, type Rec, type SkillsConfig, type UpcomingSession, type YtResponse } from '../lib/skills'
 import { pathById } from '../lib/learnPaths'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
@@ -9,7 +9,8 @@ import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './Skil
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 import CitMenu from '../components/CitMenu'
-import { BlueskyStrip } from '../components/Bluesky'
+import { BlueskyStrip, BskyDm, bskyHandle } from '../components/Bluesky'
+import { AdminBsky, CommunityTabs, Feed } from './SkillsFeed'
 import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
 import { AdminHacks, HackPage, Hackathons } from './SkillsHack'
 import { IdeasBoard } from './SkillsIdeas'
@@ -17,9 +18,9 @@ import { AdminSoftware, PathCards, PathPage, SoftwareList } from './SkillsLearn'
 import '../components/Cit.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' | 'hackathons' | 'ideas' } | { name: 'class'; id: string } | { name: 'path'; id: string } | { name: 'hack'; id: string }
+type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' | 'hackathons' | 'ideas' | 'feed' } | { name: 'class'; id: string } | { name: 'path'; id: string } | { name: 'hack'; id: string }
 const call = skillsApi.call
-const menuLabel: Record<string, string> = { learn: 'Learn', path: 'Learn', classes: 'Classes', class: 'Classes', live: 'Live', software: 'Software', hackathons: 'Hackathons', hack: 'Hackathons', ideas: 'Ideas', shop: 'Shop', chat: 'Messages', teach: 'My skills', admin: 'Admin' }
+const menuLabel: Record<string, string> = { learn: 'Learn', path: 'Learn', classes: 'Classes', class: 'Classes', live: 'Live', software: 'Software', feed: 'Community', hackathons: 'Community', hack: 'Community', ideas: 'Community', shop: 'Shop', chat: 'Messages', teach: 'My skills', admin: 'Admin' }
 
 /* ---------- recommendations ---------- */
 function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User | null; onSignIn: () => void; onError: (m: string) => void; children?: ReactNode }) {
@@ -165,7 +166,7 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend, onOpenPath, onAll
       )}
 
       <ChannelShelf config={config} />
-      <BlueskyStrip />
+      <BlueskyStrip bsky={config.bsky} />
 
       <div className="hub-sec"><h2>Search YouTube</h2></div>
       <form className="sl-search" onSubmit={ytSearch}><Search size={18} /><input value={yq} onChange={(e) => setYq(e.target.value)} placeholder="Search tutorials, e.g. “VS Code for beginners”" />
@@ -503,7 +504,7 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
 
 /* ---------- admin ---------- */
 function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick: number; config: SkillsConfig; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void; onConfigChanged: () => void }) {
-  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live' | 'software' | 'hacks'>('all')
+  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live' | 'software' | 'hacks' | 'bluesky'>('all')
   const [edits, setEdits] = useState<Record<string, { title?: string; category?: string }>>({})
   const [q, setQ] = useState<{ classes: ClassItem[]; recs: Rec[] } | null>(null)
   const [all, setAll] = useState<ClassItem[] | null>(null)
@@ -528,6 +529,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
         {config.allowTutorCreate && <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>}
         <button className={tab === 'hacks' ? 'on' : ''} onClick={() => setTab('hacks')}>Hackathons</button>
         <button className={tab === 'software' ? 'on' : ''} onClick={() => setTab('software')}>Software</button>
+        <button className={tab === 'bluesky' ? 'on' : ''} onClick={() => setTab('bluesky')}>Bluesky</button>
         <button className={tab === 'products' ? 'on' : ''} onClick={() => setTab('products')}>Products</button>
         <button className={tab === 'orders' ? 'on' : ''} onClick={() => setTab('orders')}>Orders</button>
         <button className={tab === 'live' ? 'on' : ''} onClick={() => setTab('live')}>Live</button>
@@ -554,6 +556,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
           </RecCard>))}</div>
       ))}
       {tab === 'hacks' && <AdminHacks tick={tick} />}
+      {tab === 'bluesky' && <AdminBsky config={config} onChanged={onConfigChanged} />}
       {tab === 'software' && <AdminSoftware tick={tick} />}
       {tab === 'products' && <AdminProducts config={config} tick={tick} />}
       {tab === 'orders' && <AdminOrders tick={tick} />}
@@ -597,6 +600,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const bump = () => setTick((n) => n + 1)
   const name = view.name
   const open = (id: string) => setView({ name: 'class', id })
+  const goCommunity = (t: 'feed' | 'ideas' | 'hackathons') => setView({ name: t })
   return (
     <HubShell name="CIT Group" sub="Chuka AI Community" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
       onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : name === 'hack' ? 'hackathons' : 'learn' }))}
@@ -604,8 +608,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
         { key: 'learn', label: 'Learn', icon: <GraduationCap size={18} />, on: name === 'learn' || name === 'path', onClick: () => { setLearnCat(''); setView({ name: 'learn' }) } },
         { key: 'classes', label: 'Classes', icon: <BookOpen size={18} />, on: name === 'classes' || name === 'class', onClick: () => { setClassQ(''); setView({ name: 'classes' }) } },
         { key: 'live', label: 'Live', icon: <Video size={18} />, on: name === 'live', dot: config.live.on, onClick: () => setView({ name: 'live' }) },
-        { key: 'hackathons', label: 'Hackathons', icon: <Trophy size={18} />, on: name === 'hackathons' || name === 'hack', onClick: () => setView({ name: 'hackathons' }) },
-        { key: 'ideas', label: 'Coding ideas', icon: <Lightbulb size={18} />, on: name === 'ideas', onClick: () => setView({ name: 'ideas' }) },
+        { key: 'community', label: 'Community', icon: <Lightbulb size={18} />, on: name === 'feed' || name === 'ideas' || name === 'hackathons' || name === 'hack', onClick: () => setView({ name: 'feed' }) },
         { key: 'software', label: 'Software', icon: <Download size={18} />, on: name === 'software', onClick: () => setView({ name: 'software' }) },
         { key: 'shop', label: 'Shop', icon: <ShoppingBag size={18} />, on: name === 'shop', onClick: () => setView({ name: 'shop' }) },
         { key: 'chat', label: isAdmin ? 'Inbox' : 'Ask admin', icon: <MessageCircle size={18} />, on: name === 'chat', onClick: () => gated({ name: 'chat' }) },
@@ -615,12 +618,14 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {!skillsReady && <Msg msg={{ type: 'err', text: 'Skills server not connected yet. Add VITE_SKILLS_API_URL to .env and restart npm run dev.' }} />}
       {fatal && <Msg msg={{ type: 'err', text: fatal }} />}
       {view.name === 'live' && <LiveRoom config={config} user={user} onSignIn={onSignIn} isAdmin={isAdmin} onOpenClass={open} />}
+      {view.name === 'chat' && !isAdmin && !!bskyHandle(config.bsky) && <p className="sl-sub" style={{ margin: '0 0 10px' }}>Prefer Bluesky? <BskyDm bsky={config.bsky} /></p>}
       {view.name === 'chat' && (isAdmin ? <><div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Student messages</h1></div></div><AdminInbox user={user} onSignIn={onSignIn} /></> : <StudentChat user={user} onSignIn={onSignIn} whatsapp={config.whatsapp} />)}
       {view.name === 'learn' && <Learn key={learnCat} initialCat={learnCat} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} onOpenPath={(id) => setView({ name: 'path', id })} onAllSoftware={() => setView({ name: 'software' })} />}
       {view.name === 'software' && <><div className="sl-page-head"><div><span className="sl-kicker">SOFTWARE</span><h1>Software you need</h1></div></div><p className="sl-sub" style={{ marginTop: 0 }}>Install these on your computer before class. The CIT admin keeps this list up to date.</p><SoftwareList /></>}
-      {view.name === 'hackathons' && <Hackathons user={user} onOpen={(id) => setView({ name: 'hack', id })} />}
-      {view.name === 'hack' && <HackPage key={view.id} id={view.id} user={user} onSignIn={onSignIn} isAdmin={isAdmin} />}
-      {view.name === 'ideas' && <IdeasBoard user={user} onSignIn={onSignIn} isAdmin={isAdmin} />}
+      {view.name === 'feed' && <><CommunityTabs current="feed" go={goCommunity} bsky={config.bsky} /><Feed config={config} user={user} onSignIn={onSignIn} isAdmin={isAdmin} onChanged={loadConfig} /></>}
+      {view.name === 'hackathons' && <><CommunityTabs current="hackathons" go={goCommunity} bsky={config.bsky} /><Hackathons user={user} onOpen={(id) => setView({ name: 'hack', id })} /></>}
+      {view.name === 'hack' && <HackPage key={view.id} id={view.id} user={user} onSignIn={onSignIn} isAdmin={isAdmin} bsky={config.bsky} />}
+      {view.name === 'ideas' && <><CommunityTabs current="ideas" go={goCommunity} bsky={config.bsky} /><IdeasBoard user={user} onSignIn={onSignIn} isAdmin={isAdmin} bsky={config.bsky} /></>}
       {view.name === 'path' && (() => { const path = pathById(view.id); return path ? <PathPage key={path.id} user={user} onSignIn={onSignIn} path={path} onSoftware={() => setView({ name: 'software' })} onSeeContent={(c) => { setLearnCat(c); setView({ name: 'learn' }) }} /> : null })()}
       {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}

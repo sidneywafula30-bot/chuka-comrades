@@ -216,3 +216,32 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .cit-bsky-card small { display: flex; gap: 12px; margin-top: auto; color: #5d7266; font-size: 12px; }
 .cit-bsky-card small span { display: inline-flex; align-items: center; gap: 3px; }
 .cit-share { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- Community feed, replies, live ---- */
+.cit-community { align-items: center; }
+.cit-bfeed { display: grid; gap: 12px; margin-top: 12px; }
+.cit-bpost { background: #fff; border: 1px solid #d6e4db; border-radius: 16px; padding: 12px 14px; display: grid; gap: 8px; }
+.cit-bpost header { display: flex; align-items: center; gap: 10px; }
+.cit-bpost header img, .cit-bav { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #e3efe8; flex: none; }
+.cit-bpost header div { display: grid; line-height: 1.25; min-width: 0; }
+.cit-bpost header small { color: #5d7266; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cit-bpost p { margin: 0; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.cit-bpic { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; }
+.cit-bpost footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: #5d7266; font-size: 12px; }
+.cit-bpost footer > span { display: inline-flex; align-items: center; gap: 3px; }
+.cit-bpost-actions { margin-left: auto; display: inline-flex !important; flex-wrap: wrap; gap: 6px; }
+.cit-bsub { margin: 8px 0 0 14px; padding-left: 10px; border-left: 3px solid #d6e4db; }
+.cit-bthread { display: grid; gap: 10px; }
+.cit-breply { display: grid; gap: 8px; }
+.cit-livebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; }
+.cit-livedot { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #5d7266; font-weight: 600; }
+.cit-livedot.live { color: #c62828; }
+.cit-livedot.live svg { animation: cit-pulse 1.4s ease-in-out infinite; }
+.cit-livedot.polling { color: #0a7c4a; }
+@keyframes cit-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.cit-tagform { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #d6e4db; border-radius: 999px; padding: 2px 10px; background: #fff; }
+.cit-tagform input { border: 0; outline: 0; font: inherit; font-size: 13px; width: 120px; background: transparent; }
+.cit-hidden { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.cit-hidden li { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 1px solid #d6e4db; border-radius: 12px; padding: 8px 12px; }
+.cit-hidden code { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .cit-livedot.live svg { animation: none; } }

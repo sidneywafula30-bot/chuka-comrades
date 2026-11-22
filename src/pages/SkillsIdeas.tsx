@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase'
 import { fmtDate, type Note } from '../lib/hub'
 import { Empty, Loading, Modal, Msg } from '../components/HubUi'
 import { ChatRoom } from '../components/CitChat'
-import { ShareBar } from '../components/Bluesky'
+import { BskyDiscussion, ShareBar } from '../components/Bluesky'
+import type { BskyConfig } from '../lib/bluesky'
 import '../components/Cit.css'
 
 type Status = 'open' | 'planned' | 'building' | 'done' | 'hidden'
@@ -42,7 +43,7 @@ function IdeaModal({ user, onClose, onDone }: { user: User; onClose: () => void;
   )
 }
 
-export function IdeasBoard({ user, onSignIn, isAdmin }: { user: User | null; onSignIn: () => void; isAdmin: boolean }) {
+export function IdeasBoard({ user, onSignIn, isAdmin, bsky }: { user: User | null; onSignIn: () => void; isAdmin: boolean; bsky?: BskyConfig }) {
   const [items, setItems] = useState<Idea[] | null>(null)
   const [mine, setMine] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'all' | Status>('all')
@@ -118,7 +119,7 @@ export function IdeasBoard({ user, onSignIn, isAdmin }: { user: User | null; onS
                     )}
                     {(isAdmin || i.user_id === user.uid) && <button className="sl-mini danger" onClick={() => void remove(i)}><Trash2 size={13} /></button>}
                   </div>
-                  {openId === i.id && <div style={{ marginTop: 10 }}><ChatRoom room={`idea:${i.id}`} user={user} onSignIn={onSignIn} isAdmin={isAdmin} title="Discussion" placeholder="Add your thoughts, offer to help…" /></div>}
+                  {openId === i.id && <div style={{ marginTop: 10 }}><ChatRoom room={`idea:${i.id}`} user={user} onSignIn={onSignIn} isAdmin={isAdmin} title="Discussion" placeholder="Add your thoughts, offer to help…" /><BskyDiscussion room={`idea:${i.id}`} bsky={bsky} isAdmin={isAdmin} announce={`Coding idea from the CIT community: ${i.title.slice(0, 120)} #coding`} /></div>}
                 </div>
               </article>))}</div>
           )}

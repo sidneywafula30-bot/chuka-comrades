@@ -6,7 +6,8 @@ import { shrinkImage } from '../lib/files'
 import { errMsg, type Note } from '../lib/hub'
 import { Empty, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
 import { ChatRoom } from '../components/CitChat'
-import { ShareBar } from '../components/Bluesky'
+import { BskyDiscussion, ShareBar } from '../components/Bluesky'
+import type { BskyConfig } from '../lib/bluesky'
 import '../components/Cit.css'
 
 const when = (s: string) => (s ? new Date(s).toLocaleString('en-KE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' }) : '')
@@ -115,7 +116,7 @@ function RegisterModal({ h, user, onClose, onDone }: { h: Hackathon; user: User;
 }
 
 /* ---------- one competition ---------- */
-export function HackPage({ id, user, onSignIn, isAdmin }: { id: string; user: User | null; onSignIn: () => void; isAdmin: boolean }) {
+export function HackPage({ id, user, onSignIn, isAdmin, bsky }: { id: string; user: User | null; onSignIn: () => void; isAdmin: boolean; bsky?: BskyConfig }) {
   const [h, setH] = useState<Hackathon | null | undefined>(undefined)
   const [reg, setReg] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -169,6 +170,7 @@ export function HackPage({ id, user, onSignIn, isAdmin }: { id: string; user: Us
       {!(h.live && h.liveVideoId) && h.status !== 'draft' && (
         <><div className="hub-sec"><h2>Discussion</h2></div><ChatRoom room={`hack:${h.id}`} user={user} onSignIn={onSignIn} isAdmin={isAdmin} title={h.title} sub="Ask questions, find teammates" placeholder="Ask a question or look for a team…" /></>
       )}
+      {h.status !== 'draft' && <BskyDiscussion room={`hack:${h.id}`} bsky={bsky} isAdmin={isAdmin} announce={`${h.title}: registration is open at CIT Group! #hackathon #Chuka`} />}
       {reg && user && <RegisterModal h={h} user={user} onClose={() => setReg(false)} onDone={() => void load()} />}
     </>
   )

@@ -1,3 +1,4 @@
+import type { BskyConfig, BskyPost } from './bluesky'
 import { makeApi, DEFAULT_RULES, type Attachment, type FileRules, type UploadFile } from './hub'
 
 const raw = makeApi(import.meta.env.VITE_SKILLS_API_URL as string | undefined, 'Skills', 'VITE_SKILLS_API_URL')
@@ -19,7 +20,7 @@ export type Mode = 'online' | 'physical' | 'hybrid'
 export type Provider = { name: string; about: string; url: string; search: boolean }
 export type Prices = { full: number; course: number; session: number; passDays: number }
 export type LiveState = { on: boolean; title?: string; classId?: string; free?: boolean; locked?: boolean; videoId?: string }
-export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean; payTo: string; prices: Prices; live: LiveState; channelId: string; channelHandle: string }
+export type SkillsConfig = { categories: string[]; levels: string[]; providers: Provider[]; files: FileRules; searchReady: boolean; whatsapp: string; allowTutorCreate: boolean; payTo: string; prices: Prices; live: LiveState; channelId: string; channelHandle: string; bsky?: BskyConfig }
 export type AccessKind = 'full' | 'course' | 'session'
 export type ClassAccess = 'all' | 'sessions' | 'none'
 export type ChannelVideo = { videoId: string; title: string; published: string; thumbnail: string }
@@ -98,6 +99,7 @@ export const skillsApi = {
   hackRegister: (r: HackRegInput) => api.call<{ status: HackRegStatus }>('hack_register', { ...r }),
   hackCancel: (hackId: string) => api.call<{ ok: boolean }>('hack_cancel', { hackId }),
   software: () => api.call<Software[]>('software'),
+  bskyTag: (tag: string) => api.call<{ items: BskyPost[]; error?: string }>('bsky_tag', { tag }),
   upcoming: () => api.call<UpcomingSession[]>('sessions_upcoming'),
   products: () => api.call<Product[]>('products'),
   order: (productId: string, mpesaCode?: string) => api.call<{ id: string; status: OrderStatus; price: number; productTitle: string; payTo: string }>('order_create', { productId, mpesaCode }),
@@ -145,5 +147,9 @@ export const skillsApi = {
     classes: () => api.call<ClassItem[]>('admin_classes'),
     deleteClass: (id: string) => api.call<{ deleted: boolean }>('admin_delete_class', { id }),
     deleteRec: (id: string) => api.call<{ deleted: boolean }>('admin_delete_rec', { id }),
+    bskySave: (c: { handle: string; list: string; tags: string[] }) => api.call<BskyConfig>('admin_bsky_save', { ...c }),
+    bskyHide: (uri: string, hide: boolean) => api.call<{ hidden: string[] }>('admin_bsky_hide', { uri, hide }),
+    bskyLink: (room: string, url: string) => api.call<{ links: Record<string, string> }>('admin_bsky_link', { room, url }),
+    bskyPost: (text: string, room?: string) => api.call<{ url: string; links: Record<string, string> }>('admin_bsky_post', { text, room }),
   },
 }
