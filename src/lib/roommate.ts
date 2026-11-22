@@ -1,8 +1,13 @@
 import { supabase } from './supabase'
+import { niceDate } from './hostel'
 
 export const roommateReady = Boolean(supabase)
 
 export type Gender = 'male' | 'female'
+/** 'semester' = normal roommate post. 'graduation' = short stay for the graduation period only, looking for a host. */
+export type StayType = 'semester' | 'graduation'
+export const MAX_YEAR = 6 // years of study go from Year 1 up to Year 6
+export const MAX_GRAD_DAYS = 14 // longest graduation stay (also enforced by the database)
 export type PostStatus = 'pending' | 'approved' | 'rejected'
 export type Lifestyle = { sleep: string; study: string; visitors: string; cleanliness: string; substances: string }
 
@@ -25,13 +30,15 @@ export type RoommatePost = {
   budgetMin: number; budgetMax: number; roomType: string; area: string
   hasRoom: boolean; hostelName: string; lifestyle: Lifestyle; bio: string
   status: PostStatus; rejectReason: string; hidden: boolean
+  stayType: StayType; stayFrom: string; stayTo: string // dates (yyyy-mm-dd) only for graduation stays
+  offersGraduationHosting: boolean // a student with a room who can host graduation guests
   updatedAt: string
   passExpiresAt: string // when the paid semester pass behind this post ends ('' for older posts)
   interested?: boolean // only set when browsing
   userId?: string // only set for the owner / admin
 }
 
-export type PostInput = Pick<RoommatePost, 'firstName' | 'gender' | 'course' | 'year' | 'budgetMin' | 'budgetMax' | 'roomType' | 'area' | 'hasRoom' | 'hostelName' | 'lifestyle' | 'bio'>
+export type PostInput = Pick<RoommatePost, 'firstName' | 'gender' | 'course' | 'year' | 'budgetMin' | 'budgetMax' | 'roomType' | 'area' | 'hasRoom' | 'hostelName' | 'lifestyle' | 'bio' | 'stayType' | 'stayFrom' | 'stayTo' | 'offersGraduationHosting'>
 
 export type ReceivedInterest = { id: string; postId: string; fromName: string; note: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string; whatsapp: string | null }
 export type SentInterest = { id: string; postId: string; firstName: string; area: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string; whatsapp: string | null }
@@ -57,7 +64,9 @@ export function rowToPost(r: Row): RoommatePost {
     budgetMin: Number(r.budget_min) || 0, budgetMax: Number(r.budget_max) || 0, roomType: str(r.room_type), area: str(r.area),
     hasRoom: r.has_room === true, hostelName: str(r.hostel_name), lifestyle: toLifestyle(r.lifestyle), bio: str(r.bio),
     status: (['pending', 'approved', 'rejected'].includes(str(r.status)) ? str(r.status) : 'pending') as PostStatus,
-    rejectReason: str(r.reject_reason), hidden: r.hidden === true, updatedAt: str(r.updated_at), passExpiresAt: str(r.pass_expires_at),
+    rejectReason: str(r.reject_reason), hidden: r.hidden === true,
+    stayType: r.stay_type === 'graduation' ? 'graduation' : 'semester', stayFrom: str(r.stay_from).slice(0, 10), stayTo: str(r.stay_to).slice(0, 10),
+    offersGraduationHosting: r.offers_graduation_hosting === true, updatedAt: str(r.updated_at), passExpiresAt: str(r.pass_expires_at),
     interested: r.interested === true,
   }
 }
@@ -78,23 +87,48 @@ export function normalizePhone(value: string): string {
   return /^[17]\d{8}$/.test(d) ? `254${d}` : ''
 }
 
-/** 0-100: how alike two lifestyles are. */
-export function matchScore(a: Lifestyle, b: Lifestyle): number {
+function lifestyleSum(a: Lifestyle, b: Lifestyle): number {
   let sum = 0
   for (const q of LIFESTYLE_QUESTIONS) {
     const ia = q.options.findIndex((o) => o.value === a[q.key])
     const ib = q.options.findIndex((o) => o.value === b[q.key])
     sum += ia < 0 || ib < 0 ? 0.5 : 1 - Math.abs(ia - ib) / (q.options.length - 1)
   }
-  return Math.round((sum / LIFESTYLE_QUESTIONS.length) * 100)
+  return sum
+}
+/** 0-100: how alike two lifestyles are. */
+export function matchScore(a: Lifestyle, b: Lifestyle): number {
+  return Math.round((lifestyleSum(a, b) / LIFESTYLE_QUESTIONS.length) * 100)
+}
+/** Semester roommates: the five lifestyle answers plus how close the years of study are (Year 1 to Year 6). */
+export function postMatchScore(a: Pick<RoommatePost, 'lifestyle' | 'year'>, b: Pick<RoommatePost, 'lifestyle' | 'year'>): number {
+  const yearClose = 1 - Math.min(Math.abs(a.year - b.year), MAX_YEAR - 1) / (MAX_YEAR - 1)
+  return Math.round(((lifestyleSum(a.lifestyle, b.lifestyle) + yearClose) / (LIFESTYLE_QUESTIONS.length + 1)) * 100)
 }
 export const budgetsOverlap = (a: Pick<RoommatePost, 'budgetMin' | 'budgetMax'>, b: Pick<RoommatePost, 'budgetMin' | 'budgetMax'>) =>
   a.budgetMin <= b.budgetMax && b.budgetMin <= a.budgetMax
 
+/** Number of nights/days from arrival to departure, counting both days. */
+export const graduationDays = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1
+export const stayRange = (from: string, to: string) => (from === to ? niceDate(from) : `${niceDate(from)} to ${niceDate(to)}`)
+
 /** Text + link for sharing a post on WhatsApp. Never includes a phone number. */
-export function shareLink(p: Pick<RoommatePost, 'firstName' | 'course' | 'year' | 'budgetMin' | 'budgetMax' | 'area' | 'roomType' | 'hasRoom' | 'hostelName'>): string {
+export function shareLink(p: Pick<RoommatePost, 'firstName' | 'course' | 'year' | 'budgetMin' | 'budgetMax' | 'area' | 'roomType' | 'hasRoom' | 'hostelName' | 'stayType' | 'stayFrom' | 'stayTo' | 'offersGraduationHosting'>): string {
   const site = `${window.location.origin}${window.location.pathname}#/hostel`
   const money = (n: number) => `KSh ${n.toLocaleString('en-KE')}`
+  if (p.stayType === 'graduation') {
+    const lines = [
+      'Graduation host needed on Chuka Comrades',
+      '',
+      `${p.firstName} · ${p.course}, Year ${p.year}`,
+      `Staying: ${stayRange(p.stayFrom, p.stayTo)}`,
+      `Budget for the stay: ${money(p.budgetMin)} - ${money(p.budgetMax)}`,
+      `Wants to stay near: ${p.area}`,
+      '',
+      `Can you host? See the post and connect: ${site}`,
+    ]
+    return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`
+  }
   const lines = [
     'Roommate needed on Chuka Comrades',
     '',
@@ -102,6 +136,7 @@ export function shareLink(p: Pick<RoommatePost, 'firstName' | 'course' | 'year' 
     `Budget: ${money(p.budgetMin)} - ${money(p.budgetMax)}`,
     `Area: ${p.area}${p.roomType ? ` · ${p.roomType}` : ''}`,
     p.hasRoom ? `Has a room at ${p.hostelName}` : 'Looking for a room too',
+    ...(p.offersGraduationHosting ? ['Can host graduation guests'] : []),
     '',
     `See the post and connect: ${site}`,
   ]
@@ -152,6 +187,10 @@ export const roommateApi = {
       first_name: input.firstName, gender: input.gender, course: input.course, year_of_study: input.year,
       budget_min: input.budgetMin, budget_max: input.budgetMax, room_type: input.roomType, area: input.area,
       has_room: input.hasRoom, hostel_name: input.hasRoom ? input.hostelName : '', lifestyle: input.lifestyle, bio: input.bio,
+      stay_type: input.stayType,
+      stay_from: input.stayType === 'graduation' ? input.stayFrom : null,
+      stay_to: input.stayType === 'graduation' ? input.stayTo : null,
+      offers_graduation_hosting: input.stayType === 'semester' && input.hasRoom && input.offersGraduationHosting,
     }
     const res = existingId
       ? await db().from('roommate_posts').update(row).eq('id', existingId).select().single()

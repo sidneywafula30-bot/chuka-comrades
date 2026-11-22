@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Loader2, Trash2, X } from 'lucide-react'
 import type { FormEvent } from 'react'
-import { LIFESTYLE_QUESTIONS, lifestyleLabel, roommateApi, type PassRow, type Report, type RoommatePost } from '../lib/roommate'
+import { LIFESTYLE_QUESTIONS, lifestyleLabel, roommateApi, stayRange, type PassRow, type Report, type RoommatePost } from '../lib/roommate'
 import { kes, niceDate, niceDateTime, showPhone, timeAgo, waLink, type Settings } from '../lib/hostel'
 import { WhatsAppLogo } from '../components/BrandLogos'
 
@@ -73,7 +73,9 @@ export default function RoommateAdmin({ settings }: { settings: Settings }) {
               <header>
                 <div>
                   <h3>{p.firstName} <small>{p.gender === 'female' ? 'Female' : 'Male'} · {p.course} · Year {p.year}</small></h3>
-                  <p>{kes(p.budgetMin)} – {kes(p.budgetMax)} · {p.area}{p.roomType ? ` · ${p.roomType}` : ''} · {p.hasRoom ? `has a room at ${p.hostelName}` : 'needs a room'}</p>
+                  {p.stayType === 'graduation' && <p><strong>Graduation stay:</strong> {stayRange(p.stayFrom, p.stayTo)} · needs a host</p>}
+                  {p.offersGraduationHosting && <p><strong>Can host graduation guests</strong></p>}
+                  <p>{kes(p.budgetMin)} – {kes(p.budgetMax)}{p.stayType === 'graduation' ? ' (whole stay)' : ''} · {p.area}{p.roomType ? ` · ${p.roomType}` : ''} · {p.stayType === 'graduation' ? 'needs a host' : p.hasRoom ? `has a room at ${p.hostelName}` : 'needs a room'}</p>
                 </div>
                 <span className={`hs-status ${p.status === 'approved' ? 'published' : 'hidden'}`}>{p.status}{p.hidden ? ' · hidden' : ''}</span>
               </header>

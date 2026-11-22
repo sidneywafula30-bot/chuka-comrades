@@ -229,7 +229,7 @@
 .rm-sub button.on { background: var(--green); border-color: var(--green); color: #fff; }
 .rm-dot { background: #c0392b; color: #fff; border-radius: 99px; font-size: 11px; min-width: 18px; height: 18px; display: inline-grid; place-items: center; padding: 0 5px; }
 .rm-pick { display: flex; gap: 10px; flex-wrap: wrap; }
-.rm-filters { grid-template-columns: minmax(0, 1fr) 190px 210px; }
+.rm-filters { grid-template-columns: minmax(0, 1fr) 170px 190px 130px; }
 .rm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
 .rm-card { display: grid; gap: 11px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 4px 16px #15382d0d; min-width: 0; }
 .rm-card header { display: flex; align-items: center; gap: 11px; }
@@ -343,3 +343,10 @@
 .hs-main { padding-bottom: 96px; }
 
 .hs-group-ph { width: 40px; height: 40px; border-radius: 50%; object-fit: contain; border: 2px solid #25d366; background: #fff; padding: 2px; flex-shrink: 0; }
+
+/* Graduation stays + year of study */
+.rm-mode { margin-top: 2px; }
+.rm-gradnote { margin: 0; }
+.rm-grad { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 99px; background: #e8f0fe; color: #1d4a9c; font: 800 12px 'DM Sans', sans-serif; }
+.rm-grad.host { background: #e3f4ea; color: #0f5a37; }
+.hs-chips button { display: inline-flex; align-items: center; gap: 6px; }
