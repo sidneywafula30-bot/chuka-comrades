@@ -36,6 +36,8 @@ jobs:
         env:
           VITE_BASE: /chuka-comrades/
 
+          VITE_BSKY_HANDLE: ${{ vars.VITE_BSKY_HANDLE || secrets.VITE_BSKY_HANDLE }}
+
           VITE_CPL_API_URL: ${{ secrets.VITE_CPL_API_URL }}
           VITE_CYBER_API_URL: ${{ secrets.VITE_CYBER_API_URL }}
           VITE_EFOOTBALL_API_URL: ${{ secrets.VITE_EFOOTBALL_API_URL }}
