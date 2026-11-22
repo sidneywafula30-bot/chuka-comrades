@@ -5,6 +5,7 @@ import { CHANNEL_URL, skillsApi, skillsReady, type AccessKind, type ChannelVideo
 import { errMsg, type Note } from '../lib/hub'
 import { Msg } from '../components/HubUi'
 import { ChatRoom } from '../components/CitChat'
+import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
 import '../components/Cit.css'
 
 const kes = (n: number) => (n > 0 ? `KES ${n.toLocaleString('en-KE')}` : 'Free')
@@ -115,6 +116,7 @@ export function LiveRoom({ config, user, onSignIn, isAdmin, onOpenClass }: { con
 /** Latest public videos of the CIT YouTube channel (free RSS feed, no quota). */
 export function ChannelShelf({ config }: { config: SkillsConfig }) {
   const [items, setItems] = useState<ChannelVideo[] | null>(null)
+  const [play, setPlay] = useState<PlayVideo | null>(null)
   useEffect(() => { if (skillsReady && config.channelId) skillsApi.channelFeed().then((r) => setItems(r.items)).catch(() => setItems([])) }, [config.channelId])
   if (!config.channelId) return null
   return (
@@ -122,12 +124,13 @@ export function ChannelShelf({ config }: { config: SkillsConfig }) {
       <div className="hub-sec"><h2><Video size={18} style={{ verticalAlign: -3 }} /> From our YouTube channel</h2></div>
       {items && items.length > 0 ? (
         <div className="cit-shelf">{items.map((v) => (
-          <a key={v.videoId} href={`https://www.youtube.com/watch?v=${v.videoId}`} target="_blank" rel="noreferrer noopener">
+          <button key={v.videoId} onClick={() => setPlay({ videoId: v.videoId, title: v.title })}>
             <img src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" /><span>{v.title}</span>
-          </a>))}
+          </button>))}
         </div>
       ) : <p className="sl-sub">New videos will appear here.</p>}
       <p style={{ marginTop: 8 }}><a className="sl-mini" href={`${CHANNEL_URL}?sub_confirmation=1`} target="_blank" rel="noreferrer noopener">Subscribe to @{config.channelHandle}</a></p>
+      {play && <VideoModal video={play} onClose={() => setPlay(null)} />}
     </>
   )
 }

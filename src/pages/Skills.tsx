@@ -9,6 +9,7 @@ import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './Skil
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 import CitMenu from '../components/CitMenu'
+import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
 import { AdminSoftware, PathCards, PathPage, SoftwareList } from './SkillsLearn'
 import '../components/Cit.css'
 
@@ -105,6 +106,7 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend, onOpenPath, onAll
   const [yq, setYq] = useState('')
   const [yres, setYres] = useState<YtResponse | null>(null)
   const [ybusy, setYbusy] = useState(false)
+  const [play, setPlay] = useState<PlayVideo | null>(null)
   const load = useCallback(() => {
     if (!skillsReady) { setAll([]); return }
     skillsApi.recs({}).then(setAll).catch((e) => { setMsg({ type: 'err', text: errMsg(e) }); setAll([]) })
@@ -169,12 +171,13 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend, onOpenPath, onAll
       {yres && !yres.error && (yres.items.length === 0 ? <Empty title="No videos found" /> : (
         <div className="sl-grid" style={{ marginTop: 14 }}>{yres.items.map((v) => (
           <article className="sl-resource" key={v.videoId}>
-            <a href={`https://www.youtube.com/watch?v=${v.videoId}`} target="_blank" rel="noreferrer noopener">{v.thumbnail && <img className="hub-thumb" src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />}</a>
+            {v.thumbnail && <img className="hub-thumb" src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" onClick={() => setPlay({ videoId: v.videoId, title: v.title })} style={{ cursor: 'pointer' }} />}
             <h3>{v.title}</h3><small className="sl-unitline">{v.channel}</small>
-            <div className="sl-resource-foot"><span /><span className="sl-foot-actions"><button className="sl-mini" onClick={() => (user ? onRecommend({ url: `https://www.youtube.com/watch?v=${v.videoId}`, title: v.title }) : onSignIn())}>Recommend this</button></span></div>
+            <div className="sl-resource-foot"><span /><span className="sl-foot-actions"><button className="sl-mini" onClick={() => setPlay({ videoId: v.videoId, title: v.title })}><Play size={13} /> Watch here</button><button className="sl-mini ghost" onClick={() => (user ? onRecommend({ url: `https://www.youtube.com/watch?v=${v.videoId}`, title: v.title }) : onSignIn())}>Recommend this</button></span></div>
           </article>))}</div>
       ))}
 
+      {play && <VideoModal video={play} onClose={() => setPlay(null)} />}
     </>
   )
 }
@@ -607,7 +610,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {view.name === 'chat' && (isAdmin ? <><div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Student messages</h1></div></div><AdminInbox user={user} onSignIn={onSignIn} /></> : <StudentChat user={user} onSignIn={onSignIn} whatsapp={config.whatsapp} />)}
       {view.name === 'learn' && <Learn key={learnCat} initialCat={learnCat} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} onOpenPath={(id) => setView({ name: 'path', id })} onAllSoftware={() => setView({ name: 'software' })} />}
       {view.name === 'software' && <><div className="sl-page-head"><div><span className="sl-kicker">SOFTWARE</span><h1>Software you need</h1></div></div><p className="sl-sub" style={{ marginTop: 0 }}>Install these on your computer before class. The CIT admin keeps this list up to date.</p><SoftwareList /></>}
-      {view.name === 'path' && (() => { const path = pathById(view.id); return path ? <PathPage key={path.id} path={path} onSoftware={() => setView({ name: 'software' })} onSeeContent={(c) => { setLearnCat(c); setView({ name: 'learn' }) }} /> : null })()}
+      {view.name === 'path' && (() => { const path = pathById(view.id); return path ? <PathPage key={path.id} user={user} onSignIn={onSignIn} path={path} onSoftware={() => setView({ name: 'software' })} onSeeContent={(c) => { setLearnCat(c); setView({ name: 'learn' }) }} /> : null })()}
       {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}
       {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}

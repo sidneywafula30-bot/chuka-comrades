@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ArrowRight, CheckCircle2, Circle, Code2, Download, ExternalLink, Laptop, Pencil, Play, Plus, Trash2 } from 'lucide-react'
-import { skillsApi, skillsReady, SW_PLATFORMS, type Software, type SoftwareInput, type SoftwarePrice } from '../lib/skills'
+import type { User } from 'firebase/auth'
+import { skillsApi, skillsReady, SW_PLATFORMS, type Software, type SoftwareInput, type SoftwarePrice, type YtResult } from '../lib/skills'
+import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
 import { LEARN_PATHS, type LearnPath } from '../lib/learnPaths'
 import { errMsg, type Note } from '../lib/hub'
 import { Empty, Loading, Modal, Msg } from '../components/HubUi'
@@ -137,8 +139,25 @@ export function PathCards({ onOpen }: { onOpen: (id: LearnPath['id']) => void })
   )
 }
 
-export function PathPage({ path, onSeeContent, onSoftware }: { path: LearnPath; onSeeContent: (category: string) => void; onSoftware: () => void }) {
+export function PathPage({ path, user, onSignIn, onSeeContent, onSoftware }: { path: LearnPath; user: User | null; onSignIn: () => void; onSeeContent: (category: string) => void; onSoftware: () => void }) {
   const [done, setDone] = useState<number[]>(() => readDone(path.id))
+  const [openStep, setOpenStep] = useState<number | null>(null)
+  const [vids, setVids] = useState<Record<number, YtResult[]>>({})
+  const [errs, setErrs] = useState<Record<number, string>>({})
+  const [loading, setLoading] = useState<number | null>(null)
+  const [play, setPlay] = useState<PlayVideo | null>(null)
+  async function watch(i: number, query: string) {
+    if (openStep === i) { setOpenStep(null); return }
+    setOpenStep(i)
+    if (vids[i]) return
+    if (!user) { onSignIn(); setOpenStep(null); return }
+    setLoading(i)
+    try {
+      const r = await skillsApi.ytSearch(query)
+      if (r.error || r.items.length === 0) setErrs((e) => ({ ...e, [i]: r.error || 'No videos found.' }))
+      else setVids((v) => ({ ...v, [i]: r.items.slice(0, 6) }))
+    } catch (e) { setErrs((x) => ({ ...x, [i]: errMsg(e) })) } finally { setLoading(null) }
+  }
   const Icon = ICONS[path.id]
   const toggle = (i: number) => {
     const next = done.includes(i) ? done.filter((x) => x !== i) : [...done, i]
@@ -167,12 +186,26 @@ export function PathPage({ path, onSeeContent, onSoftware }: { path: LearnPath; 
               <div>
                 <h3><span>{i + 1}</span> {s.title}</h3>
                 <p>{s.text}</p>
-                <a className="sl-mini ghost" href={`https://www.youtube.com/results?search_query=${encodeURIComponent(s.search)}`} target="_blank" rel="noreferrer noopener"><Play size={13} /> Watch tutorials <ExternalLink size={12} /></a>
+                <button className="sl-mini" onClick={() => void watch(i, s.search)}><Play size={13} /> {openStep === i ? 'Hide videos' : 'Watch here'}</button>
+                {openStep === i && (
+                  <>
+                    {loading === i && <Loading />}
+                    {errs[i] && <p className="sl-alert err" style={{ marginTop: 8 }}>{errs[i]} <a className="sl-link" href={`https://www.youtube.com/results?search_query=${encodeURIComponent(s.search)}`} target="_blank" rel="noreferrer noopener">Search on YouTube <ExternalLink size={12} /></a></p>}
+                    {vids[i] && (
+                      <div className="cit-vids">{vids[i].map((v) => (
+                        <button key={v.videoId} onClick={() => setPlay({ videoId: v.videoId, title: v.title })}>
+                          <span className="cit-thumb">{v.thumbnail && <img src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />}<Play /></span>
+                          <b>{v.title}</b><small>{v.channel}</small>
+                        </button>))}</div>
+                    )}
+                  </>
+                )}
               </div>
             </li>
           )
         })}
       </ol>
+      {play && <VideoModal video={play} onClose={() => setPlay(null)} />}
     </>
   )
 }
