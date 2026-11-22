@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, Download, ExternalLink, GraduationCap, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Users, Video } from 'lucide-react'
+import { BookOpen, CalendarDays, CalendarPlus, CheckCircle2, Download, ExternalLink, GraduationCap, Lightbulb, Link2, MessageCircle, Pencil, Play, Plus, Search, ShieldCheck, ShoppingBag, ThumbsUp, Trash2, Trophy, Users, Video } from 'lucide-react'
 import { skillsApi, skillsReady, ADMIN_WA, FALLBACK_CONFIG, type ClassDetail, type ClassItem, type Mode, type Rec, type SkillsConfig, type UpcomingSession, type YtResponse } from '../lib/skills'
 import { pathById } from '../lib/learnPaths'
 import { errMsg, fmtDate, packFiles, type Note } from '../lib/hub'
@@ -10,13 +10,15 @@ import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 import CitMenu from '../components/CitMenu'
 import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
+import { AdminHacks, HackPage, Hackathons } from './SkillsHack'
+import { IdeasBoard } from './SkillsIdeas'
 import { AdminSoftware, PathCards, PathPage, SoftwareList } from './SkillsLearn'
 import '../components/Cit.css'
 
 type Props = { user: User | null; onSignIn: () => void; onBack: () => void }
-type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' } | { name: 'class'; id: string } | { name: 'path'; id: string }
+type View = { name: 'learn' | 'classes' | 'shop' | 'teach' | 'admin' | 'live' | 'chat' | 'software' | 'hackathons' | 'ideas' } | { name: 'class'; id: string } | { name: 'path'; id: string } | { name: 'hack'; id: string }
 const call = skillsApi.call
-const menuLabel: Record<string, string> = { learn: 'Learn', path: 'Learn', classes: 'Classes', class: 'Classes', live: 'Live', software: 'Software', shop: 'Shop', chat: 'Messages', teach: 'My skills', admin: 'Admin' }
+const menuLabel: Record<string, string> = { learn: 'Learn', path: 'Learn', classes: 'Classes', class: 'Classes', live: 'Live', software: 'Software', hackathons: 'Hackathons', hack: 'Hackathons', ideas: 'Ideas', shop: 'Shop', chat: 'Messages', teach: 'My skills', admin: 'Admin' }
 
 /* ---------- recommendations ---------- */
 function RecCard({ r, user, onSignIn, onError, children }: { r: Rec; user: User | null; onSignIn: () => void; onError: (m: string) => void; children?: ReactNode }) {
@@ -499,7 +501,7 @@ function Teach({ user, onSignIn, config, isAdmin, tick, onOpen, onCreate, onEdit
 
 /* ---------- admin ---------- */
 function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick: number; config: SkillsConfig; onNew: () => void; onEdit: (c: ClassItem) => void; onOpen: (id: string) => void; onConfigChanged: () => void }) {
-  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live' | 'software'>('all')
+  const [tab, setTab] = useState<'classes' | 'recs' | 'all' | 'products' | 'orders' | 'settings' | 'live' | 'software' | 'hacks'>('all')
   const [edits, setEdits] = useState<Record<string, { title?: string; category?: string }>>({})
   const [q, setQ] = useState<{ classes: ClassItem[]; recs: Rec[] } | null>(null)
   const [all, setAll] = useState<ClassItem[] | null>(null)
@@ -522,6 +524,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
         <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All classes</button>
         <button className={tab === 'recs' ? 'on' : ''} onClick={() => setTab('recs')}>Recommendations <b>{q?.recs.length ?? 0}</b></button>
         {config.allowTutorCreate && <button className={tab === 'classes' ? 'on' : ''} onClick={() => setTab('classes')}>Class requests <b>{q?.classes.length ?? 0}</b></button>}
+        <button className={tab === 'hacks' ? 'on' : ''} onClick={() => setTab('hacks')}>Hackathons</button>
         <button className={tab === 'software' ? 'on' : ''} onClick={() => setTab('software')}>Software</button>
         <button className={tab === 'products' ? 'on' : ''} onClick={() => setTab('products')}>Products</button>
         <button className={tab === 'orders' ? 'on' : ''} onClick={() => setTab('orders')}>Orders</button>
@@ -548,6 +551,7 @@ function Admin({ tick, config, onNew, onEdit, onOpen, onConfigChanged }: { tick:
               {box(r.id)}<button className="sl-mini" onClick={() => decide('rec', r.id, 'approve')}>Approve</button><button className="sl-mini danger" onClick={() => decide('rec', r.id, 'reject')}>Reject</button></span>
           </RecCard>))}</div>
       ))}
+      {tab === 'hacks' && <AdminHacks tick={tick} />}
       {tab === 'software' && <AdminSoftware tick={tick} />}
       {tab === 'products' && <AdminProducts config={config} tick={tick} />}
       {tab === 'orders' && <AdminOrders tick={tick} />}
@@ -593,11 +597,13 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
   const open = (id: string) => setView({ name: 'class', id })
   return (
     <HubShell name="CIT Group" sub="Chuka AI Community" logo="skills-logo.svg" backLabel={name === 'learn' ? 'Back to services' : 'Back'}
-      onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : 'learn' }))}
+      onBack={() => (name === 'learn' ? onBack() : setView({ name: name === 'class' ? 'classes' : name === 'hack' ? 'hackathons' : 'learn' }))}
       nav={<CitMenu current={menuLabel[name]} items={[
         { key: 'learn', label: 'Learn', icon: <GraduationCap size={18} />, on: name === 'learn' || name === 'path', onClick: () => { setLearnCat(''); setView({ name: 'learn' }) } },
         { key: 'classes', label: 'Classes', icon: <BookOpen size={18} />, on: name === 'classes' || name === 'class', onClick: () => { setClassQ(''); setView({ name: 'classes' }) } },
         { key: 'live', label: 'Live', icon: <Video size={18} />, on: name === 'live', dot: config.live.on, onClick: () => setView({ name: 'live' }) },
+        { key: 'hackathons', label: 'Hackathons', icon: <Trophy size={18} />, on: name === 'hackathons' || name === 'hack', onClick: () => setView({ name: 'hackathons' }) },
+        { key: 'ideas', label: 'Coding ideas', icon: <Lightbulb size={18} />, on: name === 'ideas', onClick: () => setView({ name: 'ideas' }) },
         { key: 'software', label: 'Software', icon: <Download size={18} />, on: name === 'software', onClick: () => setView({ name: 'software' }) },
         { key: 'shop', label: 'Shop', icon: <ShoppingBag size={18} />, on: name === 'shop', onClick: () => setView({ name: 'shop' }) },
         { key: 'chat', label: isAdmin ? 'Inbox' : 'Ask admin', icon: <MessageCircle size={18} />, on: name === 'chat', onClick: () => gated({ name: 'chat' }) },
@@ -610,6 +616,9 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {view.name === 'chat' && (isAdmin ? <><div className="sl-page-head"><div><span className="sl-kicker">ADMIN</span><h1>Student messages</h1></div></div><AdminInbox user={user} onSignIn={onSignIn} /></> : <StudentChat user={user} onSignIn={onSignIn} whatsapp={config.whatsapp} />)}
       {view.name === 'learn' && <Learn key={learnCat} initialCat={learnCat} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} onRecommend={(p) => setRecOpen(p ?? 'new')} onOpenPath={(id) => setView({ name: 'path', id })} onAllSoftware={() => setView({ name: 'software' })} />}
       {view.name === 'software' && <><div className="sl-page-head"><div><span className="sl-kicker">SOFTWARE</span><h1>Software you need</h1></div></div><p className="sl-sub" style={{ marginTop: 0 }}>Install these on your computer before class. The CIT admin keeps this list up to date.</p><SoftwareList /></>}
+      {view.name === 'hackathons' && <Hackathons user={user} onOpen={(id) => setView({ name: 'hack', id })} />}
+      {view.name === 'hack' && <HackPage key={view.id} id={view.id} user={user} onSignIn={onSignIn} isAdmin={isAdmin} />}
+      {view.name === 'ideas' && <IdeasBoard user={user} onSignIn={onSignIn} isAdmin={isAdmin} />}
       {view.name === 'path' && (() => { const path = pathById(view.id); return path ? <PathPage key={path.id} user={user} onSignIn={onSignIn} path={path} onSoftware={() => setView({ name: 'software' })} onSeeContent={(c) => { setLearnCat(c); setView({ name: 'learn' }) }} /> : null })()}
       {view.name === 'classes' && <Classes key={classQ} initialQ={classQ} user={user} config={config} isAdmin={isAdmin} onOpen={open} onCreate={() => (user ? setClassOpen('new') : onSignIn())} />}
       {view.name === 'class' && <ClassPage id={view.id} user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onEdit={setClassOpen} onGone={() => setView({ name: 'classes' })} />}

@@ -29,6 +29,19 @@ export type SoftwarePrice = 'Free' | 'Free trial' | 'Paid'
 export type Software = { id: string; name: string; description: string; url: string; platform: string; price: SoftwarePrice; note: string; status: 'live' | 'hidden'; sort: number }
 export type SoftwareInput = { id?: string; name: string; description: string; url: string; platform: string; price: SoftwarePrice; note: string; status: 'live' | 'hidden'; sort: number }
 export const SW_PLATFORMS = ['All', 'Windows', 'Mac', 'Linux', 'Android', 'iPhone', 'Web']
+export type HackStatus = 'draft' | 'open' | 'ongoing' | 'ended'
+export type HackRegStatus = 'registered' | 'approved' | 'rejected' | 'cancelled'
+export type Hackathon = {
+  id: string; title: string; summary: string; description: string; rules: string; prizes: string; startAt: string; endAt: string; regDeadline: string
+  mode: Mode; venue: string; maxParticipants: number; teamMax: number; coverUrl: string; status: HackStatus; results: string; registered: number
+  myReg: { status: HackRegStatus; teamName: string } | null; live: boolean; liveVideoId: string; joinLink?: string; liveOn?: boolean
+}
+export type HackInput = {
+  id?: string; title: string; summary: string; description: string; rules: string; prizes: string; startAt: string; endAt: string; regDeadline: string
+  mode: Mode; venue: string; joinLink: string; maxParticipants: number; teamMax: number; status: HackStatus; results: string; cover?: UploadFile
+}
+export type HackRegInput = { hackId: string; name: string; phone: string; school: string; level: string; teamName: string; members: string }
+export type HackReg = { id: string; name: string; email: string; phone: string; school: string; level: string; teamName: string; members: string; status: HackRegStatus; note: string; createdAt: string }
 export const CHANNEL_URL = 'https://www.youtube.com/@ChukaAIcommunity'
 export type Session = { id: string; title: string; startAt: string; endAt: string; note: string; paid?: boolean }
 export type UpcomingSession = { id: string; classId: string; classTitle: string; skill: string; mode: Mode; venue: string; title: string; startAt: string; endAt: string }
@@ -81,6 +94,9 @@ export const skillsApi = {
   submitRec: (r: RecInput) => api.call<{ id: string; status: 'pending' }>('rec_submit', { ...r }),
   vote: (id: string) => api.call<{ votes: number }>('rec_vote', { id }),
   ytSearch: (q: string) => api.call<YtResponse>('yt_search', { q }),
+  hackathons: () => api.call<Hackathon[]>('hackathons'),
+  hackRegister: (r: HackRegInput) => api.call<{ status: HackRegStatus }>('hack_register', { ...r }),
+  hackCancel: (hackId: string) => api.call<{ ok: boolean }>('hack_cancel', { hackId }),
   software: () => api.call<Software[]>('software'),
   upcoming: () => api.call<UpcomingSession[]>('sessions_upcoming'),
   products: () => api.call<Product[]>('products'),
@@ -103,6 +119,12 @@ export const skillsApi = {
     saveClass: (c: ClassInput) => api.call<{ id: string; status: Status }>('admin_class_save', { ...c }),
     addSession: (s: { classId: string; start: string; minutes: number; weeks?: number; meet?: boolean; title?: string; note?: string }) =>
       api.call<{ id: string; count: number; warning: string; joinLink: string }>('admin_session_add', { ...s }),
+    hacks: () => api.call<Hackathon[]>('admin_hacks'),
+    saveHack: (h: HackInput) => api.call<{ id: string; status: string }>('admin_hack_save', { ...h }),
+    deleteHack: (id: string) => api.call<{ deleted: boolean }>('admin_hack_delete', { id }),
+    hackRegs: (hackId: string) => api.call<HackReg[]>('admin_hack_regs', { hackId }),
+    decideReg: (id: string, status: 'approved' | 'rejected' | 'registered', note?: string) => api.call<{ status: HackRegStatus }>('admin_hack_reg_decide', { id, status, note }),
+    hackLive: (id: string, on: boolean, videoId?: string) => api.call<{ live: boolean; liveVideoId: string }>('admin_hack_live', { id, on, videoId }),
     software: () => api.call<Software[]>('admin_software'),
     saveSoftware: (x: SoftwareInput) => api.call<{ id: string; status: string }>('admin_software_save', { ...x }),
     deleteSoftware: (id: string) => api.call<{ deleted: boolean }>('admin_software_delete', { id }),
