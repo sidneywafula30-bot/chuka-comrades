@@ -6,6 +6,7 @@ import { shrinkImage } from '../lib/files'
 import { errMsg, type Note } from '../lib/hub'
 import { Empty, Loading, Modal, Msg, StatusBadge } from '../components/HubUi'
 import { ChatRoom } from '../components/CitChat'
+import { ShareBar } from '../components/Bluesky'
 import '../components/Cit.css'
 
 const when = (s: string) => (s ? new Date(s).toLocaleString('en-KE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' }) : '')
@@ -132,7 +133,7 @@ export function HackPage({ id, user, onSignIn, isAdmin }: { id: string; user: Us
   return (
     <>
       <div className="cit-hk-hero"><HackCover h={h} /><span className={`cit-hk-status ${h.status}`}>{STATUS_LABEL[h.status]}</span></div>
-      <div className="sl-page-head"><div><span className="sl-kicker">HACKATHON</span><h1>{h.title}</h1></div></div>
+      <div className="sl-page-head"><div><span className="sl-kicker">HACKATHON</span><h1>{h.title}</h1></div><ShareBar text={`${h.title} — join the CIT Group hackathon!`} tags={['hackathon', 'Chuka']} /></div>
       <Msg msg={msg} />
       <div className="hub-meta" style={{ marginBottom: 10 }}>
         <span><CalendarDays size={13} /> {when(h.startAt)} to {when(h.endAt)}</span><span><MapPin size={13} /> {h.mode === 'online' ? 'Online' : h.venue || h.mode}</span>

@@ -9,6 +9,7 @@ import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './Skil
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 import CitMenu from '../components/CitMenu'
+import { BlueskyStrip } from '../components/Bluesky'
 import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
 import { AdminHacks, HackPage, Hackathons } from './SkillsHack'
 import { IdeasBoard } from './SkillsIdeas'
@@ -164,6 +165,7 @@ function Learn({ user, onSignIn, config, isAdmin, onRecommend, onOpenPath, onAll
       )}
 
       <ChannelShelf config={config} />
+      <BlueskyStrip />
 
       <div className="hub-sec"><h2>Search YouTube</h2></div>
       <form className="sl-search" onSubmit={ytSearch}><Search size={18} /><input value={yq} onChange={(e) => setYq(e.target.value)} placeholder="Search tutorials, e.g. “VS Code for beginners”" />

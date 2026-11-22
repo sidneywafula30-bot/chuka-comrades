@@ -206,3 +206,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .cit-st.building { background: #fff0cf; color: #8a5200; }
 .cit-st.done { background: #dff3e6; color: var(--cit-green-d); }
 .cit-sel { border-radius: 999px; border: 1px solid var(--cit-line); padding: 5px 10px; font: inherit; font-size: 12px; background: #fff; }
+
+/* ---- Bluesky strip + share buttons ---- */
+.cit-bsky { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 280px); gap: 12px; overflow-x: auto; padding: 4px 2px 12px; scroll-snap-type: x proximity; }
+.cit-bsky-card { scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px; background: #fff; border: 1px solid #d6e4db; border-radius: 16px; padding: 12px; color: inherit; text-decoration: none; }
+.cit-bsky-card:hover { border-color: #0a7c4a; box-shadow: 0 4px 14px rgba(10, 124, 74, .12); }
+.cit-bsky-card img { width: 100%; height: 130px; object-fit: cover; border-radius: 10px; }
+.cit-bsky-card p { margin: 0; font-size: 14px; line-height: 1.45; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.cit-bsky-card small { display: flex; gap: 12px; margin-top: auto; color: #5d7266; font-size: 12px; }
+.cit-bsky-card small span { display: inline-flex; align-items: center; gap: 3px; }
+.cit-share { display: inline-flex; flex-wrap: wrap; gap: 6px; }
