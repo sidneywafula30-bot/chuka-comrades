@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ExternalLink, Hash, MessageCircle, Radio, Send, Users } from 'lucide-react'
+import { Hash, MessageCircle, Radio, Send, Users } from 'lucide-react'
 import { skillsApi, type SkillsConfig } from '../lib/skills'
 import { authorFeed, EMPTY_BSKY, listFeed, listMembers, listUri, resolveDid, startLive, type BskyConfig, type BskyPost, type LiveState } from '../lib/bluesky'
 import { errMsg, type Note } from '../lib/hub'
 import { Empty, Loading, Msg } from '../components/HubUi'
-import { BskyCard, BskyDm, BskyThread, bskyHandle } from '../components/Bluesky'
+import { BlueskyLogo, BskyCard, BskyDm, BskyThread, bskyHandle } from '../components/Bluesky'
 import '../components/Cit.css'
 
 type Src = 'community' | 'ours' | 'live' | 'topics'
@@ -146,10 +146,10 @@ export function Feed({ config, user, onSignIn, isAdmin, onChanged }: { config: S
         <div><span className="sl-kicker">COMMUNITY · CIT GROUP</span><h1>What the community is <em>saying right now.</em></h1>
           <p>Posts from our Bluesky account and the developers we follow. Open the replies here, then join in on Bluesky.</p>
           <div className="cit-hero-actions">
-            {handle && <a className="sl-primary small" href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> Follow @{handle}</a>}
+            {handle && <a className="sl-primary small" href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener"><BlueskyLogo size={15} color="currentColor" /> Follow @{handle}</a>}
             <BskyDm bsky={bsky} className="sl-mini cit-light" />
           </div></div>
-        <div className="sl-hero-art"><Send size={46} /><span>Bluesky</span></div>
+        <div className="sl-hero-art"><BlueskyLogo size={46} color="#fff" /><span>Bluesky</span></div>
       </section>
       <div className="hub-chips">{tabs.map(([k, l, Icon]) => <button key={k} className={src === k ? 'on' : ''} onClick={() => setSrc(k)}><Icon size={13} style={{ verticalAlign: -2 }} /> {l}</button>)}</div>
       <Msg msg={msg} />

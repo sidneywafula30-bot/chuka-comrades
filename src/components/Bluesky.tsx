@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ExternalLink, EyeOff, Heart, MessageCircle, Repeat2, Send, Share2 } from 'lucide-react'
+import { EyeOff, Heart, MessageCircle, Repeat2, Send, Share2 } from 'lucide-react'
 import { skillsApi } from '../lib/skills'
 import { ago, authorFeed, fixActor, postThread, type BskyConfig, type BskyNode, type BskyPost } from '../lib/bluesky'
 import { errMsg } from '../lib/hub'
@@ -8,6 +8,15 @@ import './Cit.css'
 // The handle comes from Admin > Bluesky. VITE_BSKY_HANDLE in .env still works as a fallback.
 const ENV_HANDLE = ((import.meta.env.VITE_BSKY_HANDLE as string | undefined) ?? '').trim().replace(/^@/, '')
 export const bskyHandle = (c?: BskyConfig) => fixActor(c?.handle || ENV_HANDLE)
+
+/* ---------- the official Bluesky butterfly (brand blue #1185FE) ---------- */
+export function BlueskyLogo({ size = 14, color = '#1185FE', style }: { size?: number; color?: string; style?: React.CSSProperties }) {
+  return (
+    <svg width={size} height={Math.round(size * 0.883)} viewBox="0 0 600 530" fill={color} role="img" aria-label="Bluesky" focusable="false" style={{ flex: 'none', verticalAlign: '-2px', ...style }}>
+      <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" />
+    </svg>
+  )
+}
 
 /* ---------- a post ---------- */
 export function BskyCard({ post, admin, onHide, children }: { post: BskyPost; admin?: boolean; onHide?: (p: BskyPost) => void; children?: ReactNode }) {
@@ -23,7 +32,7 @@ export function BskyCard({ post, admin, onHide, children }: { post: BskyPost; ad
         <span><MessageCircle size={13} /> {post.replies}</span><span><Repeat2 size={13} /> {post.reposts}</span><span><Heart size={13} /> {post.likes}</span>
         <span className="cit-bpost-actions">
           {children}
-          <a className="sl-mini ghost" href={post.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={12} /> Open</a>
+          <a className="sl-mini ghost" href={post.url} target="_blank" rel="noreferrer noopener"><BlueskyLogo size={13} /> Open Bluesky</a>
           {admin && onHide && <button className="sl-mini danger" onClick={() => onHide(post)} title="Hide this post for everyone"><EyeOff size={12} /> Hide</button>}
         </span>
       </footer>
@@ -61,7 +70,7 @@ export function BskyThread({ url, hidden = [], showRoot = true }: { url: string;
     <div className="cit-bthread">
       {showRoot && <BskyCard post={root.post} />}
       {replies.length === 0 ? <p className="sl-sub">No replies yet. Be the first on Bluesky.</p> : <Replies list={replies} depth={0} />}
-      <p style={{ margin: '8px 0 0' }}><a className="sl-primary small" href={root.post.url} target="_blank" rel="noreferrer noopener"><MessageCircle size={14} /> Reply on Bluesky</a></p>
+      <p style={{ margin: '8px 0 0' }}><a className="sl-primary small" href={root.post.url} target="_blank" rel="noreferrer noopener"><BlueskyLogo size={15} color="currentColor" /> Reply on Bluesky</a></p>
     </div>
   )
 }
@@ -127,7 +136,7 @@ export function BlueskyStrip({ bsky }: { bsky?: BskyConfig }) {
   return (
     <>
       <div className="hub-sec"><h2>Latest from Bluesky</h2>
-        <a className="sl-link" href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener">@{handle} <ExternalLink size={12} /></a></div>
+        <a className="sl-link" href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener"><BlueskyLogo size={12} /> @{handle}</a></div>
       <div className="cit-bsky">
         {shown.map((p) => (
           <a key={p.uri} className="cit-bsky-card" href={p.url} target="_blank" rel="noreferrer noopener">
@@ -144,7 +153,7 @@ export function BlueskyStrip({ bsky }: { bsky?: BskyConfig }) {
 export function BskyDm({ bsky, className = 'sl-mini' }: { bsky?: BskyConfig; className?: string }) {
   const handle = bskyHandle(bsky)
   if (!handle) return null
-  return <a className={className} href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener" title="Opens our Bluesky profile. Tap the message icon there."><MessageCircle size={13} /> Message us on Bluesky</a>
+  return <a className={className} href={`https://bsky.app/profile/${handle}`} target="_blank" rel="noreferrer noopener" title="Opens our Bluesky profile. Tap the message icon there."><BlueskyLogo size={14} /> Message us on Bluesky</a>
 }
 
 /* ---------- share buttons (no keys needed) ---------- */
@@ -161,7 +170,7 @@ export function ShareBar({ text, tags = [] }: { text: string; tags?: string[] })
   }
   return (
     <span className="cit-share">
-      <a className="sl-mini" href={`https://bsky.app/intent/compose?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer noopener"><Share2 size={13} /> Bluesky</a>
+      <a className="sl-mini" href={`https://bsky.app/intent/compose?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer noopener"><BlueskyLogo size={13} /> Bluesky</a>
       <a className="sl-mini" href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer noopener"><Share2 size={13} /> WhatsApp</a>
       <button className="sl-mini ghost" onClick={() => void nativeOrCopy()}>{copied ? 'Copied!' : 'Copy'}</button>
     </span>
