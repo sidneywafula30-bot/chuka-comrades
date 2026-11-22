@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ExternalLink, EyeOff, Heart, MessageCircle, Repeat2, Send, Share2 } from 'lucide-react'
 import { skillsApi } from '../lib/skills'
-import { ago, authorFeed, postThread, type BskyConfig, type BskyNode, type BskyPost } from '../lib/bluesky'
+import { ago, authorFeed, fixActor, postThread, type BskyConfig, type BskyNode, type BskyPost } from '../lib/bluesky'
 import { errMsg } from '../lib/hub'
 import './Cit.css'
 
 // The handle comes from Admin > Bluesky. VITE_BSKY_HANDLE in .env still works as a fallback.
 const ENV_HANDLE = ((import.meta.env.VITE_BSKY_HANDLE as string | undefined) ?? '').trim().replace(/^@/, '')
-export const bskyHandle = (c?: BskyConfig) => (c?.handle || ENV_HANDLE).replace(/^@/, '')
+export const bskyHandle = (c?: BskyConfig) => fixActor(c?.handle || ENV_HANDLE)
 
 /* ---------- a post ---------- */
 export function BskyCard({ post, admin, onHide, children }: { post: BskyPost; admin?: boolean; onHide?: (p: BskyPost) => void; children?: ReactNode }) {

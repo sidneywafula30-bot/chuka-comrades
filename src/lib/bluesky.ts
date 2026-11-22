@@ -1,7 +1,15 @@
 // Bluesky helpers. Reads use the public, read-only endpoint (no key, no login).
 // Writing and topic search go through the Apps Script server (see Skills.gs).
 
-const PUB = 'https://public.api.bsky.app/xrpc'
+// Two hostnames for the same public, read-only API. If one fails DNS, the other is tried.
+const HOSTS = ['https://public.api.bsky.app/xrpc', 'https://api.bsky.app/xrpc']
+
+/** "chukaaicommunity" -> "chukaaicommunity.bsky.social". Leaves DIDs and full handles alone. */
+export function fixActor(actor: string): string {
+  const a = actor.trim().replace(/^@/, '').toLowerCase()
+  if (!a || a.startsWith('did:') || a.includes('.')) return a
+  return `${a}.bsky.social`
+}
 
 export type BskyPost = {
   uri: string; url: string; did: string; handle: string; name: string; avatar: string
@@ -22,13 +30,26 @@ type PostView = {
 
 async function get<T>(method: string, params: Record<string, string | number>): Promise<T> {
   const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
-  const r = await fetch(`${PUB}/${method}?${qs}`)
-  if (!r.ok) {
-    let why = ''
-    try { const j = (await r.json()) as { message?: string; error?: string }; why = j.message || j.error || '' } catch { /* no details */ }
-    throw new Error(why ? `Bluesky says: ${why} (${method.split('.').pop()})` : `Bluesky said ${r.status} (${method.split('.').pop()})`)
+  const name = method.split('.').pop()
+  let networkFailed = false
+  for (const host of HOSTS) {
+    let r: Response
+    try {
+      r = await fetch(`${host}/${method}?${qs}`)
+    } catch {
+      networkFailed = true // DNS / offline / blocked: try the next host
+      continue
+    }
+    if (!r.ok) {
+      let why = ''
+      try { const j = (await r.json()) as { message?: string; error?: string }; why = j.message || j.error || '' } catch { /* no details */ }
+      throw new Error(why ? `Bluesky says: ${why} (${name})` : `Bluesky said ${r.status} (${name})`)
+    }
+    return (await r.json()) as T
   }
-  return (await r.json()) as T
+  throw new Error(networkFailed
+    ? 'Cannot reach Bluesky from this network. Check your connection or try a different DNS (1.1.1.1 or 8.8.8.8).'
+    : 'Bluesky request failed.')
 }
 
 const rkeyOf = (uri: string) => uri.split('/').pop() ?? ''
@@ -47,7 +68,7 @@ const isReply = (p: PostView) => !!p.record?.reply
 
 const didCache = new Map<string, string>()
 export async function resolveDid(actor: string): Promise<string> {
-  const a = actor.trim().replace(/^@/, '')
+  const a = fixActor(actor)
   if (a.startsWith('did:')) return a
   const hit = didCache.get(a); if (hit) return hit
   const j = await get<{ did: string }>('com.atproto.identity.resolveHandle', { handle: a })
@@ -64,7 +85,7 @@ export async function listUri(input: string): Promise<string> {
 }
 
 export async function authorFeed(actor: string, limit = 12): Promise<BskyPost[]> {
-  const d = await get<{ feed?: { reason?: unknown; post: PostView }[] }>('app.bsky.feed.getAuthorFeed', { actor, limit, filter: 'posts_no_replies' })
+  const d = await get<{ feed?: { reason?: unknown; post: PostView }[] }>('app.bsky.feed.getAuthorFeed', { actor: fixActor(actor), limit, filter: 'posts_no_replies' })
   return (d.feed ?? []).filter((f) => !f.reason).map((f) => toPost(f.post))
 }
 
