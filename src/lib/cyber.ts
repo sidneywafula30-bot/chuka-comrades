@@ -2,7 +2,9 @@ import type { User } from 'firebase/auth'
 
 const API = import.meta.env.VITE_CYBER_API_URL as string | undefined
 export const cyReady = Boolean(API)
-export const DEFAULT_WA = '254184198432'
+export const DEFAULT_WA = '254768963173'
+export const ADMIN_KEY = 'cy_admin_token'
+export const getAdminToken = () => { try { return localStorage.getItem(ADMIN_KEY) || '' } catch { return '' } }
 
 export type Service = { id: string; category: string; name: string; description: string; price: number | string; unit: string; turnaround: string; needsFile: boolean; template: string }
 export type Doc = { id: string; category: string; title: string; description: string; fileUrl: string }
@@ -10,13 +12,13 @@ export type Settings = { shopName: string; whatsapp: string; hours: string; mpes
 export type Boot = { services: Service[]; documents: Doc[]; settings: Settings }
 export type Profile = { name: string; phone: string; reg: string; hostel: string }
 export type Me = { email: string; name: string; isAdmin: boolean; profile: Profile | null }
-export type Order = { orderId: string; createdAt: string; email: string; name: string; phone: string; reg: string; hostel: string; serviceName: string; qty: number; notes: string; delivery: string; fileName: string; fileUrl: string; total: number | string; status: string; payStatus: string; mpesaCode: string }
+export type Order = { orderId: string; createdAt: string; email: string; name: string; phone: string; reg: string; hostel: string; serviceName: string; qty: number; notes: string; delivery: string; fileName: string; fileUrl: string; total: number | string; status: string; payStatus: string; mpesaCode: string; updatedAt?: string }
 
 /** text/plain avoids a CORS preflight, which Apps Script cannot answer. */
 export async function cy<T>(action: string, body: Record<string, unknown> = {}, user?: User | null): Promise<T> {
   if (!API) throw new Error('Cyber server not connected')
   const token = user ? await user.getIdToken() : undefined
-  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, token, ...body }) })
+  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, token, adminToken: getAdminToken() || undefined, ...body }) })
   const j = await res.json()
   if (!j.ok) throw new Error(j.error || 'Request failed')
   return j.data as T

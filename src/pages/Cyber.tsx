@@ -3,7 +3,7 @@ import { signInWithPopup, type User } from 'firebase/auth'
 import { ArrowLeft, FileDown, MessageCircle, Search, Upload } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
 import GoogleSignInButton from '../components/GoogleSignInButton'
-import { cy, cyReady, DEFAULT_WA, fileToB64, fillTemplate, money, normPhone, waLink, type Boot, type Me, type Order, type Profile, type Service } from '../lib/cyber'
+import { ADMIN_KEY, cy, cyReady, DEFAULT_WA, getAdminToken, fileToB64, fillTemplate, money, normPhone, waLink, type Boot, type Me, type Order, type Profile, type Service } from '../lib/cyber'
 import './Cpl.css'
 import './Cyber.css'
 
@@ -35,6 +35,7 @@ function CyberInner({ user, route }: { user: User | null; route: string }) {
   const [me, setMe] = useState<Me | null>(null)
   const [busy, setBusy] = useState(false)
   const [order, setOrder] = useState<Service | null>(null)
+  const [adminOk, setAdminOk] = useState(() => Boolean(getAdminToken()))
   const page = route.split('/')[2] || ''
 
   const load = useCallback(async () => {
@@ -53,8 +54,8 @@ function CyberInner({ user, route }: { user: User | null; route: string }) {
     try { await signInWithPopup(auth, googleProvider) } catch { /* closed */ } finally { setBusy(false) }
   }
 
-  const wa = boot?.settings.whatsapp || DEFAULT_WA
-  const tabs: [string, string][] = [['', 'Services'], ['docs', 'Documents'], ['orders', 'My orders'], ...(me?.isAdmin ? [['admin', 'Admin'] as [string, string]] : [])]
+  const wa = DEFAULT_WA
+  const tabs: [string, string][] = [['', 'Services'], ['docs', 'Documents'], ['orders', 'My orders'], ['admin', 'Admin']]
 
   let body
   if (!cyReady) body = <p className="cpl-empty">The cyber server is not connected yet. Add <code>VITE_CYBER_API_URL</code> to <code>.env</code> and restart.</p>
@@ -62,7 +63,7 @@ function CyberInner({ user, route }: { user: User | null; route: string }) {
   else if (!boot) body = <p className="cpl-empty">Loading…</p>
   else if (page === 'docs') body = <Docs boot={boot} me={me} />
   else if (page === 'orders') body = user ? <Orders user={user} /> : <SignInBox busy={busy} signIn={signIn} />
-  else if (page === 'admin') body = me?.isAdmin ? <Admin user={user!} wa={wa} /> : <p className="cpl-empty">Admins only.</p>
+  else if (page === 'admin') body = adminOk || me?.isAdmin ? <Admin user={user} wa={wa} onLogout={() => { try { localStorage.removeItem(ADMIN_KEY) } catch { /* ignore */ } setAdminOk(false) }} /> : <AdminLogin onDone={() => setAdminOk(true)} />
   else body = <Services boot={boot} me={me} onOrder={setOrder} />
 
   return (
@@ -73,14 +74,18 @@ function CyberInner({ user, route }: { user: User | null; route: string }) {
       </header>
       <main className="cpl-main">
         <div className="cpl-home cy-hero">
-          <div className="cy-mark"><img src={`${import.meta.env.BASE_URL}cyber-logo.svg`} alt="Chuka Cyber logo" /></div>
-          <h1>{boot?.settings.shopName || 'Chuka Cyber'}</h1>
+          <div className="cy-mark"><img src={`${import.meta.env.BASE_URL}cyber-logo.svg`} alt="Frank Cyber logo" /></div>
+          <h1>{boot?.settings.shopName || 'Frank Cyber'}</h1>
           <p>{boot?.settings.hours || 'Printing, typing, applications and more.'}</p>
-          <a className="lp-btn" href={waLink(wa, 'Hello Chuka Cyber, I need help with a service.')} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Chat on WhatsApp</a>
+          <a className="lp-btn" href={waLink(wa, 'Hello Frank Cyber, I need help with a service.')} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Chat on WhatsApp</a>
           <nav className="cy-tabs">{tabs.map(([k, l]) => <a key={k} href={`#/cyber${k ? '/' + k : ''}`} className={'cy-tab' + (page === k ? ' on' : '')}>{l}</a>)}</nav>
         </div>
         <div className="cy-body">{body}</div>
       </main>
+      <a className="cy-fab" href={waLink(wa, 'Hello Frank Cyber, I need help with a service.')} target="_blank" rel="noopener noreferrer" aria-label="Chat with Frank Cyber on WhatsApp">
+        <img src={`${import.meta.env.BASE_URL}cyber-logo.svg`} alt="" />
+        <span className="cy-fab-wa"><MessageCircle size={14} /></span>
+      </a>
       {order && boot && <OrderModal svc={order} boot={boot} user={user} me={me} busy={busy} signIn={signIn} onClose={() => setOrder(null)} />}
     </div>
   )
@@ -111,7 +116,7 @@ function Services({ boot, me, onOrder }: { boot: Boot; me: Me | null; onOrder: (
               <div className="cy-meta"><b>{money(s.price)}</b>{s.unit && <span> {s.unit}</span>}{s.turnaround && <span> · {s.turnaround}</span>}</div>
               <div className="cy-row">
                 <button className="lp-btn" onClick={() => onOrder(s)}>Order</button>
-                <a className="lp-btn lp-btn-soft" href={waLink(boot.settings.whatsapp, msg)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> WhatsApp</a>
+                <a className="lp-btn lp-btn-soft" href={waLink(DEFAULT_WA, msg)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> WhatsApp</a>
               </div>
             </article>
           )
@@ -157,7 +162,7 @@ function OrderModal({ svc, boot, user, me, busy, signIn, onClose }: { svc: Servi
         {!user ? <SignInBox busy={busy} signIn={signIn} /> : done ? (
           <div>
             <p><b>Order {done.orderId} received.</b> {done.total !== '' && <>Total: <b>{money(done.total)}</b>. </>}Pay via M-Pesa: {boot.settings.mpesa || 'ask on WhatsApp'}.</p>
-            <a className="lp-btn" href={waLink(boot.settings.whatsapp, msg)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> Confirm on WhatsApp</a>
+            <a className="lp-btn" href={waLink(DEFAULT_WA, msg)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> Confirm on WhatsApp</a>
             <button className="lp-btn lp-btn-soft" onClick={onClose}>Close</button>
           </div>
         ) : (
@@ -196,7 +201,7 @@ function Docs({ boot, me }: { boot: Boot; me: Me | null }) {
               <div><b>{d.title}</b>{d.description && <p>{d.description}</p>}</div>
               <div className="cy-row">
                 {d.fileUrl && <a className="lp-btn" href={d.fileUrl} target="_blank" rel="noopener noreferrer"><FileDown size={14} /> Download</a>}
-                <a className="lp-btn lp-btn-soft" href={waLink(boot.settings.whatsapp, `Hello Chuka Cyber, I'm ${me?.name || ''}. I need help filling: ${d.title}.`)} target="_blank" rel="noopener noreferrer">Need help?</a>
+                <a className="lp-btn lp-btn-soft" href={waLink(DEFAULT_WA, `Hello Frank Cyber, I'm ${me?.name || ''}. I need help filling: ${d.title}.`)} target="_blank" rel="noopener noreferrer">Need help?</a>
               </div>
             </div>
           ))}
@@ -224,23 +229,74 @@ function Orders({ user }: { user: User }) {
 const STATUSES = ['New', 'In progress', 'Ready', 'Collected', 'Cancelled']
 const PAY = ['Unpaid', 'Paid', 'Refunded']
 
-function Admin({ user, wa }: { user: User; wa: string }) {
+function AdminLogin({ onDone }: { onDone: () => void }) {
+  const [phone, setPhone] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function go() {
+    setErr(''); setBusy(true)
+    try {
+      const r = await cy<{ adminToken: string }>('adminLogin', { phone: normPhone(phone) })
+      localStorage.setItem(ADMIN_KEY, r.adminToken); onDone()
+    } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="cy-box">
+      <p><b>Admin access</b><br />Enter the Frank Cyber phone number.</p>
+      <input className="cy-admin-in" inputMode="tel" placeholder="07XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void go()} />
+      {err && <p className="cpl-err">{err}</p>}
+      <button className="lp-btn" disabled={busy || !phone.trim()} onClick={() => void go()}>{busy ? 'Checking…' : 'Open admin'}</button>
+    </div>
+  )
+}
+
+const todayStr = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10) // Nairobi date
+
+function Today({ rows }: { rows: Order[] }) {
+  const day = todayStr()
+  const done = rows.filter((o) => ['Ready', 'Collected'].includes(o.status) && String(o.updatedAt || '').slice(0, 10) === day)
+  const paid = rows.filter((o) => o.payStatus === 'Paid' && String(o.updatedAt || '').slice(0, 10) === day)
+  const cash = paid.reduce((t, o) => t + (Number(o.total) || 0), 0)
+  const open = rows.filter((o) => !['Collected', 'Cancelled'].includes(o.status)).length
+  const owed = done.filter((o) => o.payStatus === 'Unpaid').reduce((t, o) => t + (Number(o.total) || 0), 0)
+  return (
+    <section className="cy-today">
+      <h3 className="cy-cat">Today · {day}</h3>
+      <div className="cy-stats">
+        <div><b>{done.length}</b><span>Done</span></div>
+        <div><b>{money(cash)}</b><span>Cash in (paid)</span></div>
+        <div><b>{money(owed)}</b><span>Done, unpaid</span></div>
+        <div><b>{open}</b><span>Still open</span></div>
+      </div>
+      {!done.length && <p className="cpl-empty">Nothing marked done yet today.</p>}
+      {done.map((o) => (
+        <div className="cy-doc" key={o.orderId}>
+          <div><b>{o.orderId} · {o.serviceName}</b> ×{o.qty}<p>{o.name} · {o.phone} · {o.total !== '' && money(o.total)}</p></div>
+          <div className="cy-badges"><span className={`st st-${o.status.replace(/\s/g, '')}`}>{o.status}</span><span className={`st pay-${o.payStatus}`}>{o.payStatus}</span></div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function Admin({ user, wa, onLogout }: { user: User | null; wa: string; onLogout: () => void }) {
   const [rows, setRows] = useState<Order[] | null>(null)
   const [err, setErr] = useState('')
-  const [f, setF] = useState('Open')
+  const [f, setF] = useState('Today')
   const load = useCallback(() => { cy<Order[]>('adminOrders', {}, user).then(setRows).catch((e) => setErr(e.message)) }, [user])
   useEffect(load, [load])
   async function upd(o: Order, patch: Partial<Order>) {
     setRows((r) => r && r.map((x) => (x.orderId === o.orderId ? { ...x, ...patch } : x)))
     try { await cy('adminUpdate', { orderId: o.orderId, ...patch }, user) } catch (e) { setErr((e as Error).message); load() }
   }
-  if (err) return <p className="cpl-err">{err}</p>
+  if (err) return <p className="cpl-err">{err} <button className="cy-link" onClick={onLogout}>Log out</button></p>
   if (!rows) return <p className="cpl-empty">Loading…</p>
-  const list = rows.filter((o) => f === 'All' || (f === 'Open' ? !['Collected', 'Cancelled'].includes(o.status) : o.status === f))
+  const list = rows.filter((o) => f === 'Today' ? false : f === 'All' || (f === 'Open' ? !['Collected', 'Cancelled'].includes(o.status) : o.status === f))
   return (
     <>
-      <div className="cpl-chips">{['Open', 'All', ...STATUSES].map((s) => <button key={s} className={s === f ? 'on' : ''} onClick={() => setF(s)}>{s}</button>)}<button onClick={load}>Refresh</button></div>
-      {!list.length && <p className="cpl-empty">No orders.</p>}
+      <div className="cpl-chips">{['Today', 'Open', 'All', ...STATUSES].map((s) => <button key={s} className={s === f ? 'on' : ''} onClick={() => setF(s)}>{s}</button>)}<button onClick={load}>Refresh</button><button onClick={onLogout}>Log out</button></div>
+      {f === 'Today' && <Today rows={rows} />}
+      {f !== 'Today' && !list.length && <p className="cpl-empty">No orders.</p>}
       {list.map((o) => (
         <div className="cy-order" key={o.orderId}>
           <div><b>{o.orderId} · {o.serviceName}</b> ×{o.qty} <span className="cy-meta">{o.total !== '' && money(o.total)} · {o.createdAt}</span>

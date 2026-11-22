@@ -271,7 +271,7 @@ export default function Landing({ user }: { user: User | null }) {
                     : title === 'Cyber Services'
                     ? (
                       <span className="lp-card-icon has-logo">
-                        <img src={`${BASE}cyber-logo.svg`} alt="Chuka Cyber logo" />
+                        <img src={`${BASE}cyber-logo.svg`} alt="Frank Cyber logo" />
                       </span>
                     )
                     : title === 'Chuka Soko'
