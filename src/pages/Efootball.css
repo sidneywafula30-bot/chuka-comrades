@@ -420,3 +420,60 @@ a.ef-wa-admin .ef-badge { width: 30px; height: 30px; }
 .ef-share-mini:hover { background: #e2efe6; }
 .ef-share-mini:focus-visible { outline: 3px solid var(--ef-pitch); outline-offset: 2px; }
 @media (max-width: 520px) { .ef-result { grid-template-columns: 30px 1fr auto 1fr 30px; } .ef-share-cell { grid-column: 1 / -1; justify-items: center; } }
+
+/* ================= landing page: scoreboard, matchday ticket, knockout card ================= */
+.ef-hero .ef-eyebrow { text-transform: none; letter-spacing: .01em; font-size: 13px; font-weight: 700; color: #8fd6a8; }
+.ef-stats { display: flex; flex-wrap: wrap; gap: 0; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid #ffffff26; }
+.ef-stats div { display: flex; flex-direction: column-reverse; gap: 2px; padding: 0 22px 0 0; margin-right: 22px; border-right: 1px solid #ffffff1f; }
+.ef-stats div:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+.ef-stats dd { margin: 0; font: 800 28px/1 'Manrope', sans-serif; color: #e8b923; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+.ef-stats dt { font-size: 12px; color: #bfe3cc; }
+
+.ef-today { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; width: 100%; margin: 0 0 22px; align-items: stretch; }
+@media (max-width: 760px) { .ef-today { grid-template-columns: 1fr; } }
+
+/* the ticket: your next fixture, both squads face to face */
+.ef-ticket { position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 18px 20px 20px; border-radius: 24px; color: #fff; text-align: left;
+  background: radial-gradient(110% 130% at 0% 0%, #1f5a38 0%, #0f1d16 70%); box-shadow: 0 16px 36px #0f1d1640; }
+.ef-ticket-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font: 700 13px 'Manrope', sans-serif; color: #bfe3cc; }
+.ef-tclock { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 99px; background: #ffffff1c; color: #fff; font-variant-numeric: tabular-nums; }
+.ef-tclock.hot { background: #e8b923; color: #3a2b00; }
+.ef-ticket-vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; margin: 16px 0 6px; }
+.ef-tside { display: grid; gap: 4px; min-width: 0; }
+.ef-tside strong { font: 800 16px/1.2 'Manrope', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ef-tside small { color: #bfe3cc; font-size: 12px; }
+.ef-tshot { display: block; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 2px solid #ffffff2e; border-radius: 16px; overflow: hidden; background: #ffffff14; cursor: zoom-in; }
+.ef-tside.you .ef-tshot { border-color: #e8b923; }
+.ef-tshot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ef-tshot .ph { display: grid; place-items: center; width: 100%; height: 100%; font: 800 26px 'Manrope', sans-serif; color: #e8b923; }
+.ef-tshot:focus-visible, .ef-ticket-wa:focus-visible { outline: 3px solid #e8b923; outline-offset: 2px; }
+.ef-ticket-mid { display: grid; gap: 4px; justify-items: center; text-align: center; }
+.ef-ticket-mid b { font: 800 22px 'Manrope', sans-serif; color: #e8b923; letter-spacing: 1px; }
+.ef-ticket-mid small { color: #bfe3cc; font-size: 11px; max-width: 8ch; line-height: 1.25; }
+.ef-ticket-note { margin: 4px 0 0; color: #cfe8d8; font-size: 13px; line-height: 1.45; }
+.ef-ticket-foot { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px -20px 0; padding: 18px 20px 0; border-top: 2px dashed #ffffff30; }
+.ef-ticket-foot::before, .ef-ticket-foot::after { content: ''; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: #fbfcfa; }
+.ef-ticket-foot::before { left: -11px; } .ef-ticket-foot::after { right: -11px; }
+.ef-ticket-foot .lp-btn { margin: 0; background: #e8b923; color: #2d2200; }
+.ef-ticket-wa { display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 99px; background: #25d366; color: #063d1d; font: 800 13px 'Manrope', sans-serif; text-decoration: none; }
+.ef-ticket-wa:hover { filter: brightness(1.06); }
+.ef-ticket.empty { justify-content: flex-start; }
+.ef-ticket.empty h3 { margin: 18px 0 6px; font: 800 24px/1.15 'Manrope', sans-serif; color: #fff; }
+.ef-ticket.empty .ef-ticket-note { font-size: 14px; max-width: 44ch; }
+@media (max-width: 520px) {
+  .ef-ticket { padding: 16px 16px 18px; } .ef-ticket-foot { margin: 16px -16px 0; padding: 18px 16px 0; }
+  .ef-ticket-vs { gap: 8px; } .ef-tside strong { font-size: 14px; } .ef-ticket-mid b { font-size: 18px; }
+}
+
+/* the knockout card next to it */
+.ef-ko { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px; border-radius: 24px; border: 1px solid var(--line); border-top: 4px solid #e8b923; background: #fff; color: inherit; text-decoration: none; text-align: left; box-shadow: 0 1px 0 #0000000a, 0 8px 24px #173d250d; transition: border-color .15s, transform .15s; }
+.ef-ko:hover { border-color: var(--green); border-top-color: #e8b923; transform: translateY(-2px); }
+.ef-ko h3 { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--green); font-size: 15px; }
+.ef-ko-name { margin: 0; font: 800 22px/1.2 'Manrope', sans-serif; color: #12301f; overflow-wrap: anywhere; }
+.ef-ko .ef-bar { width: 100%; margin: 2px 0 0; }
+.ef-ko-note { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 13px; }
+.ef-ko-cta { margin-top: auto; padding: 10px 18px; border-radius: 99px; background: var(--green); color: #fff; font: 800 13px 'Manrope', sans-serif; }
+
+/* the floating admin chat keeps its label on the landing page, even on phones */
+@media (max-width: 520px) { .ef-fab.wide { padding: 4px 16px 4px 4px; } .ef-fab.wide span { display: inline; } }
+@media (prefers-reduced-motion: reduce) { .ef-ko, .ef-ko:hover { transition: none; transform: none; } }

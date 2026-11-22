@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { DEFAULT_PAY, ef, ksh, showPhone, waLink, type PayCfg } from '../lib/efootball'
 import { WhatsAppLogo } from './BrandLogos'
 
@@ -45,11 +46,13 @@ export function AdminFab({ page = '' }: { page?: string }) {
   const cfg = usePayCfg()
   const where: Record<string, string> = { league: 'my league', players: 'the players list', market: 'the marketplace', fpl: 'FPL', tournament: 'the weekly knockout', join: 'the weekly knockout', profile: 'my profile' }
   const msg = where[page] ? `Hi eFootball admin, I need help with ${where[page]}. ` : 'Hi eFootball admin, '
-  return (
-    <a className="ef-fab" href={waLink(cfg.adminWa, msg)} target="_blank" rel="noopener noreferrer" aria-label="Chat with the eFootball admin on WhatsApp">
+  const btn = (
+    <a className={`ef-fab${page ? '' : ' wide'}`} href={waLink(cfg.adminWa, msg)} target="_blank" rel="noopener noreferrer" aria-label="Chat with the eFootball admin on WhatsApp">
       <AdminBadge size={44} /><span>Chat admin</span>
     </a>
   )
+  // Drawn on <body>, so a parent with transform / overflow can never hide or move it.
+  return typeof document === 'undefined' ? btn : createPortal(btn, document.body)
 }
 
 type BoxProps = {

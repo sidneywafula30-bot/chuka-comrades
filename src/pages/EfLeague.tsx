@@ -20,7 +20,7 @@ export default function EfLeague({ me, reload, signedIn, onSignIn, sub, arg }: P
   if (sub === 'view' && arg) return <PublicView id={decodeURIComponent(arg)} me={me} />
   const L = me?.profile?.league ?? null
   if (signedIn && !me) return <p className="cpl-empty">Loading…</p>
-  if (L && me?.profile) return <MyLeague key={L.id} L={L} me={me} reload={reload} />
+  if (L && me?.profile) return <MyLeague key={L.id} L={L} me={me} reload={reload} initial={sub === 'mine' ? 'mine' : 'today'} />
   return <Discover signedIn={signedIn} />
 }
 
@@ -44,9 +44,9 @@ function PublicView({ id, me }: { id: string; me: Me | null }) {
 }
 
 /* ---------------- my league ---------------- */
-function MyLeague({ L, me, reload }: { L: LeagueInfo; me: Me; reload: () => Promise<void> }) {
+function MyLeague({ L, me, reload, initial }: { L: LeagueInfo; me: Me; reload: () => Promise<void>; initial: Tab }) {
   const p = me.profile!
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useState<Tab>(initial)
   const [zoom, setZoom] = useState('')
   const [skew, setSkew] = useState(0)
   const lg = useApi<League>('league', { id: L.id })
