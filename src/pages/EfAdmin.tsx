@@ -121,14 +121,14 @@ function ListingsAdmin() {
 /* ---------------- tournament form ---------------- */
 function TournamentAdmin() {
   const [t, setT] = useState<Tournament | null | undefined>(undefined)
-  const [editing, setEditing] = useState(false)
+  const [mode, setMode] = useState<'' | 'edit' | 'new'>('')
   const { setMsg, el } = useMsg()
   const [busy, setBusy] = useState(false)
   const load = useCallback(async () => { try { setT(await ef<Tournament | null>('tournament')) } catch (e) { setMsg({ ok: false, text: (e as Error).message }); setT(null) } }, [setMsg])
   useEffect(() => { void load() }, [load])
 
   if (t === undefined) return <p className="cpl-empty">Loading…</p>
-  const live = t && t.status !== 'done'
+  const live = !!t && t.status !== 'done'
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true); setMsg(null)
     try { await fn(); await load(); setMsg({ ok: true, text: ok }) } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
@@ -137,23 +137,24 @@ function TournamentAdmin() {
 
   return (
     <>
-      {live && t && (
+      {t && (
         <section className="cpl-card">
-          <h3>{t.name} <span className="ef-pill">{t.status === 'open' ? 'registration open' : `round ${t.round} of ${t.stages}`}</span></h3>
+          <h3>{t.name} <span className="ef-pill">{t.status === 'open' ? 'registration open' : t.status === 'running' ? `round ${t.round} of ${t.stages}` : 'finished'}</span></h3>
           <p className="cpl-sub" style={{ margin: '0 0 12px' }}>{t.count} verified of {t.cap} ({t.cap === 64 ? '64-player knockout' : '512-player knockout'}){t.pending ? ` · ${t.pending} waiting for payment verification (Payments tab)` : ''} · entry KSh {t.fee ?? 0} · hosts earn KSh {t.hostFee} per pool, chosen automatically.</p>
           <div className="ef-copy"><span style={{ flex: 1 }}>{link}</span>
             <button className="lp-btn" onClick={() => { void navigator.clipboard?.writeText(link); setMsg({ ok: true, text: 'Invite link copied.' }) }}><Copy size={14} /> Copy</button></div>
           <div className="ef-actions">
-            <button className="lp-btn" disabled={busy} onClick={() => setEditing((v) => !v)}>{editing ? 'Close editor' : 'Edit tournament'}</button>
-            <button className="lp-btn cpl-danger" disabled={busy} onClick={() => run(() => ef('regenToken', { tid: t.id }), 'New invite link created. The old one no longer works.')}>New invite link</button>
+            <button className="lp-btn" disabled={busy} onClick={() => setMode((m) => (m === 'edit' ? '' : 'edit'))}>{mode === 'edit' ? 'Close editor' : 'Edit tournament'}</button>
+            {!live && <button className="lp-btn" disabled={busy} onClick={() => setMode((m) => (m === 'new' ? '' : 'new'))}>{mode === 'new' ? 'Cancel' : 'Start a new tournament'}</button>}
+            {live && <button className="lp-btn cpl-danger" disabled={busy} onClick={() => run(() => ef('regenToken', { tid: t.id }), 'New invite link created. The old one no longer works.')}>New invite link</button>}
             {t.status === 'open' && <button className="lp-btn" disabled={busy} onClick={() => confirm('Close registration and draw the pools now?') && run(() => ef('drawNow', { tid: t.id }), 'Pools drawn.')}>Draw pools now</button>}
             {t.status === 'running' && <button className="lp-btn" disabled={busy} onClick={() => run(() => ef('advanceNow', { tid: t.id }), 'Advanced.')}>Advance to next round</button>}
           </div>
           {el}
         </section>
       )}
-      {(!live || editing) && <TournamentForm t={live ? t : null} onSaved={async () => { setEditing(false); await load() }} />}
-      {!live && el}
+      {(!t || mode) && <TournamentForm key={mode || 'new'} t={mode === 'edit' ? t : null} onSaved={async () => { setMode(''); await load() }} />}
+      {!t && el}
     </>
   )
 }
