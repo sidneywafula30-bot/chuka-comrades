@@ -13,29 +13,35 @@ export type VideoResult = { videos: Video[]; warning?: string }
 export type VideoCategory = 'highlights' | 'goals' | 'skills' | 'tips' | 'formations' | 'updates'
 
 /** `chat` = the player turned the WhatsApp button on (everyone sees the button). `whatsapp` = the number, sent only to signed-in registered players. */
-export type PublicPlayer = { uid: string; username: string; name: string; course: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean; freeTimes: string[]; inLeague: boolean; fpl?: boolean; chat?: boolean; whatsapp?: string }
-export type Profile = Omit<PublicPlayer, 'whatsapp'> & {
-  fullName: string; whatsapp: string; status: string; email: string; showWhatsapp: boolean; paused: boolean; strikes: number; leagueOpen?: boolean; fplId?: string; fplTeam?: string
-  /** Class-league money: the fee the first member set, who that is ('me' | 'other' | '' = nobody yet), and whether my payment waits for the admin. */
-  leagueFee?: number; leaguePending?: boolean; leagueLogoId?: string
-  /** 3 days free after joining, then a one-time activation: none | trial | active | expired. `trialEnds` is when the free days end. */
-  leagueState?: 'none' | 'trial' | 'active' | 'expired'; trialEnds?: string
+export type PublicPlayer = { uid: string; username: string; name: string; year: number; platform: string; strength: number; squadId: string; canHost: boolean; leagueId: string; league: string; freeTimes: string[]; inLeague: boolean; fpl?: boolean; chat?: boolean; whatsapp?: string }
+
+/** A league as the app sees it. `code` is sent only to members, and for public leagues. */
+export type LeagueInfo = { id: string; name: string; about: string; logoId: string; founder: string; founderUid: string; members: number; isPublic: boolean; code: string; createdAt: string }
+
+export type Profile = Omit<PublicPlayer, 'whatsapp' | 'league'> & {
+  fullName: string; whatsapp: string; status: string; email: string; showWhatsapp: boolean; paused: boolean; strikes: number; fplId?: string; fplTeam?: string
+  /** Free for the first matches, then a one-time activation: none | trial | active | expired. */
+  leagueState: 'none' | 'trial' | 'active' | 'expired'; trialLeft: number; leagueFee: number; leaguePending: boolean
+  /** false = joined before the conditions existed and must accept them once. */
+  termsOk: boolean
+  league: LeagueInfo | null
 }
 export type ProfileInput = {
-  username: string; fullName: string; course: string; year: number; platform: string; strength: number
+  username: string; fullName: string; year: number; platform: string; strength: number
   whatsapp: string; freeTimes: string[]; canHost: boolean; showWhatsapp: boolean; squad?: string
 }
-export type Course = { name: string; department: string; level: string; league?: boolean }
-export type AdminCourse = Course & { campuses: string; active: boolean; league: boolean; players: number; interested: number; fee: number; founder: string }
+export type AdminLeague = LeagueInfo & { reports: number }
+/** A row of the admin's player list. `league` is the league name. */
+export type AdminPlayer = { uid: string; username: string; fullName: string; whatsapp: string; email: string; status: string; platform: string; strength: number; squadId: string; league: string; fplId?: string; canHost: boolean }
 
 export type MatchView = {
   id: string; week: string; day: string; deadline: string; note: string; status: 'pending' | 'disputed' | 'confirmed' | 'void'
   myClaim: { mine: number; theirs: number } | null; oppReported: boolean; final: { mine: number; theirs: number } | null
-  opp: { uid: string; username: string; platform: string; strength: number; course: string; whatsapp: string; freeTimes: string[] }
+  opp: { uid: string; username: string; platform: string; strength: number; squadId: string; whatsapp: string; freeTimes: string[] }
 }
 export type Me = { uid: string; email: string; isAdmin: boolean; profile: Profile | null; tid: string; joined: boolean; entry: '' | 'pending' | 'paid'; pending: { kind: PayKind; ref: string }[]; matches: MatchView[] }
 
-export type PoolMember = { uid: string; username: string; strength: number; platform: string; course: string; squadId: string }
+export type PoolMember = { uid: string; username: string; strength: number; platform: string; league: string; squadId: string }
 export type PoolStatus = 'waiting' | 'reported' | 'disputed' | 'locked'
 export type Pool = {
   id: string; stage: number; idx: number; hostUid: string; backupUid: string; members: PoolMember[]; winnerUid: string
@@ -43,17 +49,22 @@ export type Pool = {
 }
 export type Tournament = {
   id: string; name: string; logoId: string; rules: string; token: string; status: 'open' | 'running' | 'done'
-  stages: number; round: number; regClose: string; cap: number; windows: [string, string][]; count: number; pending?: number; fee?: number
+  stages: number; round: number; regClose: string; cap: number; windows: [string, string][]; count: number; pending?: number; fee: number; hostFee: number
   champion: PoolMember | null; pools: Pool[]; serverNow: number
 }
-export type Champion = { name: string; date: string; username: string; course: string; squadId: string }
+export type Champion = { name: string; date: string; username: string; league: string; squadId: string }
 
-export type LeagueRow = { uid: string; username: string; course: string; platform: string; strength: number; squadId: string; p: number; w: number; d: number; l: number; gf: number; ga: number; gd: number; pts: number }
-export type CourseRow = { course: string; players: number; pts: number; avg: number; ranked: boolean; fee?: number; paid?: number; pool?: number; founder?: string; logoId?: string }
+export type LeagueRow = { uid: string; username: string; platform: string; strength: number; squadId: string; p: number; w: number; d: number; l: number; gf: number; ga: number; gd: number; pts: number; form: ('W' | 'D' | 'L')[] }
+export type LeagueRecent = { id: string; p1: string; p2: string; s1: number; s2: number; at: string; sq1: string; sq2: string }
+/** One league: its table, recent results and the fixture rules. */
 export type League = {
-  table: LeagueRow[]; courses: CourseRow[]; recent: { id: string; p1: string; p2: string; s1: number; s2: number; at: string }[]; registered: number; week: string
-  openCourses: string[]; today: string; fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number; serverNow: number
+  league: LeagueInfo; table: LeagueRow[]; recent: LeagueRecent[]
+  today: string; fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number; serverNow: number
 }
+export type FixtureSide = { uid: string; username: string; squadId: string; strength: number; platform: string }
+export type FixtureRow = { id: string; p1: FixtureSide; p2: FixtureSide; status: 'pending' | 'disputed' | 'confirmed' | 'void'; reported: number; s1: number | null; s2: number | null }
+/** The newest fixture day of a league with every pairing. */
+export type Fixtures = { day: string; isToday: boolean; closeAt: string; closeHour: number; total: number; reported: number; list: FixtureRow[]; serverNow: number; fixtureDays: string[] }
 
 export type Attention = {
   id: string; idx: number; why: string; status: string; hostUid: string; winnerUid: string; proofId: string; note: string
@@ -106,8 +117,11 @@ export function sharedSlots(a: string[], b: string[]): string[] {
   return a.filter((s) => set.has(s)).map((s) => s.replace('-', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()))
 }
 
-/** Link that opens the league join page for a course (works for classmates who are not signed in yet). */
-export const leagueInviteLink = (course: string) => `${window.location.origin}${window.location.pathname}#/efootball/league/join/${encodeURIComponent(course)}`
+const base = () => `${window.location.origin}${window.location.pathname}`
+/** The invite link of a league. It carries the league's short code and opens the join page (works for people who are not signed in yet). */
+export const leagueInviteLink = (code: string) => `${base()}#/efootball/league/join/${encodeURIComponent(code)}`
+/** The invite link of the weekly knockout. */
+export const tournamentInviteLink = (token: string) => `${base()}#/efootball/join/${encodeURIComponent(token)}`
 
 /** "Wed-Evening" slots -> { Mon: ['Morning', ...] } */
 export function slotsByDay(free: string[]): Record<string, string[]> {
@@ -116,15 +130,15 @@ export function slotsByDay(free: string[]): Record<string, string[]> {
   return out
 }
 
+export type HomeLeague = { id: string; name: string; logoId: string; members: number; code: string }
 export type HomeData = {
-  serverNow: number; players: number; registered: number
+  serverNow: number; players: number; leagues: number; inLeague: number
   tournament: { id: string; name: string; status: 'open' | 'running' | 'done'; round: number; stages: number; regClose: string; start: string; cap: number; count: number; champion: string } | null
-  top: { username: string; course: string; p: number; pts: number; gd: number }[]
-  courses: CourseRow[]
+  topLeagues: HomeLeague[]
   league: { fixtureToday: boolean; closeAt: string; fixtureDays: string[]; closeHour: number }
-  champion: { name: string; date: string; username: string; course: string } | null
+  champion: { name: string; date: string; username: string; league: string } | null
   waGroup?: string
-  fpl?: { configured: boolean; ready: boolean; next: { id: number; name: string; at: string } | null; gw: number; managers: number; top: { username: string; course: string; total: number }[]; stale: boolean }
+  fpl?: { configured: boolean; ready: boolean; next: { id: number; name: string; at: string } | null; gw: number; managers: number; top: { username: string; league: string; total: number }[]; stale: boolean }
 }
 
 /** "2d 4h 10m" style countdown to an ISO time. Pass the server/client clock difference so wrong phone clocks do not matter. */
@@ -136,13 +150,13 @@ export function countdown(iso: string, skew = 0): string {
 }
 
 /** `move`: places gained (+) or lost (-) since the last gameweek; null = nothing to compare with. */
-export type FplRow = { uid: string; entry?: string; username: string; course: string; team: string; total: number; gwPts: number; rank: number; gwRank: number; move?: number | null }
+export type FplRow = { uid: string; entry?: string; username: string; league: string; team: string; total: number; gwPts: number; rank: number; gwRank: number; move?: number | null }
 export type FplBoard = {
   configured: boolean; ready: boolean; leagueId: string; leagueCode: string; at: string; error: string; size: number; unlinked?: number; serverNow: number
   gw: { id: number; name: string; finished: boolean; started: boolean } | null
   next: { id: number; name: string; at: string } | null
   rows: FplRow[]
-  courses: { course: string; managers: number; counted?: number; avg: number; gwAvg: number; ranked: boolean }[]
+  leagues: { league: string; managers: number; counted?: number; avg: number; gwAvg: number; ranked: boolean }[]
   winners: { gw: number; name: string; pts: number; w: { u: string; c: string }[] }[]
   captains: { gw: number; got: number; total: number; list: { name: string; n: number }[]; own?: FplOwn[]; diff?: FplOwn[] } | null
   status: 'anon' | 'unregistered' | 'unlinked' | 'linked' | 'outside'; fplId: string; mine: FplRow | null
@@ -153,16 +167,39 @@ export type FplAdminInfo = { leagueId: string; leagueCode: string; at: string; e
 export const fplJoinLink = (code: string) => (code ? `https://fantasy.premierleague.com/leagues/auto-join/${encodeURIComponent(code)}` : '')
 
 /* ---------------- money: M-Pesa to the admin, the admin verifies ---------------- */
-export type PayKind = 'course' | 'league' | 'knockout' | 'listing'
-export type PayCfg = { adminWa: string; payPhone: string; fees: { course: number; knockout: number; listing: number; activation?: number }; cutPct: number; maxLeagueFee: number }
-export const DEFAULT_PAY: PayCfg = { adminWa: '254184198432', payPhone: '254184198432', fees: { course: 10, knockout: 20, listing: 20, activation: 20 }, cutPct: 10, maxLeagueFee: 1000 }
+export type PayKind = 'league' | 'knockout' | 'listing'
+export type PayCfg = {
+  adminWa: string; payPhone: string; fees: { knockout: number; listing: number; activation: number; host: number }; maxFee: number; hostFee: number
+  terms: string[]; termsV: string; trialMatches: number; maxMembers: number; fixtureDays: string[]; closeHour: number
+}
+/** The admin's WhatsApp. One constant, used by every "chat the admin" button and the floating button. */
+export const ADMIN_WA = '254712670914'
+/** Used until (or if) the server answers. The server's own copy of the conditions replaces it. */
+export const DEFAULT_PAY: PayCfg = {
+  adminWa: ADMIN_WA, payPhone: ADMIN_WA, fees: { knockout: 20, listing: 20, activation: 20, host: 20 }, maxFee: 1000, hostFee: 20,
+  termsV: '2026-11', trialMatches: 3, maxMembers: 100, fixtureDays: ['Mon', 'Wed', 'Fri', 'Sun'], closeHour: 21,
+  terms: [
+    'Fixtures are made automatically at 00:00 (Nairobi time) on Monday, Wednesday, Friday and Sunday.',
+    'You play one match per fixture day against another member of your league. Agree the time with your opponent on WhatsApp.',
+    'Matches and results must be reported before 21:00 (9 pm) the same day.',
+    'Claiming a win needs a screenshot of the final score. A win with no screenshot is void.',
+    'If nobody reports a fixture it is void and nobody gets points. Missing 3 fixtures in a row pauses you until you tap Resume.',
+    'Your first 3 matches are free. After that a one-time KSh 20 activation keeps your fixtures and saved results.',
+    'Be respectful. The admin can remove players, leagues and results, and the admin\u2019s decision is final.',
+  ],
+}
 export type PayView = { id: string; kind: PayKind; ref: string; label: string; amount: number; status: 'pending' | 'verified' | 'rejected'; createdAt: string; note: string; mpesa: string }
 export type Listing = {
   id: string; type: 'sell' | 'buy'; title: string; platform: string; strength: number; price: number; details: string; imageId: string
-  status: string; createdAt: string; approvedAt: string; owner: { uid: string; username: string; course: string }; whatsapp: string
+  status: string; createdAt: string; approvedAt: string; owner: { uid: string; username: string }; whatsapp: string
 }
-export type AdminPay = PayView & { cut: number; decidedAt: string; username: string; fullName: string; whatsapp: string; email: string; listing: Listing | null }
-export type PayAdmin = { rows: AdminPay[]; summary: { pending: number; verified: number; verifiedTotal: number; cutTotal: number } }
+export type AdminPay = PayView & { decidedAt: string; username: string; fullName: string; whatsapp: string; email: string; listing: Listing | null }
+export type PayAdmin = { rows: AdminPay[]; summary: { pending: number; verified: number; verifiedTotal: number } }
+/** What a host earned by running knockout pools. */
+export type Earning = { id: string; tid: string; poolId: string; amount: number; status: 'pending' | 'paid'; createdAt: string; paidAt: string; mpesa: string; note: string }
+export type MyEarnings = { rows: Earning[]; summary: { pending: number; paid: number; pools: number }; hostFee: number }
+export type AdminHost = { uid: string; username: string; fullName: string; whatsapp: string; total: number; rows: Earning[] }
+export type AdminEarnings = { hosts: AdminHost[]; summary: { pending: number; paid: number; hosts: number } }
 export const ksh = (n: number) => `KSh ${Math.round(n * 100) / 100}`
 /** 0712 345 678 / +254712345678 -> 254712345678 (for wa.me). */
 export const waDigits = (n: string) => { const d = String(n || '').replace(/\D/g, ''); return d.startsWith('0') ? `254${d.slice(1)}` : d.startsWith('7') || d.startsWith('1') ? `254${d}` : d }
@@ -197,7 +234,7 @@ export type FplPlayerDetail = {
   fixtures: { gw: number; opp: string; home: boolean; diff: number; ko: string }[]
 }
 export type FplManager = {
-  entry: string; username: string; course: string; name: string; manager: string; region: string; stale: boolean
+  entry: string; username: string; league: string; name: string; manager: string; region: string; stale: boolean
   overall: { points: number; rank: number; gwPoints: number; gwRank: number; value: number; bank: number; transfers: number }
   stats: { played: number; avg: number; best: { gw: number; pts: number } | null; worst: { gw: number; pts: number } | null; bestRank: number; hits: number; transfers: number; benchPts: number }
   gws: { gw: number; pts: number; total: number; rank: number; value: number; bench: number; cost: number }[]
@@ -208,7 +245,10 @@ export type FplManager = {
 }
 export const isoOf = (ms: number) => (ms ? new Date(ms).toISOString() : '')
 
-/** A course league logo as a data URL (needed so a share-card canvas can be saved). Empty string when the course has no logo. */
-export async function courseLogoData(course: string): Promise<string> {
-  try { return (await ef<{ data: string }>('courseLogo', { course })).data || '' } catch { return '' }
+/** A league logo as a data URL (needed so a share-card canvas can be saved). Empty string when the league has no logo. */
+export async function leagueLogoData(id: string): Promise<string> {
+  try { return (await ef<{ data: string }>('leagueLogo', { id })).data || '' } catch { return '' }
 }
+
+/** Admin chat message that opens WhatsApp with the admin. */
+export const adminChatLink = (text = 'Hi eFootball admin, ') => waLink(ADMIN_WA, text)

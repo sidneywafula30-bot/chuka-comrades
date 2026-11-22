@@ -82,7 +82,7 @@ function Card({ l, me, mine, reload, zoom }: { l: Listing; me: Me | null; mine?:
         <b className="ef-price">{ksh(l.price)}</b>
         <small>{l.platform}{l.strength ? ` · strength ${l.strength}` : ''}</small>
         {l.details && <small>{l.details}</small>}
-        <small>{l.owner.username}{l.owner.course ? ` · ${l.owner.course}` : ''}{l.approvedAt ? ` · ${fmtDay(l.approvedAt)}` : ''}</small>
+        <small>{l.owner.username}{l.approvedAt ? ` · ${fmtDay(l.approvedAt)}` : ''}</small>
         {!mine && !own && (l.whatsapp
           ? <a className="ef-wa" href={waLink(l.whatsapp, `Hi ${l.owner.username}, I saw your ${l.type === 'sell' ? 'account for sale' : 'wanted post'} "${l.title}" (${ksh(l.price)}) on Chuka eFootball.`)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> Chat on WhatsApp</a>
           : <a className="ef-wa locked" href="#/efootball/profile"><MessageCircle size={14} /> Register to chat</a>)}

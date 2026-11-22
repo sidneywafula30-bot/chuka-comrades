@@ -11,6 +11,7 @@ import EfLeague from './EfLeague'
 import EfAdmin from './EfAdmin'
 import EfFpl from './EfFpl'
 import EfMarket from './EfMarket'
+import { AdminFab } from '../components/EfPay'
 import './Cpl.css'
 import './Efootball.css'
 
@@ -19,8 +20,6 @@ const CATEGORIES: { id: VideoCategory; label: string }[] = [
   { id: 'tips', label: 'Tips & tricks' }, { id: 'formations', label: 'Formations' }, { id: 'updates', label: 'Updates' },
 ]
 
-function safeDecode(s: string) { try { return decodeURIComponent(s) } catch { return s } }
-
 export default function Efootball({ user, route }: { user: User | null; route: string }) {
   const [me, setMe] = useState<Me | null>(null)
   const [meErr, setMeErr] = useState('')
@@ -28,6 +27,7 @@ export default function Efootball({ user, route }: { user: User | null; route: s
   const parts = route.split('/')
   const page = parts[2] || ''
   const arg = parts[3] || ''
+  const arg2 = parts[4] || ''
 
   const reload = useCallback(async () => {
     if (!user || !efReady) { setMe(null); return }
@@ -52,7 +52,7 @@ export default function Efootball({ user, route }: { user: User | null; route: s
   let body
   if (!efReady) body = <p className="cpl-empty">The eFootball server is not connected yet. Add <code>VITE_EFOOTBALL_API_URL</code> to <code>.env</code> and restart.</p>
   else if (page === 'players') body = <EfPlayers me={me} signedIn={!!user} />
-  else if (page === 'league') body = <EfLeague me={me} reload={reload} signedIn={!!user} onSignIn={signIn} joinCourse={arg === 'join' ? safeDecode(parts[4] || '') : ''} joining={arg === 'join' || arg === 'list'} />
+  else if (page === 'league') body = <EfLeague me={me} reload={reload} signedIn={!!user} onSignIn={signIn} sub={arg} arg={arg2} />
   else if (page === 'market') body = <EfMarket me={me} signedIn={!!user} onSignIn={signIn} />
   else if (page === 'fpl') body = <EfFpl me={me} signedIn={!!user} onSignIn={signIn} reload={reload} />
   else if (page === 'tournament' || page === 'join') body = <EfTournament token={page === 'join' ? arg : ''} me={me} signedIn={!!user} onSignIn={signIn} reload={reload} />
@@ -67,6 +67,7 @@ export default function Efootball({ user, route }: { user: User | null; route: s
         <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
       </header>
       <main className="cpl-main">{body}</main>
+      <AdminFab />
     </div>
   )
 }
@@ -75,6 +76,8 @@ function useTick() {
   const [, set] = useState(0)
   useEffect(() => { const i = setInterval(() => set((n) => n + 1), 1000); return () => clearInterval(i) }, [])
 }
+
+function pendingInvite() { try { return sessionStorage.getItem('ef-invite') || '' } catch { return '' } }
 
 function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean; meErr: string; retry: () => Promise<void> }) {
   const [h, setH] = useState<HomeData | null>(null)
@@ -94,9 +97,9 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
         <div className="ef-hero-text">
           <span className="ef-eyebrow">Chuka University</span>
           <h1>Chuka eFootball</h1>
-          <p>Weekly knockout, a daily campus league and every eFootball player in Chuka{h ? ` · ${h.players} registered` : ''}.</p>
+          <p>A weekly knockout, closed leagues for your friends, hostel or class, and every eFootball player in Chuka{h ? ` · ${h.players} registered` : ''}.</p>
           <div className="ef-hero-cta">
-            {!p ? <a className="lp-btn" href="#/efootball/profile">Register as a player</a> : !p.inLeague ? <a className="lp-btn" href="#/efootball/league">Join the league</a> : <a className="lp-btn" href="#/efootball/league">My fixtures</a>}
+            {!p ? <a className="lp-btn" href="#/efootball/profile">Register as a player</a> : !p.inLeague ? <a className="lp-btn" href="#/efootball/league">Find a league</a> : <a className="lp-btn" href="#/efootball/league">My league</a>}
             <a className="ef-ghost" href="#/efootball/tournament">Weekly knockout</a>
             {h?.waGroup && <a className="ef-wa-group" href={h.waGroup} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Join our WhatsApp group</a>}
           </div>
@@ -104,8 +107,8 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
       </header>
 
       <nav className="ef-tiles" aria-label="eFootball sections">
-        <a href="#/efootball/tournament"><Trophy size={20} /><b>Knockout</b><small>512-player weekly</small></a>
-        <a href="#/efootball/league"><Table2 size={20} /><b>League</b><small>Daily fixtures</small></a>
+        <a href="#/efootball/tournament"><Trophy size={20} /><b>Knockout</b><small>Weekly, hosts earn</small></a>
+        <a href="#/efootball/league"><Table2 size={20} /><b>Leagues</b><small>Start or join one</small></a>
         <a href="#/efootball/fpl"><Target size={20} /><b>FPL</b><small>EPL fixtures &amp; Chuka league</small></a>
         <a href="#/efootball/market"><Tag size={20} /><b>Marketplace</b><small>Buy &amp; sell accounts</small></a>
         <a href="#/efootball/players"><Users size={20} /><b>Players</b><small>Find a match</small></a>
@@ -113,9 +116,11 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
         {me?.isAdmin && <a href="#/efootball/admin"><ShieldCheck size={20} /><b>Admin</b><small>Manage</small></a>}
       </nav>
 
+      {p && !p.inLeague && pendingInvite() && <a className="ef-resume" href={`#/efootball/league/join/${pendingInvite()}`}>You have an unfinished league invite. <b>Finish joining</b></a>}
+
       <div className="ef-dash">
         <section className="cpl-card ef-dcard">
-          <h3><Swords size={15} /> {next ? 'Your next fixture' : 'Your league'}</h3>
+          <h3><Swords size={15} /> {next ? 'Your next fixture' : p?.league ? p.league.name : 'Your league'}</h3>
           {next ? (
             <>
               <p className="ef-big">vs {next.opp.username}</p>
@@ -125,7 +130,7 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
           ) : !signedIn ? <p className="cpl-sub" style={{ margin: 0 }}>Sign in with Google (top of the main page) to register and join the league.</p>
             : !me ? <p className="cpl-sub" style={{ margin: 0 }}>{meErr ? <>{meErr} <button type="button" className="cpl-link" onClick={() => void retry()}>Try again</button></> : 'Loading your account…'}</p>
             : !p ? <><p className="cpl-sub" style={{ margin: '0 0 12px' }}>You are not registered yet.</p><a className="lp-btn" href="#/efootball/profile">Register</a></>
-            : !p.inLeague ? <><p className="cpl-sub" style={{ margin: '0 0 12px' }}>Join the league to get daily fixtures for {p.course}.</p><a className="lp-btn" href="#/efootball/league">Join the league</a></>
+            : !p.inLeague ? <><p className="cpl-sub" style={{ margin: '0 0 12px' }}>Join a league or start your own to get fixtures. Free for your first 3 matches.</p><a className="lp-btn" href="#/efootball/league">Find a league</a></>
             : p.paused ? <><p className="cpl-sub" style={{ margin: '0 0 12px' }}>You are paused after missed fixtures.</p><a className="lp-btn" href="#/efootball/league">Resume</a></>
             : <p className="cpl-sub" style={{ margin: 0 }}>{h?.league.fixtureToday ? 'No open fixture for you today. ' : ''}New fixtures come at 00:00 on {h?.league.fixtureDays.join(', ') ?? 'Mon, Wed, Fri, Sun'}.</p>}
         </section>
@@ -144,14 +149,14 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
         </a>
 
         <section className="cpl-card ef-dcard">
-          <h3><Table2 size={15} /> League top 5</h3>
-          {!h ? <p className="cpl-sub" style={{ margin: 0 }}>Loading…</p> : !h.top.length ? <p className="cpl-sub" style={{ margin: 0 }}>No results yet. {h.registered} in the league.</p> : (
+          <h3><Table2 size={15} /> Leagues</h3>
+          {!h ? <p className="cpl-sub" style={{ margin: 0 }}>Loading…</p> : !h.topLeagues.length ? <p className="cpl-sub" style={{ margin: 0 }}>No public leagues yet. Start the first one.</p> : (
             <ol className="ef-mini">
-              {h.top.map((r, i) => <li key={r.username}><b>{i + 1}</b><span><strong>{r.username}</strong><small>{r.course}</small></span><em>{r.pts} pts</em></li>)}
+              {h.topLeagues.map((l, i) => <li key={l.id}><b>{i + 1}</b><span><strong>{l.name}</strong><small>{l.members} {l.members === 1 ? 'member' : 'members'}</small></span><a className="cpl-link" href={`#/efootball/league/join/${l.code}`}>Join</a></li>)}
             </ol>
           )}
-          {h && h.courses[0] && h.courses[0].players > 0 && <p className="cpl-note" style={{ textAlign: 'left', margin: '10px 0 0' }}>Top course: <strong>{h.courses[0].course}</strong> ({h.courses[0].avg} avg)</p>}
-          <a className="cpl-link" style={{ marginTop: 12 }} href="#/efootball/league">Full tables</a>
+          {h && <p className="cpl-note" style={{ textAlign: 'left', margin: '10px 0 0' }}>{h.leagues} {h.leagues === 1 ? 'league' : 'leagues'} · {h.inLeague} players inside</p>}
+          <div className="ef-actions" style={{ marginTop: 10 }}><a className="cpl-link" href="#/efootball/league">Browse leagues</a><a className="cpl-link" href="#/efootball/league/new">Start a league</a></div>
         </section>
 
         <a className="cpl-card ef-dcard ef-dlink" href="#/efootball/fpl">
@@ -162,7 +167,7 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
               {h.fpl.next && <p className="ef-deadline"><Clock size={14} /> Deadline in {countdown(h.fpl.next.at, skew) || 'moments'}</p>}
               {h.fpl.top.length > 0 ? (
                 <ol className="ef-mini">
-                  {h.fpl.top.map((r, i) => <li key={r.username}><b>{i + 1}</b><span><strong>{r.username}</strong><small>{r.course}</small></span><em>{r.total}</em></li>)}
+                  {h.fpl.top.map((r, i) => <li key={r.username}><b>{i + 1}</b><span><strong>{r.username}</strong><small>{r.league}</small></span><em>{r.total}</em></li>)}
                 </ol>
               ) : <p className="cpl-sub" style={{ margin: 0 }}>No managers linked yet. Be the first.</p>}
             </>
@@ -171,7 +176,7 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
 
         <section className="cpl-card ef-dcard">
           <h3><Crown size={15} /> Latest champion</h3>
-          {h?.champion ? <><p className="ef-big">{h.champion.username}</p><p className="cpl-sub" style={{ margin: 0 }}>{h.champion.course}<br />{h.champion.name} · {fmtDay(h.champion.date)}</p></>
+          {h?.champion ? <><p className="ef-big">{h.champion.username}</p><p className="cpl-sub" style={{ margin: 0 }}>{h.champion.league}<br />{h.champion.name} · {fmtDay(h.champion.date)}</p></>
             : <p className="cpl-sub" style={{ margin: 0 }}>No champion yet. Win the first knockout.</p>}
         </section>
       </div>

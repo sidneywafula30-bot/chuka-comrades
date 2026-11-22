@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, Crown, MessageCircle, Trophy } from 'lucide-react'
+import { Crown, MessageCircle, Server, Trophy } from 'lucide-react'
+import EfInvite from '../components/EfInvite'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import ImagePicker from '../components/ImagePicker'
 import { PayBox, PendingPay } from '../components/EfPay'
-import { driveImg, ksh, ef, fmtDay, fmtStamp, fmtTime, stageName, stageWindow, waLink, type Champion, type Me, type Pool, type Tournament } from '../lib/efootball'
+import { driveImg, ksh, ef, fmtDay, fmtStamp, fmtTime, stageName, stageWindow, tournamentInviteLink, waLink, type Champion, type Me, type Pool, type Tournament } from '../lib/efootball'
 
 type Props = { token: string; me: Me | null; signedIn: boolean; onSignIn: () => void; reload: () => Promise<void> }
 
@@ -91,11 +92,15 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
   const pendingPay = !!me && me.tid === t.id && me.entry === 'pending'
   const fee = t.fee ?? 0
   const profile = me?.profile ?? null
-  const link = `${window.location.origin}${window.location.pathname}#/efootball/join/${t.token}`
+  const link = tournamentInviteLink(t.token)
   const myPools = t.pools.filter((p) => p.members.some((m) => m.uid === me?.uid))
   const current = myPools.find((p) => p.stage === t.round) ?? null
   const eliminated = t.status !== 'open' && myPools.length > 0 && !current && !(t.status === 'done' && t.champion?.uid === me?.uid)
-  const stages = t.status === 'open' ? [1, 2, 3] : Array.from({ length: t.stages }, (_, i) => i + 1)
+  // A 512 knockout has Round 1, Round 2 and the Final; a 64 knockout skips Round 2. Once drawn, the real number of stages is used.
+  const schedule: { label: string; w: [string, string]; now: boolean }[] = t.status === 'open'
+    ? (t.cap === 64 ? [{ label: 'Round 1', w: t.windows[0], now: false }, { label: 'Final', w: t.windows[2], now: false }]
+      : [{ label: 'Round 1', w: t.windows[0], now: false }, { label: 'Round 2', w: t.windows[1], now: false }, { label: 'Final', w: t.windows[2], now: false }])
+    : Array.from({ length: t.stages }, (_, i) => i + 1).map((s) => ({ label: stageName(s, t.stages), w: stageWindow(t, s), now: t.status === 'running' && s === t.round }))
 
   async function act(fn: () => Promise<unknown>, ok = '') {
     setBusy(true); setMsg(null)
@@ -167,18 +172,22 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
         <h3>Schedule</h3>
         <ul className="ef-steps">
           <li><span>Registration closes</span><strong>{fmtStamp(t.regClose)}</strong></li>
-          {stages.map((s) => {
-            const w = t.status === 'open' ? t.windows[s - 1] : stageWindow(t, s)
-            const label = t.status === 'open' ? (s === 3 ? 'Final' : `Round ${s}`) : stageName(s, t.stages)
-            return <li key={s} className={t.status === 'running' && s === t.round ? 'now' : ''}><span>{label}</span><strong>{fmtTime(w[0])} to {fmtTime(w[1])}</strong></li>
-          })}
+          {schedule.map((x) => <li key={x.label} className={x.now ? 'now' : ''}><span>{x.label}</span><strong>{fmtTime(x.w[0])} to {fmtTime(x.w[1])}</strong></li>)}
         </ul>
-        <p className="cpl-note" style={{ textAlign: 'left' }}>Pools of 8 play an in-game knockout. The pool host reports the winner, and winners go on to the next round.</p>
+        <p className="cpl-note" style={{ textAlign: 'left' }}>{t.cap === 64 ? 'A 64-player knockout: 8 pools of 8, then the final.' : 'A 512-player knockout: 64 pools of 8, then 8 pools, then the final.'} Pools of 8 play an in-game knockout. The pool host reports the winner, and winners go on to the next round.</p>
+      </section>
+
+      <section className="cpl-card ef-hostinfo">
+        <h3><Server size={15} /> How hosting works</h3>
+        <p className="cpl-sub" style={{ margin: 0 }}>Hosts are <strong>chosen automatically by the system</strong>: nobody picks them. Players who ticked “I can host” in their profile are chosen first. <strong>Each host earns {ksh(t.hostFee)} for every pool they host</strong>, paid by the admin after the pool result is confirmed. The host is also a player in the pool, so hosting is extra.</p>
       </section>
 
       <section className="cpl-card">
-        <h3>Invite link</h3>
-        <div className="ef-copy"><span style={{ flex: 1 }}>{link}</span><button className="lp-btn" onClick={() => { void navigator.clipboard?.writeText(link); setMsg({ ok: true, text: 'Link copied.' }) }}><Copy size={14} /> Copy</button></div>
+        <h3>Invite card</h3>
+        <p className="cpl-sub" style={{ margin: '0 0 12px' }}>Share the card on WhatsApp. Tap it to open the join link, or scan the QR from a screenshot.</p>
+        <EfInvite
+          spec={{ kind: 'knockout', title: t.name, subtitle: `Registration closes ${fmtStamp(t.regClose)}`, facts: [{ value: fee > 0 ? ksh(fee) : 'Free', label: 'Entry' }, { value: `${t.cap}`, label: 'Players' }, { value: fmtTime(t.windows[0][0]), label: 'Round 1 starts' }], rules: `Pools of 8 · hosts earn ${ksh(t.hostFee)} per pool`, link, cta: 'Scan or tap to join' }}
+          filename="chuka-knockout-invite.png" message={`Join ${t.name}, the Chuka eFootball weekly knockout.`} />
       </section>
 
       {t.rules && <section className="cpl-card"><h3>Rules</h3><div className="ef-rules">{t.rules}</div></section>}
@@ -191,7 +200,7 @@ function View({ t, skew, me, signedIn, onSignIn, reload, refresh, champs }: { t:
   )
 }
 
-function Member({ m, win, tag }: { m: { username: string; strength: number; platform: string; course: string; squadId: string }; win?: boolean; tag?: string }) {
+function Member({ m, win, tag }: { m: { username: string; strength: number; platform: string; squadId: string }; win?: boolean; tag?: string }) {
   return (
     <div className={`ef-member${win ? ' win' : ''}`}>
       {m.squadId ? <img src={driveImg(m.squadId, 120)} alt="" loading="lazy" /> : <img alt="" />}
@@ -216,7 +225,7 @@ function MyPool({ t, pool, me, act, busy, msg }: { t: Tournament; pool: Pool; me
   return (
     <section className="cpl-card">
       <h3>Your pool: {stageName(pool.stage, t.stages)}, pool {pool.idx + 1}</h3>
-      <p className="cpl-sub" style={{ margin: '0 0 6px' }}>Plays {fmtTime(w[0])} to {fmtTime(w[1])}. Host: <strong>{host?.username}</strong>{pool.hostUid === me.uid ? ' (you)' : ''}.</p>
+      <p className="cpl-sub" style={{ margin: '0 0 6px' }}>Plays {fmtTime(w[0])} to {fmtTime(w[1])}. Host (chosen by the system): <strong>{host?.username}</strong>{pool.hostUid === me.uid ? ' (you)' : ''}.</p>
       <div className="ef-members">
         {pool.members.map((m) => <Member key={m.uid} m={m} win={m.uid === pool.winnerUid && pool.status === 'locked'} tag={m.uid === pool.hostUid ? 'Host' : m.uid === pool.backupUid ? 'Backup host' : m.uid === me.uid ? 'You' : undefined} />)}
       </div>
@@ -226,7 +235,7 @@ function MyPool({ t, pool, me, act, busy, msg }: { t: Tournament; pool: Pool; me
           : <button className="cpl-link" onClick={() => act(async () => setContacts(await ef('poolContacts', { poolId: pool.id })))}><MessageCircle size={15} /> Show WhatsApp contacts</button>}
       </div>
 
-      {pool.hostUid === me.uid && pool.status === 'waiting' && <p className="cpl-msg" style={{ marginTop: 14 }}>You are the host: create the in-game tournament room, invite everyone by username, then report the winner below.</p>}
+      {pool.hostUid === me.uid && pool.status === 'waiting' && <p className="cpl-msg" style={{ marginTop: 14 }}>The system chose you as host. Create the in-game tournament room, invite everyone by username, then report the winner below. You earn {ksh(t.hostFee)} once the result is confirmed.</p>}
 
       {isHost && (pool.status === 'waiting' || pool.status === 'reported') && (
         <div className="cpl-form" style={{ marginTop: 14 }}>
@@ -293,7 +302,7 @@ function Bracket({ t }: { t: Tournament }) {
   )
 }
 
-type Entrant = { n: number; uid: string; username: string; course: string; platform: string; strength: number; squadId: string }
+type Entrant = { n: number; uid: string; username: string; league: string; platform: string; strength: number; squadId: string }
 
 /** Everyone registered (payment verified) for this tournament, with a search box. */
 function Entrants({ tid, count, me }: { tid: string; count: number; me?: string }) {
@@ -303,7 +312,7 @@ function Entrants({ tid, count, me }: { tid: string; count: number; me?: string 
   const [shown, setShown] = useState(40)
   useEffect(() => { ef<{ list: Entrant[] }>('entrants', { tid }).then((r) => setList(r.list)).catch((e) => setErr((e as Error).message)) }, [tid, count])
   const s = q.trim().toLowerCase()
-  const rows = (list ?? []).filter((x) => !s || x.username.toLowerCase().includes(s) || x.course.toLowerCase().includes(s))
+  const rows = (list ?? []).filter((x) => !s || x.username.toLowerCase().includes(s) || x.league.toLowerCase().includes(s))
   return (
     <section className="cpl-card">
       <h3>Registered players{list ? ` (${list.length})` : ''}</h3>
@@ -312,12 +321,12 @@ function Entrants({ tid, count, me }: { tid: string; count: number; me?: string 
       {list && !list.length && <p className="cpl-empty" style={{ margin: 0 }}>No one has registered yet. Entries show here once the admin verifies the payment.</p>}
       {list && list.length > 0 && (
         <>
-          <div className="cpl-search" style={{ width: '100%', marginBottom: 10 }}><input value={q} onChange={(e) => { setQ(e.target.value); setShown(40) }} placeholder="Search username or course" aria-label="Search registered players" /></div>
+          <div className="cpl-search" style={{ width: '100%', marginBottom: 10 }}><input value={q} onChange={(e) => { setQ(e.target.value); setShown(40) }} placeholder="Search username or league" aria-label="Search registered players" /></div>
           <div className="ef-members">
             {rows.slice(0, shown).map((x) => (
               <div className={`ef-member${x.uid === me ? ' win' : ''}`} key={x.uid}>
                 {x.squadId ? <img src={driveImg(x.squadId, 120)} alt="" loading="lazy" /> : <img alt="" />}
-                <div><strong>{x.n}. {x.username}{x.uid === me ? ' (you)' : ''}</strong><small>{x.platform} · {x.strength}</small><small>{x.course}</small></div>
+                <div><strong>{x.n}. {x.username}{x.uid === me ? ' (you)' : ''}</strong><small>{x.platform} · {x.strength}</small><small>{x.league || 'No league'}</small></div>
               </div>
             ))}
           </div>
@@ -335,7 +344,7 @@ function Champions({ list }: { list: Champion[] }) {
     <section className="cpl-card">
       <h3><Crown size={16} /> Champions</h3>
       {list.map((c, i) => (
-        <div className="cpl-row" key={i}><div><strong>{c.username}</strong><small>{c.course}</small></div><span className="ef-pill gold">{c.name}</span></div>
+        <div className="cpl-row" key={i}><div><strong>{c.username}</strong><small>{c.league || 'No league'}</small></div><span className="ef-pill gold">{c.name}</span></div>
       ))}
     </section>
   )

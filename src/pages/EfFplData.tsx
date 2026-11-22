@@ -275,7 +275,7 @@ export function ManagerModal({ entry, onClose }: { entry: string; onClose: () =>
       {!m ? <Loading err={err} retry={retry} /> : (
         <>
           {m.stale && <p className="ef-stale" role="status">FPL is busy, so this is the last saved copy.</p>}
-          <p className="cpl-sub" style={{ margin: '0 0 10px' }}>{[m.manager, m.course, m.region].filter(Boolean).join(' · ')}</p>
+          <p className="cpl-sub" style={{ margin: '0 0 10px' }}>{[m.manager, m.league, m.region].filter(Boolean).join(' · ')}</p>
           <div className="ef-facts">
             {([['Total points', m.overall.points], ['Overall rank', m.overall.rank ? `#${m.overall.rank.toLocaleString()}` : '–'], ['This GW', m.overall.gwPoints], ['GW rank', m.overall.gwRank ? `#${m.overall.gwRank.toLocaleString()}` : '–'], ['Team value', `£${m.overall.value}`], ['In the bank', `£${m.overall.bank}`], ['Transfers', m.overall.transfers]] as [string, string | number][]).map(([l, v]) => <div key={l}><small>{l}</small><b>{v}</b></div>)}
           </div>

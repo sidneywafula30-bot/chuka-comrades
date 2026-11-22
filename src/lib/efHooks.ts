@@ -28,3 +28,12 @@ export function useTick() {
   const [, set] = useState(0)
   useEffect(() => { const i = setInterval(() => set((n) => n + 1), 1000); return () => clearInterval(i) }, [])
 }
+
+/** Time left to a deadline by the SERVER clock (skew = server time minus this phone's time), so a wrong phone clock cannot hide a form. Empty once passed. */
+export function useCountdown(iso: string, skew: number) {
+  useTick()
+  const ms = Date.parse(iso) - (Date.now() + skew)
+  if (!iso || !(ms > 0)) return ''
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
+  return h ? `${h}h ${m}m` : `${m}m ${String(s % 60).padStart(2, '0')}s`
+}

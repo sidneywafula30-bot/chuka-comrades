@@ -9,7 +9,7 @@ export type CardSpec = {
   eyebrow: string
   title: string
   subtitle?: string
-  /** Data URL of a logo (course league card). */
+  /** Data URL of a logo (league card). */
   logo?: string
   /** Up to 4 big numbers under the title. */
   stats?: { value: string; label: string }[]
@@ -149,3 +149,83 @@ export async function shareCard(c: HTMLCanvasElement, filename: string, text: st
 
 /** "Kenya time" style label for a card, e.g. 19 Nov 2026. */
 export const cardDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Nairobi' })
+
+/* ---------------- invite card (league or knockout): portrait, logo, big name, rules line, QR + link ---------------- */
+export type InviteSpec = {
+  /** 'league' or 'knockout' changes only the wording and the accent. */
+  kind: 'league' | 'knockout'
+  title: string
+  /** Line under the title, e.g. "Set up by Sidney" or the tournament date. */
+  subtitle?: string
+  /** Data URL of the league / tournament logo. The eFootball logo is used when empty. */
+  logo?: string
+  /** Facts shown as tiles, up to 3. */
+  facts: { value: string; label: string }[]
+  /** Short sentence of rules under the tiles. */
+  rules: string
+  link: string
+  /** Text printed above the QR. */
+  cta: string
+}
+
+/** Draws the invite card. The QR code holds the link, so the card works from a screenshot or a WhatsApp status. */
+export async function drawInvite(spec: InviteSpec, qrDataUrl: string, fallbackLogo: string): Promise<HTMLCanvasElement> {
+  const w = 1080, h = 1500
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const g = c.getContext('2d')!
+  const gold = '#e8b923'
+  const [logo, qr] = await Promise.all([loadImg(spec.logo || fallbackLogo), loadImg(qrDataUrl)])
+  const bg = g.createLinearGradient(0, 0, w, h)
+  bg.addColorStop(0, '#1f5a38'); bg.addColorStop(0.5, '#0f1d16'); bg.addColorStop(1, '#0a130e')
+  g.fillStyle = bg; g.fillRect(0, 0, w, h)
+  // pitch lines: a centre circle and halfway line, drawn very faintly
+  g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 6
+  g.beginPath(); g.moveTo(0, 560); g.lineTo(w, 560); g.stroke()
+  g.beginPath(); g.arc(w / 2, 560, 230, 0, Math.PI * 2); g.stroke()
+  g.fillStyle = 'rgba(255,255,255,0.07)'; g.beginPath(); g.arc(w / 2, 560, 10, 0, Math.PI * 2); g.fill()
+
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+  g.fillStyle = gold; g.font = '800 30px Manrope, Arial, sans-serif'
+  g.fillText(spec.kind === 'league' ? 'You are invited to a league' : 'Weekly knockout', w / 2, 120)
+
+  // logo disc
+  const s = 280, cx = w / 2, cy = 330
+  g.save(); g.beginPath(); g.arc(cx, cy, s / 2 + 10, 0, Math.PI * 2); g.fillStyle = gold; g.fill(); g.restore()
+  g.save(); g.beginPath(); g.arc(cx, cy, s / 2, 0, Math.PI * 2); g.clip(); g.fillStyle = '#fff'; g.fillRect(cx - s / 2, cy - s / 2, s, s)
+  if (logo) { const k = Math.max(s / logo.width, s / logo.height); g.drawImage(logo, cx - (logo.width * k) / 2, cy - (logo.height * k) / 2, logo.width * k, logo.height * k) }
+  g.restore()
+
+  // title (up to 2 lines, shrinks to fit)
+  g.fillStyle = '#fff'
+  let size = 84; const maxW = w - 140
+  const lines = (): string[] => {
+    g.font = `800 ${size}px Manrope, Arial, sans-serif`
+    const out: string[] = []; let cur = ''
+    for (const word of spec.title.split(' ')) { const t = cur ? `${cur} ${word}` : word; if (g.measureText(t).width > maxW && cur) { out.push(cur); cur = word } else cur = t }
+    if (cur) out.push(cur); return out
+  }
+  let L = lines(); while (L.length > 2 && size > 44) { size -= 6; L = lines() }
+  L.slice(0, 2).forEach((l, i) => g.fillText(i === 1 && L.length > 2 ? fit(g, l, maxW) : l, w / 2, 590 + i * (size + 10)))
+  const ty = 590 + (Math.min(L.length, 2) - 1) * (size + 10)
+  if (spec.subtitle) { g.fillStyle = '#cfe8d8'; g.font = '500 32px Manrope, Arial, sans-serif'; g.fillText(fit(g, spec.subtitle, maxW), w / 2, ty + 60) }
+
+  // fact tiles
+  const f = spec.facts.slice(0, 3), gap = 20, fw = (w - 140 - gap * (f.length - 1)) / Math.max(1, f.length), fy = ty + 110
+  f.forEach((x, i) => {
+    const fx = 70 + i * (fw + gap)
+    g.fillStyle = 'rgba(255,255,255,0.09)'; round(g, fx, fy, fw, 130, 26); g.fill()
+    g.fillStyle = '#fff'; g.font = '800 44px Manrope, Arial, sans-serif'; g.fillText(fit(g, x.value, fw - 24), fx + fw / 2, fy + 60)
+    g.fillStyle = '#cfe8d8'; g.font = '500 24px Manrope, Arial, sans-serif'; g.fillText(fit(g, x.label, fw - 24), fx + fw / 2, fy + 100)
+  })
+  g.fillStyle = '#cfe8d8'; g.font = '500 28px Manrope, Arial, sans-serif'; g.fillText(fit(g, spec.rules, w - 140), w / 2, fy + 190)
+
+  // QR panel
+  const qs = 330, qy = h - 520
+  g.fillStyle = '#fff'; round(g, w / 2 - qs / 2 - 26, qy - 26, qs + 52, qs + 52, 34); g.fill()
+  if (qr) g.drawImage(qr, w / 2 - qs / 2, qy, qs, qs)
+  g.fillStyle = gold; g.font = '800 34px Manrope, Arial, sans-serif'; g.fillText(spec.cta, w / 2, qy - 56)
+  g.fillStyle = '#fff'; g.font = '700 26px Manrope, Arial, sans-serif'; g.fillText(fit(g, spec.link.replace(/^https?:\/\//, ''), w - 120), w / 2, qy + qs + 90)
+  g.fillStyle = gold; g.fillRect(w / 2 - 45, h - 130, 90, 6)
+  g.fillStyle = '#fff'; g.font = '800 30px Manrope, Arial, sans-serif'; g.fillText('Chuka Comrades · eFootball', w / 2, h - 70)
+  return c
+}

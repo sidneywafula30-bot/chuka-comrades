@@ -1,15 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Gamepad2 } from 'lucide-react'
 import ImagePicker from '../components/ImagePicker'
-import { DAYS, PARTS, PLATFORMS, driveImg, ef, fmtStamp, ksh, type Course, type Me, type PayView, type Profile } from '../lib/efootball'
+import { DAYS, PARTS, PLATFORMS, driveImg, ef, fmtStamp, ksh, type Me, type MyEarnings, type PayView, type Profile } from '../lib/efootball'
+import { usePayCfg } from '../components/EfPay'
 import { useApi } from '../lib/efHooks'
 
 export default function EfProfile({ me, reload, error }: { me: Me | null; reload: () => Promise<void>; error: string }) {
-  const [courses, setCourses] = useState<Course[]>([])
   const p = me?.profile ?? null
-  useEffect(() => { ef<Course[]>('courses').then(setCourses).catch(() => {}) }, [])
   if (!me) return <Waiting error={error} retry={reload} />
-  return <Form key={p?.uid ?? 'new'} p={p} courses={courses} reload={reload} />
+  return <Form key={p?.uid ?? 'new'} p={p} reload={reload} />
 }
 
 function Waiting({ error, retry }: { error: string; retry: () => Promise<void> }) {
@@ -30,10 +29,11 @@ function Waiting({ error, retry }: { error: string; retry: () => Promise<void> }
   )
 }
 
-function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; reload: () => Promise<void> }) {
+function Form({ p, reload }: { p: Profile | null; reload: () => Promise<void> }) {
   const [username, setUsername] = useState(p?.username ?? '')
   const [fullName, setFullName] = useState(p?.fullName ?? '')
-  const [course, setCourse] = useState(p?.course ?? '')
+  const cfg = usePayCfg()
+  const invite = (() => { try { return sessionStorage.getItem('ef-invite') || '' } catch { return '' } })()
   const [year, setYear] = useState(String(p?.year ?? 1))
   const [platform, setPlatform] = useState(p?.platform ?? 'Mobile')
   const [strength, setStrength] = useState(p ? String(p.strength) : '')
@@ -51,9 +51,9 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
     e.preventDefault()
     setBusy(true); setMsg(null)
     try {
-      await ef('saveProfile', { profile: { username, fullName, course, year: Number(year), platform, strength: Number(strength), whatsapp, freeTimes: free, canHost, showWhatsapp: showWa, squad: squad || undefined } })
+      await ef('saveProfile', { profile: { username, fullName, year: Number(year), platform, strength: Number(strength), whatsapp, freeTimes: free, canHost, showWhatsapp: showWa, squad: squad || undefined } })
       await reload()
-      setMsg({ ok: true, text: p ? 'Profile saved.' : 'You are registered. Open the League page and tap Join to get daily fixtures.' })
+      setMsg({ ok: true, text: p ? 'Profile saved.' : invite ? 'You are registered. Now open your league invite to finish joining.' : 'You are registered. Open Leagues to join one or start your own.' })
     } catch (x) { setMsg({ ok: false, text: (x as Error).message }) }
     finally { setBusy(false) }
   }
@@ -65,19 +65,9 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
       <form className="cpl-card cpl-form cpl-wide" onSubmit={save}>
         <label>eFootball username<input type="text" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={30} required /></label>
         <label>Full name<input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={60} required /></label>
-        <div className="cpl-grid2">
-          <label>Course
-            <select value={course} onChange={(e) => setCourse(e.target.value)} required>
-              <option value="">Choose your course</option>
-              {course && !courses.some((c) => c.name === course) && <option value={course}>{course}</option>}
-              {courses.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-            </select>
-            <small>Course not here? <a href="#/efootball/league/list">List my course</a> (KSh 10, the admin opens it).</small>
-          </label>
-          <label>Year of study
-            <select value={year} onChange={(e) => setYear(e.target.value)}>{[1, 2, 3, 4, 5, 6].map((y) => <option key={y} value={y}>Year {y}</option>)}</select>
-          </label>
-        </div>
+        <label>Year of study
+          <select value={year} onChange={(e) => setYear(e.target.value)}>{[1, 2, 3, 4, 5, 6].map((y) => <option key={y} value={y}>Year {y}</option>)}</select>
+        </label>
         <div className="cpl-grid2">
           <label>Platform
             <select value={platform} onChange={(e) => setPlatform(e.target.value)}>{PLATFORMS.map((x) => <option key={x}>{x}</option>)}</select>
@@ -106,10 +96,11 @@ function Form({ p, courses, reload }: { p: Profile | null; courses: Course[]; re
         </fieldset>
 
         <label className="cpl-file"><input type="checkbox" checked={showWa} onChange={(e) => setShowWa(e.target.checked)} /> Show a WhatsApp “Chat” button on my player card. Other registered players can then message me on WhatsApp for a match, and will be able to see my number</label>
-        <label className="cpl-file"><input type="checkbox" checked={canHost} onChange={(e) => setCanHost(e.target.checked)} /> I can host a tournament room (good internet)</label>
+        <label className="cpl-file ef-hostopt"><input type="checkbox" checked={canHost} onChange={(e) => setCanHost(e.target.checked)} /> <span>I can host a knockout pool (good internet). The system picks hosts automatically and chooses players who tick this first. <strong>A host earns {ksh(cfg.hostFee)} for every pool they host.</strong></span></label>
         <button className="lp-btn" disabled={busy}>{busy ? 'Saving…' : p ? 'Save profile' : 'Register'}</button>
         {msg && <p className={`cpl-msg${msg.ok ? '' : ' bad'}`} role="status">{msg.text}</p>}
       </form>
+      {p && <MyEarningsCard />}
       {p && <MyPayments />}
     </div>
   )
@@ -124,6 +115,28 @@ function FragmentRow({ day, free, toggle }: { day: string; free: string[]; toggl
         return <button type="button" key={k} className={free.includes(k) ? 'on' : ''} aria-pressed={free.includes(k)} aria-label={`${day} ${x}`} onClick={() => toggle(k)}>{free.includes(k) ? '✓' : ''}</button>
       })}
     </>
+  )
+}
+
+function MyEarningsCard() {
+  const { data } = useApi<MyEarnings>('myEarnings')
+  if (!data || !data.summary.pools) return null
+  return (
+    <section className="cpl-card" style={{ marginTop: 16 }}>
+      <h3>My host earnings</h3>
+      <div className="ef-facts">
+        <div><small>Waiting to be paid</small><b>{ksh(data.summary.pending)}</b></div>
+        <div><small>Paid</small><b>{ksh(data.summary.paid)}</b></div>
+        <div><small>Pools hosted</small><b>{data.summary.pools}</b></div>
+      </div>
+      {data.rows.slice(0, 8).map((e) => (
+        <div className="cpl-row" key={e.id}>
+          <div><strong>{ksh(e.amount)}</strong><small>{e.note || 'Hosted a pool'} · {fmtStamp(e.createdAt)}{e.mpesa ? ` · ${e.mpesa}` : ''}</small></div>
+          <span className={`ef-pill${e.status === 'paid' ? '' : ' gold'}`}>{e.status === 'paid' ? 'paid' : 'waiting'}</span>
+        </div>
+      ))}
+      <p className="cpl-note" style={{ textAlign: 'left' }}>The admin pays hosts by M-Pesa after the tournament. A pool the admin had to settle by hand earns nothing.</p>
+    </section>
   )
 }
 
