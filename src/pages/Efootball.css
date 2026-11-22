@@ -477,3 +477,37 @@ a.ef-wa-admin .ef-badge { width: 30px; height: 30px; }
 /* the floating admin chat keeps its label on the landing page, even on phones */
 @media (max-width: 520px) { .ef-fab.wide { padding: 4px 16px 4px 4px; } .ef-fab.wide span { display: inline; } }
 @media (prefers-reduced-motion: reduce) { .ef-ko, .ef-ko:hover { transition: none; transform: none; } }
+
+
+/* ---------- landing: logo as page background, menu, create league, standings ---------- */
+.ef-bgd { position: relative; isolation: isolate; }
+.ef-bgd::before { content: ''; position: fixed; inset: 0; z-index: -1; background: linear-gradient(rgba(251,252,250,.80), rgba(251,252,250,.93)), var(--ef-bg) center top / cover no-repeat; pointer-events: none; }
+.ef-bgd .ef-hero { background: linear-gradient(160deg, rgba(31,90,56,.80) 0%, rgba(15,29,22,.90) 70%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding-top: 28px; }
+.ef-create { display: inline-flex; align-items: center; gap: 7px; padding: 11px 18px; border-radius: 99px; background: #e8b923; color: #2d2200; font-weight: 800; font-size: 14px; text-decoration: none; }
+.ef-create:hover { filter: brightness(1.06); }
+.ef-stack { display: grid; gap: 16px; width: 100%; margin: 0 0 22px; }
+.ef-stack > .ef-ticket, .ef-stack > .ef-ko { width: 100%; }
+.ef-stand { margin-bottom: 0 !important; text-align: left; }
+.ef-stand-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ef-stand-head h3 { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--green); font-size: 15px; }
+.ef-stand-table td:nth-child(2) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ef-stand-table tr.me td { background: #fff3cc; }
+.ef-stand-table tr.gap td { text-align: center; color: var(--muted); padding: 2px 0; }
+
+.ef-topr { display: flex; align-items: center; gap: 12px; }
+.ef-menu-btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; color: #12301f; border-radius: 99px; padding: 8px 14px; font: 700 13px 'Manrope', sans-serif; cursor: pointer; }
+.ef-menu-btn:hover { border-color: var(--green); }
+.ef-menu-btn:focus-visible, .ef-drawer a:focus-visible, .ef-drawer button:focus-visible { outline: 3px solid #e8b923; outline-offset: 2px; }
+@media (max-width: 420px) { .ef-menu-btn span { display: none; } .ef-menu-btn { padding: 9px; } }
+.ef-drawer-wrap { position: fixed; inset: 0; z-index: 80; display: flex; justify-content: flex-end; }
+.ef-drawer-back { position: absolute; inset: 0; border: 0; background: #0009; cursor: pointer; }
+.ef-drawer { position: relative; width: min(320px, 86vw); height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 16px; background: #0f1d16; color: #fff; box-shadow: -18px 0 40px #0006; animation: ef-slide .18s ease-out; }
+@keyframes ef-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ef-drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font: 800 17px 'Manrope', sans-serif; }
+.ef-drawer-head button { border: 0; background: #ffffff1f; color: #fff; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.ef-drawer a { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 14px; color: #e5f3ea; text-decoration: none; font: 700 15px 'Manrope', sans-serif; }
+.ef-drawer a svg { color: #8fd6a8; flex-shrink: 0; }
+.ef-drawer a:hover, .ef-drawer a.on { background: #ffffff1a; }
+.ef-drawer a.on { color: #e8b923; }
+.ef-drawer-out { margin-top: auto; border-top: 1px solid #ffffff22; border-radius: 0 !important; padding-top: 16px !important; }
+@media (prefers-reduced-motion: reduce) { .ef-drawer { animation: none; } }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { signInWithPopup, type User } from 'firebase/auth'
-import { ArrowLeft, Clock, Crown, ExternalLink, MessageCircle, Target, Play, Search, ShieldCheck, Trophy, UserRound, Users, X, Table2, Tag } from 'lucide-react'
+import { ArrowLeft, Clock, Crown, ExternalLink, Home as HomeIcon, Menu, MessageCircle, Plus, Target, Play, Search, ShieldCheck, Trophy, UserRound, Users, X, Table2, Tag } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
-import { countdown, ef, efReady, fmtDay, fmtTime, sharedSlots, waLink, type HomeData, type MatchView, type Me, type Video, type VideoCategory, type VideoResult } from '../lib/efootball'
+import { countdown, ef, efReady, fmtDay, fmtTime, sharedSlots, waLink, type HomeData, type League, type MatchView, type Me, type Video, type VideoCategory, type VideoResult } from '../lib/efootball'
 import DriveImage from '../components/DriveImage'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import EfProfile from './EfProfile'
@@ -13,6 +13,7 @@ import EfAdmin from './EfAdmin'
 import EfFpl from './EfFpl'
 import EfMarket from './EfMarket'
 import { AdminFab, usePayCfg } from '../components/EfPay'
+import { useApi } from '../lib/efHooks'
 import './Cpl.css'
 import './Efootball.css'
 
@@ -61,14 +62,58 @@ export default function Efootball({ user, route }: { user: User | null; route: s
   else if (page === 'admin') body = !user ? needSignIn : !me ? <p className="cpl-empty">Checking access…</p> : me.isAdmin ? <EfAdmin /> : <p className="cpl-empty">This area is for eFootball admins only.</p>
   else body = <Home me={me} signedIn={!!user} meErr={meErr} retry={reload} />
 
+  const [menu, setMenu] = useState(false)
+  useEffect(() => { setMenu(false) }, [route])
+
   return (
-    <div className="cpl ef">
+    <div className={`cpl ef${page ? '' : ' ef-bgd'}`} style={{ ['--ef-bg' as string]: `url(${import.meta.env.BASE_URL}efootball.png)` }}>
       <header className="cpl-top">
         <a className="cpl-back" href={page ? '#/efootball' : '#services'}><ArrowLeft size={16} /> {page ? 'eFootball home' : 'Student services'}</a>
-        <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
+        <div className="ef-topr">
+          <button type="button" className="ef-menu-btn" onClick={() => setMenu(true)} aria-label="Open menu" aria-expanded={menu}><Menu size={18} /> <span>Menu</span></button>
+          <img src={`${import.meta.env.BASE_URL}chukalogo.png`} alt="" height={34} />
+        </div>
       </header>
+      <MenuDrawer open={menu} close={() => setMenu(false)} me={me} page={page} />
       <main className="cpl-main">{body}</main>
       <AdminFab page={page} />
+    </div>
+  )
+}
+
+/** Slide-in menu with every eFootball page. Closes on Escape, on the backdrop and after a link is tapped. */
+function MenuDrawer({ open, close, me, page }: { open: boolean; close: () => void; me: Me | null; page: string }) {
+  useEffect(() => {
+    if (!open) return
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    window.addEventListener('keydown', k)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = prev }
+  }, [open, close])
+  if (!open) return null
+  const inLeague = !!me?.profile?.inLeague
+  const items: { href: string; label: string; icon: ReactNode; key: string; show?: boolean }[] = [
+    { key: '', href: '#/efootball', label: 'Home', icon: <HomeIcon size={18} /> },
+    { key: 'league', href: '#/efootball/league', label: inLeague ? 'My league' : 'Leagues', icon: <Table2 size={18} /> },
+    { key: 'new', href: '#/efootball/league/new', label: 'Create a league', icon: <Plus size={18} />, show: !inLeague },
+    { key: 'tournament', href: '#/efootball/tournament', label: 'Weekly knockout', icon: <Trophy size={18} /> },
+    { key: 'players', href: '#/efootball/players', label: 'Players', icon: <Users size={18} /> },
+    { key: 'fpl', href: '#/efootball/fpl', label: 'Fantasy Premier League', icon: <Target size={18} /> },
+    { key: 'market', href: '#/efootball/market', label: 'Marketplace', icon: <Tag size={18} /> },
+    { key: 'profile', href: '#/efootball/profile', label: me?.profile ? 'My profile' : 'Register', icon: <UserRound size={18} /> },
+    { key: 'admin', href: '#/efootball/admin', label: 'Admin', icon: <ShieldCheck size={18} />, show: !!me?.isAdmin },
+  ]
+  return (
+    <div className="ef-drawer-wrap" role="dialog" aria-modal="true" aria-label="eFootball menu">
+      <button type="button" className="ef-drawer-back" onClick={close} aria-label="Close menu" />
+      <nav className="ef-drawer">
+        <div className="ef-drawer-head"><strong>Chuka eFootball</strong><button type="button" onClick={close} aria-label="Close menu"><X size={18} /></button></div>
+        {items.filter((i) => i.show !== false).map((i) => (
+          <a key={i.href} href={i.href} onClick={close} className={i.key === page ? 'on' : ''}>{i.icon}<span>{i.label}</span></a>
+        ))}
+        <a href="#services" onClick={close} className="ef-drawer-out"><ArrowLeft size={18} /><span>Student services</span></a>
+      </nav>
     </div>
   )
 }
@@ -95,13 +140,13 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
   return (
     <div className="cpl-home">
       <header className="ef-hero">
-        <img className="ef-hero-logo" src={`${import.meta.env.BASE_URL}efootball.png`} alt="Chuka eFootball logo" onError={(e) => { e.currentTarget.style.display = 'none' }} />
         <div className="ef-hero-text">
           <span className="ef-eyebrow">Chuka University</span>
           <h1>Chuka eFootball</h1>
           <p>Play a fixture every other day in your own league, and take on the whole campus in the weekly knockout.</p>
           <div className="ef-hero-cta">
             {!p ? <a className="lp-btn" href="#/efootball/profile">Register as a player</a> : !p.inLeague ? <a className="lp-btn" href="#/efootball/league">Find a league</a> : <a className="lp-btn" href="#/efootball/league">My league</a>}
+            {!p?.inLeague && <a className="ef-create" href="#/efootball/league/new"><Plus size={16} /> Create a league</a>}
             <a className="ef-ghost" href="#/efootball/tournament">Weekly knockout</a>
             {h?.waGroup && <a className="ef-wa-group" href={h.waGroup} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Join our WhatsApp group</a>}
           </div>
@@ -115,13 +160,22 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
 
       {p && !p.inLeague && pendingInvite() && <a className="ef-resume" href={`#/efootball/league/join/${pendingInvite()}`}>You have an unfinished league invite. <b>Finish joining</b></a>}
 
-      <div className="ef-today">
-        <Ticket next={next} me={me} signedIn={signedIn} meErr={meErr} retry={retry} h={h} skew={skew} zoom={setZoom} />
-        <Knockout t={t} skew={skew} />
-      </div>
+      {p?.inLeague && p.league ? (
+        <div className="ef-stack">
+          <Standings me={me!} />
+          <Ticket next={next} me={me} signedIn={signedIn} meErr={meErr} retry={retry} h={h} skew={skew} zoom={setZoom} />
+          <Knockout t={t} skew={skew} />
+        </div>
+      ) : (
+        <div className="ef-today">
+          <Ticket next={next} me={me} signedIn={signedIn} meErr={meErr} retry={retry} h={h} skew={skew} zoom={setZoom} />
+          <Knockout t={t} skew={skew} />
+        </div>
+      )}
 
       <nav className="ef-tiles" aria-label="eFootball sections">
-        <a href="#/efootball/league"><Table2 size={20} /><b>Leagues</b><small>Start or join one</small></a>
+        <a href="#/efootball/league"><Table2 size={20} /><b>{p?.inLeague ? 'My league' : 'Leagues'}</b><small>{p?.inLeague ? 'Table and fixtures' : 'Browse and join'}</small></a>
+        {!p?.inLeague && <a href="#/efootball/league/new"><Plus size={20} /><b>Create league</b><small>Free, instant</small></a>}
         <a href="#/efootball/tournament"><Trophy size={20} /><b>Knockout</b><small>Weekly, hosts earn</small></a>
         <a href="#/efootball/players"><Users size={20} /><b>Players</b><small>Find a match</small></a>
         <a href="#/efootball/fpl"><Target size={20} /><b>FPL</b><small>EPL and Chuka league</small></a>
@@ -166,6 +220,46 @@ function Home({ me, signedIn, meErr, retry }: { me: Me | null; signedIn: boolean
       <Watch />
       {zoom && <div className="ef-zoom" onClick={() => setZoom('')} role="dialog" aria-label="Squad image"><DriveImage id={zoom} w={1200} alt="Squad" /></div>}
     </div>
+  )
+}
+
+/** The member's own league table on the home page: top of the table, plus their own row when they are further down. */
+function Standings({ me }: { me: Me }) {
+  const L = me.profile!.league!
+  const { data, err } = useApi<League>('league', { id: L.id }, 60000)
+  const rows = data?.table ?? []
+  const mineIdx = rows.findIndex((r) => r.uid === me.uid)
+  const top = rows.slice(0, 5)
+  const extra = mineIdx >= 5 ? rows[mineIdx] : null
+  const line = (r: (typeof rows)[number], i: number) => (
+    <tr key={r.uid} className={r.uid === me.uid ? 'me' : ''}>
+      <td>{i + 1}</td><td><strong>{r.username}</strong>{r.uid === me.uid ? ' (you)' : ''}</td><td>{r.p}</td><td>{r.gd}</td><td><strong>{r.pts}</strong></td>
+    </tr>
+  )
+  return (
+    <section className="cpl-card ef-stand" aria-label="Your league standings">
+      <div className="ef-stand-head">
+        <h3><Table2 size={15} /> {L.name}</h3>
+        <span className="ef-pill">{L.members} {L.members === 1 ? 'member' : 'members'}</span>
+      </div>
+      {err ? <p className="cpl-err" role="alert">{err}</p> : !data ? <p className="cpl-sub" style={{ margin: 0 }}>Loading standings…</p> : !rows.length ? (
+        <p className="cpl-sub" style={{ margin: 0 }}>No one is in the table yet. Invite friends from your league page.</p>
+      ) : (
+        <div className="ef-scroll">
+          <table className="ef-table ef-stand-table">
+            <thead><tr><th>#</th><th>Player</th><th>P</th><th>GD</th><th>Pts</th></tr></thead>
+            <tbody>
+              {top.map(line)}
+              {extra && <><tr className="gap"><td colSpan={5}>…</td></tr>{line(extra, mineIdx)}</>}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="ef-actions" style={{ marginTop: 12 }}>
+        <a className="cpl-link" href="#/efootball/league">Full table</a>
+        <a className="cpl-link" href="#/efootball/league/mine">My fixtures</a>
+      </div>
+    </section>
   )
 }
 
