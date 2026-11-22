@@ -23,7 +23,11 @@ type PostView = {
 async function get<T>(method: string, params: Record<string, string | number>): Promise<T> {
   const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
   const r = await fetch(`${PUB}/${method}?${qs}`)
-  if (!r.ok) throw new Error(`Bluesky said ${r.status}`)
+  if (!r.ok) {
+    let why = ''
+    try { const j = (await r.json()) as { message?: string; error?: string }; why = j.message || j.error || '' } catch { /* no details */ }
+    throw new Error(why ? `Bluesky says: ${why} (${method.split('.').pop()})` : `Bluesky said ${r.status} (${method.split('.').pop()})`)
+  }
   return (await r.json()) as T
 }
 
