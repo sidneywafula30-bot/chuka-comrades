@@ -9,6 +9,7 @@ import { AdminOrders, AdminProducts, AdminSettings, Library, Shop } from './Skil
 import { AccessPanel, AdminLive, ChannelShelf, LiveRoom } from './SkillsAccess'
 import { AdminInbox, ChatRoom, StudentChat } from '../components/CitChat'
 import CitMenu from '../components/CitMenu'
+import CitAdminFab from '../components/CitAdminFab'
 import { BlueskyStrip, BskyDm, bskyHandle } from '../components/Bluesky'
 import { AdminBsky, CommunityTabs, Feed } from './SkillsFeed'
 import VideoModal, { type PlayVideo } from '../components/VideoPlayer'
@@ -632,6 +633,7 @@ export default function Skills({ user, onSignIn, onBack }: Props) {
       {view.name === 'shop' && <Shop user={user} onSignIn={onSignIn} config={config} />}
       {view.name === 'teach' && <Teach user={user} onSignIn={onSignIn} config={config} isAdmin={isAdmin} tick={tick} onOpen={open} onCreate={() => setClassOpen('new')} onEdit={setClassOpen} />}
       {view.name === 'admin' && isAdmin && <Admin tick={tick} config={config} onNew={() => setClassOpen('new')} onEdit={setClassOpen} onOpen={open} onConfigChanged={loadConfig} />}
+      {!(view.name === 'chat' && isAdmin) && <CitAdminFab phone={config.whatsapp || ADMIN_WA} />}
       {recOpen && <RecModal config={config} prefill={recOpen === 'new' ? undefined : recOpen} onClose={() => setRecOpen(null)} onDone={bump} />}
       {classOpen && <ClassModal cls={classOpen === 'new' ? undefined : classOpen} config={config} admin={isAdmin} onClose={() => setClassOpen(null)} onDone={bump} />}
     </HubShell>

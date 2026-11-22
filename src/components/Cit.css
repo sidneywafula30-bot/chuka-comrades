@@ -245,3 +245,18 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .cit-hidden li { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 1px solid #d6e4db; border-radius: 12px; padding: 8px 12px; }
 .cit-hidden code { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .cit-livedot.live svg { animation: none; } }
+
+/* Floating admin button on every CIT page (same look as the Hostel / O-Zone ones; Bluesky logo as the badge) */
+.cit-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; background: #25d366; color: #063d1d; font: 800 14px 'Manrope', sans-serif; text-decoration: none; box-shadow: 0 8px 24px #0f5a2e55; animation: cit-fab-float 3s ease-in-out infinite; transition: box-shadow .2s; }
+.cit-fab:hover { box-shadow: 0 12px 30px #0f5a2e66; animation-play-state: paused; }
+.cit-fab:active { transform: scale(.97); }
+.cit-fab-ph { width: 42px; height: 42px; border-radius: 50%; object-fit: contain; border: 2px solid #fff; background: #fff; padding: 2px; flex-shrink: 0; }
+.cit-fab-bs { background: #fff; border-radius: 50%; padding: 4px 3px; box-sizing: content-box; flex-shrink: 0; vertical-align: middle; }
+@keyframes cit-fab-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@media (max-width: 520px) {
+  .cit-fab { padding: 4px; }
+  .cit-fab span { display: none; }
+  .cit-fab-ph { width: 52px; height: 52px; }
+  .cit-fab-bs { position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; padding: 2px; box-shadow: 0 1px 4px #0004; }
+}
+@media (prefers-reduced-motion: reduce) { .cit-fab { animation: none; } }
