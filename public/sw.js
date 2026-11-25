@@ -1,11 +1,10 @@
-/* Chuka Comrades service worker: offline app shell.
+﻿/* Chuka Comrades service worker: offline app shell.
    Only same-origin files are cached. API calls (Supabase, Firebase, etc.) always go to the network. */
-const VERSION = 'v4'
+const VERSION = 'v5'
 const CACHE = `comrades-${VERSION}`
 const SCOPE = self.registration.scope
 
-// Background "scan a paper" jobs: keep working after the page or browser is closed.
-try { importScripts(SCOPE + 'scan-runner.js') } catch (err) { /* the scan job just runs in the page instead */ }
+
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
