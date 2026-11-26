@@ -4,10 +4,16 @@ import { auth } from './firebase'
 const API = import.meta.env.VITE_HOSTEL_API_URL as string | undefined
 export const hostelReady = Boolean(API)
 
-export const STUDENT_GROUP_URL =
-  (import.meta.env.VITE_HOSTEL_STUDENT_GROUP as string) || 'https://chat.whatsapp.com/BhLqKOxHjigHF3oH6fyuFM'
-export const LANDLORD_GROUP_URL =
-  (import.meta.env.VITE_HOSTEL_LANDLORD_GROUP as string) || 'https://chat.whatsapp.com/FDizebVp5qP0yr91lnNduG'
+export const STUDENT_CHANNEL_LINK =
+  (import.meta.env.VITE_STUDENT_CHANNEL_LINK as string) || 'https://whatsapp.com/channel/0029VbEIkedDJ6GzNSGLUO42'
+export const STUDENT_GROUP_LINK =
+  (import.meta.env.VITE_STUDENT_GROUP_LINK as string) || 'https://chat.whatsapp.com/IVmQ1HAwcVu8FNHPvmQut5'
+export const LANDLORD_GROUP_LINK =
+  (import.meta.env.VITE_LANDLORD_GROUP_LINK as string) || 'https://chat.whatsapp.com/E3mPjVQM5SJ3ofzgSxeQ99'
+
+// Backwards-compatible names used by existing hostel pages.
+export const STUDENT_GROUP_URL = STUDENT_GROUP_LINK
+export const LANDLORD_GROUP_URL = LANDLORD_GROUP_LINK
 /** The Chuka Hostel WhatsApp bot number (same account the agent is logged into). */
 export const BOT_WHATSAPP = (import.meta.env.VITE_HOSTEL_BOT_WHATSAPP as string) || '254184198432'
 

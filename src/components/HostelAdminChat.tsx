@@ -6,7 +6,7 @@ import { WhatsAppLogo } from './BrandLogos'
  * in place of a photo, plus the admin WhatsApp number. Mirrors the O-Zone admin chat button.
  */
 export const HOSTEL_ADMIN_LABEL = 'Hostel admin'
-export const hostelAdminUrl = (text = 'Hello Chuka Comrades admin, ') => waLink(ADMIN_WHATSAPP, text)
+export const hostelAdminUrl = (text = 'MENU') => waLink(ADMIN_WHATSAPP, text)
 
 export function HostelAdminLogo({ className = 'hs-fab-ph' }: { className?: string }) {
   return <img className={className} src={`${import.meta.env.BASE_URL}hostel-logo.png`} alt="" />

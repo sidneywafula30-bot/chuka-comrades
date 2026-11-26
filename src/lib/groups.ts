@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { LANDLORD_GROUP_URL, STUDENT_GROUP_URL } from './hostel'
+import { LANDLORD_GROUP_LINK, STUDENT_GROUP_LINK } from './hostel'
 
 export type WaGroup = { id: string; name: string; description: string; link: string; sort: number; active: boolean }
 
@@ -7,8 +7,8 @@ export const WA_LINK_RE = /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9_-]{10,}(\?
 
 /** Shown until the database answers, and if Supabase is not set up yet. */
 export const FALLBACK_GROUPS: WaGroup[] = [
-  { id: 'f1', name: 'Hostels: students', description: 'Find hostels, rooms and roommates.', link: STUDENT_GROUP_URL, sort: 10, active: true },
-  { id: 'f2', name: 'Hostels: landlords', description: 'For landlords and hostel managers.', link: LANDLORD_GROUP_URL, sort: 20, active: true },
+  { id: 'f1', name: 'Hostels: students', description: 'Find hostels, rooms and roommates.', link: STUDENT_GROUP_LINK, sort: 10, active: true },
+  { id: 'f2', name: 'Hostels: landlords', description: 'For landlords and hostel managers.', link: LANDLORD_GROUP_LINK, sort: 20, active: true },
 ]
 
 const CACHE = 'wa_groups_v1'

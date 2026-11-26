@@ -32,7 +32,7 @@ const FACTS = [
 
 const ADMIN_WHATSAPP =
   (import.meta.env.VITE_ADMIN_WHATSAPP as string) || '254184198432'
-const WHATSAPP_URL = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent('Hello Chuka Comrades admin,')}`
+const WHATSAPP_URL = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent('MENU')}`
 
 /** Services that are open now -> where their card goes. */
 /** Official Chuka University student portal (login) and e-learning (Moodle) links. */

@@ -8,7 +8,7 @@ import {
 import { markSignedOut } from '../lib/session'
 import { auth, googleProvider } from '../lib/firebase'
 import {
-  ADMIN_WHATSAPP, DEFAULT_SETTINGS, STUDENT_GROUP_URL, cleanProvided, hostelApi, hostelReady, isFull, isStale, kes, niceDateTime,
+  ADMIN_WHATSAPP, DEFAULT_SETTINGS, STUDENT_CHANNEL_LINK, STUDENT_GROUP_LINK, LANDLORD_GROUP_LINK, cleanProvided, hostelApi, hostelReady, isFull, isStale, kes, niceDateTime,
   providedLabel, roomTotals, showPhone, timeAgo, waLink, type Hostel as HostelT, type HostelImage, type Settings,
 } from '../lib/hostel'
 import { GoogleMapsLogo, WhatsAppLogo } from '../components/BrandLogos'
@@ -150,9 +150,19 @@ export default function Hostel({ user }: { user: User | null }) {
         </section>
 
         <div className="hs-groups">
-          <a href={STUDENT_GROUP_URL} target="_blank" rel="noopener noreferrer">
+          <a href={STUDENT_CHANNEL_LINK} target="_blank" rel="noopener noreferrer">
+            <HostelAdminLogo className="hs-group-ph" />
+            <span><strong>Join the student channel</strong><small>Get official Chuka Comrades announcements and updates.</small></span>
+            <ExternalLink size={16} />
+          </a>
+          <a href={STUDENT_GROUP_LINK} target="_blank" rel="noopener noreferrer">
             <HostelAdminLogo className="hs-group-ph" />
             <span><strong>Students: Hostels &amp; Reviews</strong><small>Ask questions and share hostel experiences.</small></span>
+            <ExternalLink size={16} />
+          </a>
+          <a href={LANDLORD_GROUP_LINK} target="_blank" rel="noopener noreferrer">
+            <HostelAdminLogo className="hs-group-ph" />
+            <span><strong>Landlords: Hostel Network</strong><small>Connect with students and other hostel providers.</small></span>
             <ExternalLink size={16} />
           </a>
         </div>
@@ -318,7 +328,7 @@ function HostelCard({ h, onOpen }: { h: HostelT; onOpen: (images: HostelImage[],
               <a className="outline" href={`tel:+${h.landlordContact}`}><Phone size={15} /> Call</a>
             </>
           )}
-          <a className={h.showContact ? 'outline' : ''} href={waLink(ADMIN_WHATSAPP, `Hello Chuka Comrades admin, I'm interested in ${h.name} (${h.area}). Is a room still available?`)} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Ask admin</a>
+          <a className={h.showContact ? 'outline' : ''} href={waLink(ADMIN_WHATSAPP, 'MENU')} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Ask admin</a>
         </div>
       </div>
     </article>
@@ -349,7 +359,6 @@ function PhotoViewer({ box, onChange }: { box: NonNullable<Lightbox>; onChange: 
 }
 
 function LandlordsTab() {
-  const msg = "Hello Chuka Comrades admin, I'm a landlord and I'd like to list my hostel."
   return (
     <section className="hs-panel">
       <span className="hs-kicker dark">FOR LANDLORDS</span>
@@ -362,7 +371,7 @@ function LandlordsTab() {
         <li><strong>When a room is taken or becomes free, just text the admin.</strong> The listing is updated so students always see current availability.</li>
       </ol>
       <div className="hs-actions left">
-        <a href={waLink(ADMIN_WHATSAPP, msg)} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Message the admin</a>
+        <a href={waLink(ADMIN_WHATSAPP, 'MENU')} target="_blank" rel="noopener noreferrer"><WhatsAppLogo size={16} /> Message the admin</a>
       </div>
     </section>
   )

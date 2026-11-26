@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth'
 import { ChevronRight, EyeOff, Eye, Plus, Settings2, Trash2 } from 'lucide-react'
 import { WhatsAppLogo } from './BrandLogos'
 import { FALLBACK_GROUPS, cachedGroups, groupsApi, type WaGroup } from '../lib/groups'
+import { STUDENT_CHANNEL_LINK, STUDENT_GROUP_LINK, LANDLORD_GROUP_LINK } from '../lib/hostel'
 import { supabaseReady } from '../lib/supabase'
 
 /** Landing-page section: public WhatsApp group links. The admin gets a "Manage groups" panel (add, hide, delete). */
@@ -39,20 +40,33 @@ export default function WhatsAppGroups({ user }: { user: User | null }) {
     await act(async () => { await groupsApi.add({ name, description: desc, link }); setName(''); setDesc(''); setLink('') }, 'Group added. It is now on the landing page.')
   }
 
-  if (groups.length === 0 && !isAdmin) return null
   return (
     <section className="lp-section" id="community">
       <span className="lp-kicker">COMMUNITY</span>
-      <h2>Join our WhatsApp groups</h2>
+      <h2>Join our WhatsApp community</h2>
       <div className="wg-grid">
-        {groups.map((g) => (
+        <a className="wg-card" href={STUDENT_CHANNEL_LINK} target="_blank" rel="noopener noreferrer">
+          <WhatsAppLogo size={38} />
+          <span><strong>Chuka Comrades student channel</strong><small>Follow official announcements and student updates.</small></span>
+          <span className="wg-join">Join channel <ChevronRight size={16} /></span>
+        </a>
+        <a className="wg-card" href={STUDENT_GROUP_LINK} target="_blank" rel="noopener noreferrer">
+          <WhatsAppLogo size={38} />
+          <span><strong>Hostels: students</strong><small>Find hostels, rooms and roommates.</small></span>
+          <span className="wg-join">Join <ChevronRight size={16} /></span>
+        </a>
+        <a className="wg-card" href={LANDLORD_GROUP_LINK} target="_blank" rel="noopener noreferrer">
+          <WhatsAppLogo size={38} />
+          <span><strong>Hostels: landlords</strong><small>For landlords and hostel managers.</small></span>
+          <span className="wg-join">Join <ChevronRight size={16} /></span>
+        </a>
+        {groups.filter((g) => ![STUDENT_GROUP_LINK, LANDLORD_GROUP_LINK].includes(g.link) && !/^hostels:\s*(students|landlords)$/i.test(g.name.trim())).map((g) => (
           <a className="wg-card" key={g.id} href={g.link} target="_blank" rel="noopener noreferrer">
             <WhatsAppLogo size={38} />
             <span><strong>{g.name}</strong>{g.description && <small>{g.description}</small>}</span>
             <span className="wg-join">Join <ChevronRight size={16} /></span>
           </a>
         ))}
-        {groups.length === 0 && <p className="lp-hint">No groups yet. Use Manage groups to add the first one.</p>}
       </div>
       {isAdmin && (
         <div className="wg-admin">
