@@ -17,6 +17,7 @@ import GoogleSignInButton from '../components/GoogleSignInButton'
 import PayCard from '../components/PayCard'
 import HostelAdminFab, { HostelAdminLogo } from '../components/HostelAdminChat'
 import SemesterCalendar from '../components/SemesterCalendar'
+import StudentVerify from '../components/StudentVerify'
 import HostelAdmin from './HostelAdmin'
 import Roommates from './Roommates'
 import RoommateAdmin from './RoommateAdmin'
@@ -172,6 +173,7 @@ export default function Hostel({ user }: { user: User | null }) {
           <>
             {!locked && accessUntil && <p className="hs-access-ok"><BadgeCheck size={15} /> Full access active until {niceDateTime(accessUntil)}.</p>}
             {isAdmin && locked === false && <p className="hs-access-ok"><BadgeCheck size={15} /> Admin view: you see every published hostel.</p>}
+            {!isAdmin && <StudentVerify user={user} onSignIn={handleSignIn} authBusy={authBusy} />}
             {!locked && <div className="hs-filters">
               <label className="hs-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search hostel, area, landmark or room type…" aria-label="Search hostels" /></label>
               <select value={area} onChange={(e) => setArea(e.target.value)} aria-label="Filter by area"><option value="">All areas</option>{areas.map((a) => <option key={a}>{a}</option>)}</select>

@@ -11,6 +11,9 @@ export const LANDLORD_GROUP_URL =
 /** Hostel admin WhatsApp. Fixed here (like the O-Zone admin) so every hostel button uses the same number. */
 export const ADMIN_WHATSAPP = '254792545125'
 
+/** The Chuka Hostel WhatsApp bot number (same account the agent is logged into). */
+export const BOT_WHATSAPP = (import.meta.env.VITE_HOSTEL_BOT_WHATSAPP as string) || '254184198432'
+
 export const MAX_PHOTOS = 3
 
 export type Period = 'month' | 'semester'
@@ -42,6 +45,17 @@ export type HostelList = {
   hostels: Hostel[]; locked: boolean; lockedCount: number; signedIn: boolean; accessUntil: string; settings: Settings
 }
 export type AccessRow = { email: string; activatedAt: string; expiresAt: string; mpesaCode: string; activatedBy: string; active: boolean }
+
+/** One student account shared by the website and the WhatsApp bot (matched by Google email / WhatsApp number). */
+export type StudentMe = {
+  registered: boolean
+  status: 'pending' | 'approved' | 'rejected' | ''
+  fullName: string
+  phone: string // 2547XXXXXXXX, the WhatsApp number linked to this account
+  source: 'website' | 'whatsapp' | ''
+  subscriptionActive: boolean
+  accessUntil: string
+}
 
 /** What the admin sends when adding or editing a hostel. */
 export type HostelInput = Omit<Hostel, 'id' | 'images' | 'roomsUpdatedAt' | 'createdAt' | 'updatedAt'>
@@ -104,6 +118,9 @@ export const hostelApi = {
   accessGrant: (email: string, mpesaCode: string, expiresOn?: string) => call<AccessRow[]>('access_grant', { email, mpesaCode, expiresOn }),
   accessRevoke: (email: string) => call<AccessRow[]>('access_revoke', { email }),
   saveSettings: (settings: Settings) => call<Settings>('settings_save', { settings }),
+  studentMe: () => call<StudentMe>('student_web_me'),
+  studentRegister: (fullName: string, phone: string, studentCard: UploadImage) =>
+    call<StudentMe>('student_web_register', { fullName, phone, studentCard }),
 }
 
 /* ---------- helpers ---------- */

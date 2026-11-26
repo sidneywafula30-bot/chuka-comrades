@@ -1,0 +1,22 @@
+/* Student registration card (website side of the shared student account). */
+.sv { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.sv * { box-sizing: border-box; }
+.sv-plain, .sv-pending { display: flex; gap: 14px; align-items: flex-start; }
+.sv-pending { background: #fffaf0; border-color: #efd99a; }
+.sv-head { display: flex; gap: 14px; align-items: flex-start; }
+.sv-icon { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--green-soft); color: var(--green); }
+.sv-body { display: grid; gap: 8px; min-width: 0; }
+.sv h3 { margin: 0 0 4px; font: 800 17px/1.2 'Manrope', sans-serif; color: var(--ink); }
+.sv p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+.sv-muted { color: var(--muted); font-size: 13px; }
+.sv-form { display: grid; gap: 12px; max-width: 520px; }
+.sv-form label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 700; color: #3c5044; }
+.sv-form label small { font-weight: 500; color: var(--muted); }
+.sv-form input { width: 100%; border: 1px solid #ccd8d3; border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--ink); font: inherit; }
+.sv-card { display: grid; gap: 10px; justify-items: start; }
+.sv-card img { max-width: 260px; width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+.sv-upload { display: inline-flex !important; align-items: center; gap: 7px; padding: 10px 14px; border: 1.5px dashed var(--green); border-radius: 10px; color: var(--green); font-weight: 700; cursor: pointer; }
+.sv-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sv-wa { display: inline-flex; align-items: center; gap: 7px; padding: 10px 14px; border-radius: 11px; background: #25d366; color: #05381c; font: 800 13px 'DM Sans', sans-serif; text-decoration: none; }
+.sv-ok { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 9px 12px; border-radius: 10px; background: #edf8f1; color: #185d43; font-size: 13px; font-weight: 600; }
+.sv-ok a { color: #185d43; text-decoration: underline; }
