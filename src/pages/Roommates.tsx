@@ -291,7 +291,7 @@ function MyPost({ user, mine, onChange, pass, settings, onSignIn, authBusy, onRe
   )
   // Posting needs a paid semester pass. The database enforces this too, so this is only the friendly front door.
   if (!mine && !pass) {
-    return payCard('Post a roommate request', `Posting costs a one-off fee for the whole semester. Browsing other students' posts and sending interest stays free.`)
+    return payCard('Post a roommate request', `Posting is included with a Chuka Hostel subscription, which also unlocks every hostel. Browsing other students' posts and sending interest stays free.`)
   }
   const expired = Boolean(mine && !pass && mine.post.passExpiresAt && Date.parse(mine.post.passExpiresAt) < Date.now())
   if (!mine || editing) {
@@ -315,7 +315,7 @@ function MyPost({ user, mine, onChange, pass, settings, onSignIn, authBusy, onRe
   }
   return (
     <section className="hs-panel">
-      {expired && payCard('Your semester pass has ended', `Your post is hidden from other students until you renew. Renew for the new semester and it shows again straight away.`)}
+      {expired && payCard('Your subscription has ended', `Your post is hidden from other students until you renew. Renew your subscription and it shows again straight away.`)}
       {pass && <p className="hs-access-ok"><Check size={15} /> Posting pass active until {niceDateTime(pass)}.</p>}
       <div className={`rm-status ${post.status}`}>
         {post.status === 'pending' && <><Clock size={18} /><span><strong>Waiting for admin approval.</strong> Nobody can see your post until it is approved.</span></>}

@@ -33,12 +33,18 @@ export type Hostel = {
   freePreview: boolean
 }
 
-/** Semester dates and prices, kept in the Apps Script (Admin desk > Semester). Dates are yyyy-mm-dd. */
+/** A subscription plan. One subscription unlocks every hostel AND roommate posting. Prices live in the SubscriptionPlans sheet. */
+export type Plan = { id: string; label: string; durationDays: number; priceKes: number; enabled: boolean }
+
+/** Semester dates (for the calendar) and payment note, kept in the Apps Script. Dates are yyyy-mm-dd.
+ *  `plans` is read-only here: the admin changes prices in the WhatsApp admin menu (ADMIN > 5). */
 export type Settings = {
   semesterName: string; semesterStart: string; semesterEnd: string
-  hostelPrice: number; roommatePrice: number; payNote: string
+  payNote: string
+  plans: Plan[]
 }
-export const DEFAULT_SETTINGS: Settings = { semesterName: '', semesterStart: '', semesterEnd: '', hostelPrice: 150, roommatePrice: 100, payNote: '' }
+export type SettingsInput = Omit<Settings, 'plans'>
+export const DEFAULT_SETTINGS: Settings = { semesterName: '', semesterStart: '', semesterEnd: '', payNote: '', plans: [] }
 
 /** What the server returns to a student: either everything (paid / admin) or one free preview hostel. */
 export type HostelList = {
@@ -115,9 +121,9 @@ export const hostelApi = {
   updateRooms: (id: string, rooms: { type: string; available: number }[]) => call<Hostel>('update_rooms', { id, rooms }),
   remove: (id: string) => call<{ deleted: boolean }>('delete', { id }),
   accessList: () => call<AccessRow[]>('access_list'),
-  accessGrant: (email: string, mpesaCode: string, expiresOn?: string) => call<AccessRow[]>('access_grant', { email, mpesaCode, expiresOn }),
+  accessGrant: (email: string, mpesaCode: string, expiresOn: string) => call<AccessRow[]>('access_grant', { email, mpesaCode, expiresOn }),
   accessRevoke: (email: string) => call<AccessRow[]>('access_revoke', { email }),
-  saveSettings: (settings: Settings) => call<Settings>('settings_save', { settings }),
+  saveSettings: (settings: SettingsInput) => call<Settings>('settings_save', { settings }),
   studentMe: () => call<StudentMe>('student_web_me'),
   studentRegister: (fullName: string, phone: string, studentCard: UploadImage) =>
     call<StudentMe>('student_web_register', { fullName, phone, studentCard }),
@@ -208,8 +214,8 @@ export function googleCalendarLink(title: string, from: string, to = from): stri
   return `https://calendar.google.com/calendar/render?${q.toString()}`
 }
 
-/** WhatsApp message a student sends the admin after paying. Includes the email so the admin can activate it. */
-export function paymentLink(kind: 'hostels' | 'roommate', email: string, price: number): string {
-  const what = kind === 'hostels' ? 'unlock all hostels' : 'post a roommate request'
-  return waLink(ADMIN_WHATSAPP, `Hello Chuka Comrades admin, I have paid KSh ${price} to ${what} this semester.\nMy Google email: ${email}\nM-Pesa code: `)
-}
+/** All payments happen on WhatsApp with the Chuka Hostel bot: the chat opens with SUBSCRIBE already typed. */
+export const subscribeLink = () => waLink(BOT_WHATSAPP, 'SUBSCRIBE')
+
+/** Plans that are on sale, cheapest first. */
+export const livePlans = (s: Settings): Plan[] => (s.plans ?? []).filter((p) => p.enabled && p.priceKes > 0).sort((a, b) => a.priceKes - b.priceKes)

@@ -199,7 +199,7 @@ export default function Hostel({ user }: { user: User | null }) {
                 kind="hostels" user={user} settings={settings} onSignIn={handleSignIn} authBusy={authBusy}
                 onRefresh={() => void refresh()} refreshing={loading}
                 headline={lockedCount > 0 ? `${lockedCount} more hostel${lockedCount === 1 ? '' : 's'} to browse` : 'Unlock every hostel'}
-                detail="You are viewing one free preview hostel. Pay once to see every hostel, with live room counts, prices and landlord contacts, for the whole semester."
+                detail="You are viewing one free preview hostel. Subscribe to see every hostel, with live room counts and prices. The same subscription also lets you post a roommate request."
               />
             )}
 

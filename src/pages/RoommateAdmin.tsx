@@ -7,7 +7,7 @@ import { WhatsAppLogo } from '../components/BrandLogos'
 
 type Filter = 'pending' | 'approved' | 'rejected' | 'reported' | 'passes'
 
-export default function RoommateAdmin({ settings }: { settings: Settings }) {
+export default function RoommateAdmin(_props: { settings?: Settings }) {
   const [posts, setPosts] = useState<RoommatePost[]>([])
   const [phones, setPhones] = useState<Record<string, string>>({})
   const [reports, setReports] = useState<Report[]>([])
@@ -60,7 +60,7 @@ export default function RoommateAdmin({ settings }: { settings: Settings }) {
         ))}
         <button className={filter === 'passes' ? 'on' : ''} onClick={() => setFilter('passes')}>Paid passes</button>
       </div>
-      {filter === 'passes' && <PassesDesk settings={settings} />}
+      {filter === 'passes' && <PassesDesk />}
       {notice && <p className="hs-ok">{notice}</p>}
       {error && <p className="hs-error" role="alert">{error}</p>}
       {filter !== 'passes' && !loading && shown.length === 0 && <p className="hs-empty">Nothing here.</p>}
@@ -102,9 +102,9 @@ export default function RoommateAdmin({ settings }: { settings: Settings }) {
   )
 }
 
-/* ---------- paid posting passes (KSh per semester) ---------- */
+/* ---------- posting passes (created by subscriptions, or by hand) ---------- */
 
-function PassesDesk({ settings }: { settings: Settings }) {
+function PassesDesk() {
   const [rows, setRows] = useState<PassRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -124,8 +124,8 @@ function PassesDesk({ settings }: { settings: Settings }) {
     e.preventDefault()
     setBusy(true); setError(''); setNotice('')
     try {
-      const end = expiresOn || settings.semesterEnd
-      if (!end) throw new Error('Set the semester end date first (Admin desk > Semester & prices), or pick an expiry date.')
+      const end = expiresOn
+      if (!end) throw new Error('Pick an expiry date.')
       await roommateApi.passGrant(email.trim(), code.trim(), new Date(`${end}T23:59:59+03:00`).toISOString())
       setNotice(`${email.trim().toLowerCase()} can post until ${niceDate(end)}.`)
       setEmail(''); setCode(''); setExpiresOn('')
@@ -141,14 +141,14 @@ function PassesDesk({ settings }: { settings: Settings }) {
 
   return (
     <div>
-      <p className="hs-note">Roommate posting costs KSh {settings.roommatePrice} per semester. After a student pays and WhatsApps you their email and M-Pesa code, activate them here.</p>
+      <p className="hs-note">Posting is part of the Chuka Hostel subscription: when an admin approves a payment in WhatsApp, the pass is created here automatically. Use this form only to give or fix a pass by hand.</p>
       <form className="hs-form hs-grant" onSubmit={grant}>
         <div className="hs-fgrid">
           <label>Student&apos;s Google email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="student@gmail.com" /></label>
           <label>M-Pesa code<input value={code} onChange={(e) => setCode(e.target.value)} maxLength={30} /></label>
-          <label>Expires on <small>(empty = semester end)</small><input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></label>
+          <label>Expires on<input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} required /></label>
         </div>
-        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim()}>{busy ? <Loader2 size={15} className="hs-spin" /> : <Check size={15} />} Activate posting</button>
+        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim() || !expiresOn}>{busy ? <Loader2 size={15} className="hs-spin" /> : <Check size={15} />} Activate posting</button>
       </form>
       {notice && <p className="hs-ok">{notice}</p>}
       {error && <p className="hs-error" role="alert">{error}</p>}

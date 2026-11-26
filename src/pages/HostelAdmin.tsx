@@ -19,7 +19,7 @@ export default function HostelAdmin({ onChanged, settings, onSettings }: Props) 
         <button className={desk === 'semester' ? 'on' : ''} onClick={() => setDesk('semester')}>Semester &amp; prices</button>
       </div>
       {desk === 'hostels' && <HostelsDesk onChanged={onChanged} />}
-      {desk === 'students' && <StudentsDesk settings={settings} />}
+      {desk === 'students' && <StudentsDesk />}
       {desk === 'semester' && <SemesterDesk settings={settings} onSettings={(s) => { onSettings(s); onChanged() }} />}
     </>
   )
@@ -361,7 +361,7 @@ function HostelForm({ initial, onClose, onSaved }: { initial: Hostel | null; onC
 
 /* ---------- paid students (hostel access) ---------- */
 
-function StudentsDesk({ settings }: { settings: Settings }) {
+function StudentsDesk() {
   const [rows, setRows] = useState<AccessRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -382,8 +382,8 @@ function StudentsDesk({ settings }: { settings: Settings }) {
     e.preventDefault()
     setBusy(true); setError(''); setNotice('')
     try {
-      setRows(await hostelApi.accessGrant(email.trim(), code.trim(), expiresOn || undefined))
-      setNotice(`${email.trim().toLowerCase()} can now see every hostel${expiresOn ? ` until ${niceDate(expiresOn)}` : settings.semesterEnd ? ` until ${niceDate(settings.semesterEnd)}` : ''}.`)
+      setRows(await hostelApi.accessGrant(email.trim(), code.trim(), expiresOn))
+      setNotice(`${email.trim().toLowerCase()} can now see every hostel until ${niceDate(expiresOn)}.`)
       setEmail(''); setCode(''); setExpiresOn('')
     } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }
@@ -402,17 +402,17 @@ function StudentsDesk({ settings }: { settings: Settings }) {
       <div className="hs-admin-head">
         <div>
           <span className="hs-kicker dark">PAID STUDENTS</span>
-          <h2>Hostel access (KSh {settings.hostelPrice})</h2>
-          <p>After a student pays and WhatsApps you their email and M-Pesa code, activate them here. Access ends on the semester end date automatically{settings.semesterEnd ? ` (${niceDate(settings.semesterEnd)})` : ' once you set it under Semester & prices'}.</p>
+          <h2>Hostel access (manual override)</h2>
+          <p>Normal payments are confirmed in WhatsApp: the bot forwards each M-Pesa message to the admins, who reply APPROVE or REJECT. Use this form only to give or fix access by hand, with an explicit expiry date.</p>
         </div>
       </div>
       <form className="hs-form hs-grant" onSubmit={grant}>
         <div className="hs-fgrid">
           <label>Student&apos;s Google email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="student@gmail.com" /></label>
           <label>M-Pesa code<input value={code} onChange={(e) => setCode(e.target.value)} maxLength={30} placeholder="e.g. SJK3L9XYZ1" /></label>
-          <label>Expires on <small>(leave empty = semester end)</small><input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></label>
+          <label>Expires on<input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} required /></label>
         </div>
-        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim()}>{busy ? <Loader2 size={15} className="hs-spin" /> : <CheckCircle2 size={15} />} Activate access</button>
+        <button className="hs-btn hs-btn-green" disabled={busy || !email.trim() || !expiresOn}>{busy ? <Loader2 size={15} className="hs-spin" /> : <CheckCircle2 size={15} />} Activate access</button>
       </form>
       {notice && <p className="hs-ok" role="status"><CheckCircle2 size={16} /> {notice}</p>}
       {error && <p className="hs-error" role="alert">{error}</p>}
@@ -447,8 +447,6 @@ function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings
   const [name, setName] = useState(settings.semesterName)
   const [start, setStart] = useState(settings.semesterStart)
   const [end, setEnd] = useState(settings.semesterEnd)
-  const [hostelPrice, setHostelPrice] = useState(String(settings.hostelPrice))
-  const [roommatePrice, setRoommatePrice] = useState(String(settings.roommatePrice))
   const [payNote, setPayNote] = useState(settings.payNote)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -458,8 +456,8 @@ function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings
     e.preventDefault()
     setBusy(true); setError(''); setNotice('')
     try {
-      const next = await hostelApi.saveSettings({ semesterName: name, semesterStart: start, semesterEnd: end, hostelPrice: Number(hostelPrice), roommatePrice: Number(roommatePrice), payNote })
-      onSettings(next); setNotice('Saved. Students see the new dates and prices straight away.')
+      const next = await hostelApi.saveSettings({ semesterName: name, semesterStart: start, semesterEnd: end, payNote })
+      onSettings(next); setNotice('Saved. Students see the new dates and payment note straight away.')
     } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }
 
@@ -467,9 +465,9 @@ function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings
     <form className="hs-panel hs-form" onSubmit={save}>
       <div className="hs-admin-head">
         <div>
-          <span className="hs-kicker dark">SEMESTER &amp; PRICES</span>
+          <span className="hs-kicker dark">SEMESTER &amp; PAYMENT NOTE</span>
           <h2>Semester calendar</h2>
-          <p>These dates appear in the calendar at the top of the hostel page, and decide when paid access ends.</p>
+          <p>These dates appear in the calendar at the top of the hostel page. Subscription length comes from the plan the student buys, not from these dates.</p>
         </div>
       </div>
       <fieldset>
@@ -481,12 +479,10 @@ function SemesterDesk({ settings, onSettings }: { settings: Settings; onSettings
         </div>
       </fieldset>
       <fieldset>
-        <legend>Prices &amp; payment</legend>
+        <legend>Payment instructions</legend>
         <div className="hs-fgrid">
-          <label>Hostel access (KSh)<input type="number" inputMode="numeric" min={0} value={hostelPrice} onChange={(e) => setHostelPrice(e.target.value)} required /></label>
-          <label>Roommate posting (KSh)<input type="number" inputMode="numeric" min={0} value={roommatePrice} onChange={(e) => setRoommatePrice(e.target.value)} required /></label>
-          <label className="wide">Payment instructions shown to students <small>(optional)</small>
-            <textarea value={payNote} onChange={(e) => setPayNote(e.target.value)} rows={2} maxLength={300} placeholder="e.g. Send the money by M-Pesa to 0792 545 125, then WhatsApp the M-Pesa code." />
+          <label className="wide">Shown by the bot after a student picks a plan <small>(prices are set in WhatsApp: ADMIN, then 5)</small>
+            <textarea value={payNote} onChange={(e) => setPayNote(e.target.value)} rows={2} maxLength={300} placeholder="e.g. Send the money by M-Pesa to 0792 545 125, then paste the M-Pesa message here." />
           </label>
         </div>
       </fieldset>
